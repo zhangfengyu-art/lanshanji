@@ -2,27 +2,11 @@
 
 return [
     'mode' => env('SITE_MODE', 'A'),
-    'shadow_order_allowed_merchants' => array_values(array_filter(array_map('trim', explode(',', (string) env('SHADOW_ORDER_ALLOWED_MERCHANTS', 'site-a'))))),
-    'shadow_order_sign_secret' => env('SHADOW_ORDER_SIGN_SECRET', ''),
-    'shadow_order_sign_ttl' => env('SHADOW_ORDER_SIGN_TTL', 300),
-    'shadow_order_sign_future_skew' => env('SHADOW_ORDER_SIGN_FUTURE_SKEW', 300),
-    'shadow_order_nonce_prefix' => env('SHADOW_ORDER_NONCE_PREFIX', 'shadow_order_nonce'),
-    'shadow_order_nonce_ttl' => env('SHADOW_ORDER_NONCE_TTL', 300),
-    'payment_return_sign_secret' => env('PAYMENT_RETURN_SIGN_SECRET', env('SHADOW_ORDER_SIGN_SECRET', '')),
-    'payment_return_sign_ttl' => env('PAYMENT_RETURN_SIGN_TTL', 300),
-    'payment_return_sign_future_skew' => env('PAYMENT_RETURN_SIGN_FUTURE_SKEW', 300),
-    'payment_return_nonce_prefix' => env('PAYMENT_RETURN_NONCE_PREFIX', 'payment_return_ticket'),
-    'payment_return_nonce_ttl' => env('PAYMENT_RETURN_NONCE_TTL', 300),
-    'payment_return_redirect_url' => env('PAYMENT_RETURN_REDIRECT_URL', 'http://127.0.0.1:8000/payment/return'),
-    'shadow_order_merchant_id' => env('SHADOW_ORDER_MERCHANT_ID', 'site-a'),
-    'shadow_order_create_url' => env('SHADOW_ORDER_CREATE_URL', 'http://127.0.0.1:8001/api/v1/create-shadow-order'),
-    'shadow_order_create_timeout' => env('SHADOW_ORDER_CREATE_TIMEOUT', 5),
-    'shadow_order_pay_url_template' => env('SHADOW_ORDER_PAY_URL_TEMPLATE', 'http://127.0.0.1:8001/relay/shadow-orders/{shadow_no}/{channel}'),
-    'shadow_order_pay_url_template_wechat' => env('SHADOW_ORDER_PAY_URL_TEMPLATE_WECHAT', 'http://127.0.0.1:8001/relay/shadow-orders/{shadow_no}/wechat'),
-    'shadow_order_pay_url_template_alipay' => env('SHADOW_ORDER_PAY_URL_TEMPLATE_ALIPAY', 'http://127.0.0.1:8001/relay/shadow-orders/{shadow_no}/alipay'),
-    'shadow_order_paid_webhook' => env('SHADOW_ORDER_PAID_WEBHOOK', ''),
-    'shadow_order_receiver_url' => env('SHADOW_ORDER_RECEIVER_URL', ''),
-    'shadow_order_webhook_timeout' => env('SHADOW_ORDER_WEBHOOK_TIMEOUT', 3),
-    'shadow_order_webhook_queue' => env('SHADOW_ORDER_WEBHOOK_QUEUE', 'default'),
-    'shadow_order_webhook_max_tries' => env('SHADOW_ORDER_WEBHOOK_MAX_TRIES', 8),
+
+    'a_url' => env('SITE_A_URL', 'http://127.0.0.1:8000'),
+
+    'b_url' => env('SITE_B_URL', 'http://127.0.0.1:8001'),
+
+    // 1 人民币 = N 日元（管理员可在后台覆盖）
+    'default_jpy_per_cny' => (float) env('JPY_PER_CNY', 22),
 ];

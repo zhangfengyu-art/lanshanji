@@ -160,7 +160,7 @@ class GenerateBackgroundOrders extends Command
             '演示求购：想收 %s，预算约 JPY %s，优先近期可发货。',
             '演示场景：求购 %s，预算 JPY %s 左右，可接受轻微盒损。',
             '压测样本：需要 %s，预算 JPY %s，要求正品可溯源。',
-            'Demo 单：想带一件 %s，预算 JPY %s，支持直邮。',
+            'Demo 单：想带一件 %s，预算 JPY %s，支持EMS直邮。',
         ];
 
         $template = $templates[array_rand($templates)];

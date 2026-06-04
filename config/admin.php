@@ -5,17 +5,17 @@ return [
     /*
      * 站点标题
      */
-    'name' => 'Laravel Shop',
+    'name' => '岚山集后台',
 
     /*
      * 页面顶部 Logo
      */
-    'logo' => '<b>Laravel</b> Shop',
+    'logo' => '<b>岚山集</b> 后台',
 
     /*
      * 页面顶部小 Logo
      */
-    'logo-mini' => '<b>LS</b>',
+    'logo-mini' => '<b>岚</b>',
 
     /*
      * 路由配置
@@ -37,7 +37,7 @@ return [
     /*
      * Laravel-Admin 页面标题
      */
-    'title' => 'Laravel Shop 管理后台',
+    'title' => '岚山集管理后台',
 
     /*
      * 是否使用 https
@@ -58,7 +58,7 @@ return [
         'providers' => [
             'admin' => [
                 'driver' => 'eloquent',
-                'model'  => Encore\Admin\Auth\Database\Administrator::class,
+                'model'  => App\Models\Admin\Administrator::class,
             ],
         ],
     ],
@@ -86,7 +86,7 @@ return [
 
         // 管理员用户表及模型
         'users_table' => 'admin_users',
-        'users_model' => Encore\Admin\Auth\Database\Administrator::class,
+        'users_model' => App\Models\Admin\Administrator::class,
 
         // 角色表及模型
         'roles_table' => 'admin_roles',

@@ -2,18 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\CastsJsonCompat;
 use Illuminate\Database\Eloquent\Model;
 
 class ProcurementOrder extends Model
 {
+    use CastsJsonCompat;
     const STATUS_PENDING = 0;
     const STATUS_ACCEPTED = 1;
     const STATUS_SOURCING = 2;
     const STATUS_SHIPPED = 3;
-
-    const REVIEW_STATUS_PENDING = 0;
-    const REVIEW_STATUS_APPROVED = 1;
-    const REVIEW_STATUS_REJECTED = 2;
 
     public static $statusMap = [
         self::STATUS_PENDING => '等待接单',
@@ -22,29 +20,19 @@ class ProcurementOrder extends Model
         self::STATUS_SHIPPED => '已发货',
     ];
 
-    public static $reviewStatusMap = [
-        self::REVIEW_STATUS_PENDING => '待审核',
-        self::REVIEW_STATUS_APPROVED => '已通过',
-        self::REVIEW_STATUS_REJECTED => '已拒绝',
-    ];
-
     protected $fillable = [
         'no',
         'order_no',
         'user_id',
-        'accepted_by',
-        'accepted_at',
         'item_name',
         'item_image',
         'buyer_nickname',
         'proxy_status',
+        'accepted_by',
+        'accepted_at',
         'order_narrative',
         'budget_amount',
         'extra',
-        'review_status',
-        'reviewed_by',
-        'reviewed_at',
-        'review_comment',
     ];
 
     protected $casts = [
@@ -73,14 +61,9 @@ class ProcurementOrder extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function reviewer()
+    public function acceptedByUser()
     {
-        return $this->belongsTo(User::class, 'reviewed_by');
-    }
-
-    public function product()
-    {
-        return $this->belongsTo(Product::class, 'id', 'procurement_order_id');
+        return $this->belongsTo(User::class, 'accepted_by');
     }
 
     public static function findAvailableNo()

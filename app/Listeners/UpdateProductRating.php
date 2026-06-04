@@ -15,12 +15,12 @@ class UpdateProductRating implements ShouldQueue
     {
         // 通过 with 方法提前加载数据，避免 N + 1 性能问题
         $items = $event->getOrder()->items()->with(['product'])->get();
-        $paidOrderIds = \App\Models\Order::query()->whereNotNull('paid_at')->pluck('id');
-
         foreach ($items as $item) {
             $result = OrderItem::query()
                 ->where('product_id', $item->product_id)
-                ->whereIn('order_id', $paidOrderIds)
+                ->whereHas('order', function ($query) {
+                    $query->whereNotNull('paid_at');
+                })
                 ->first([
                     DB::raw('count(*) as review_count'),
                     DB::raw('avg(rating) as rating')

@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\SiteSetting;
 use Monolog\Logger;
 use Yansongda\Pay\Pay;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
@@ -20,7 +21,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        Schema::defaultStringLength(191);
+        $this->app['router']->aliasMiddleware('super.admin', \App\Admin\Middleware\SuperAdminOnly::class);
 
         // 设置中文本地化
         config([
@@ -30,7 +31,7 @@ class AppServiceProvider extends ServiceProvider
         ]);
         app()->setLocale('zh-CN');
 
-        // 同步 admin_menu 菜单标题为中文
+        // 同步后台菜单与权限中文命名
         try {
             if (Schema::hasTable('admin_menu')) {
                 $menuTitleMap = [
@@ -39,22 +40,85 @@ class AppServiceProvider extends ServiceProvider
                     'products' => '商品管理',
                     'orders' => '订单调度',
                     'coupon_codes' => '优惠券管理',
-                    'payment_settings' => '支付设置',
+                    'procurement-orders' => '代购需求管理',
+                    'procurement-reference-items' => '参考商品库',
                     'categories' => '分类管理',
                     'site-settings/logo' => '站点设置',
-                    'support-feedbacks' => '客服反馈',
+                    'support-feedbacks' => '客户反馈',
                     'auth/logs' => '操作日志',
-                    'auth/users' => '管理员',
+                    'auth/users' => '管理员账号',
                     'auth/roles' => '角色管理',
                     'auth/permissions' => '权限管理',
                     'auth/menu' => '菜单管理',
+                    'super-console' => '终极管控台',
                 ];
 
                 foreach ($menuTitleMap as $uri => $title) {
-                    \Illuminate\Support\Facades\DB::table('admin_menu')
+                    DB::table('admin_menu')
                         ->where('uri', $uri)
                         ->update(['title' => $title]);
                 }
+            }
+
+            if (Schema::hasTable('admin_permissions')) {
+                $permissionMap = [
+                    ['paths' => ['/', '/'], 'name' => '后台首页访问'],
+                    ['paths' => ['users*', '/users*'], 'name' => '用户管理权限'],
+                    ['paths' => ['products*', '/products*'], 'name' => '商品管理权限'],
+                    ['paths' => ['orders*', '/orders*'], 'name' => '订单管理权限'],
+                    ['paths' => ['coupon_codes*', '/coupon_codes*'], 'name' => '优惠券管理权限'],
+                    ['paths' => ['categories*', '/categories*'], 'name' => '分类管理权限'],
+                    ['paths' => ['site-settings/logo*', '/site-settings/logo*'], 'name' => '站点设置权限'],
+                    ['paths' => ['procurement-orders*', '/procurement-orders*'], 'name' => '代购需求管理权限'],
+                    ['paths' => ['procurement-reference-items*', '/procurement-reference-items*'], 'name' => '参考商品库管理权限'],
+                    ['paths' => ['auth/logs*', '/auth/logs*'], 'name' => '操作日志查看权限'],
+                    ['paths' => ['auth/users*', '/auth/users*'], 'name' => '管理员账号管理权限'],
+                    ['paths' => ['auth/roles*', '/auth/roles*'], 'name' => '角色管理权限'],
+                    ['paths' => ['auth/permissions*', '/auth/permissions*'], 'name' => '权限管理权限'],
+                    ['paths' => ['auth/menu*', '/auth/menu*'], 'name' => '菜单管理权限'],
+                ];
+
+                foreach ($permissionMap as $item) {
+                    DB::table('admin_permissions')
+                        ->where(function ($query) use ($item) {
+                            foreach ((array) $item['paths'] as $pathPattern) {
+                                $pathPattern = trim((string) $pathPattern);
+                                if ($pathPattern === '') {
+                                    continue;
+                                }
+
+                                $like = str_replace('*', '%', ltrim($pathPattern, '/'));
+
+                                // admin_permissions.http_path 可能是多行规则，也可能带 / 前缀。
+                                $query->orWhere('http_path', 'like', '%'.$like.'%');
+                                $query->orWhere('http_path', 'like', '%/'.$like.'%');
+                            }
+                        })
+                        ->update(['name' => $item['name']]);
+                }
+
+                $permissionSlugMap = [
+                    '*' => '系统全量权限',
+                    'dashboard' => '后台首页访问',
+                    'auth.login' => '后台登录权限',
+                    'auth.setting' => '个人设置权限',
+                    'auth.users' => '管理员账号管理权限',
+                    'auth.roles' => '角色管理权限',
+                    'auth.permissions' => '权限管理权限',
+                    'auth.menu' => '菜单管理权限',
+                    'auth.logs' => '操作日志查看权限',
+                ];
+
+                foreach ($permissionSlugMap as $slug => $name) {
+                    DB::table('admin_permissions')
+                        ->where('slug', $slug)
+                        ->update(['name' => $name]);
+                }
+            }
+
+            if (Schema::hasTable('admin_roles')) {
+                DB::table('admin_roles')->where('slug', 'administrator')->update(['name' => '普通管理员（兼容）']);
+                DB::table('admin_roles')->where('slug', 'super-admin')->update(['name' => '终极管理员']);
             }
         } catch (\Throwable $e) {
             // Keep admin pages available even when table is not ready.
@@ -66,23 +130,14 @@ class AppServiceProvider extends ServiceProvider
         $siteBrandEn = 'ARASHIYAMA TOBACCO SHOP';
 
         if (Schema::hasTable('categories')) {
-            $categoriesQuery = Category::query()
-                ->with(['children' => function ($query) {
-                    if (Schema::hasColumn('categories', 'site_mode')) {
-                        $query->where('site_mode', site_mode());
-                    }
-                }])
+            $categories = Category::query()
+                ->with('children')
                 ->where(function ($query) {
                     $query->whereNull('parent_id')
                         ->orWhere('parent_id', 0);
                 })
-                ->orderBy('id');
-
-            if (Schema::hasColumn('categories', 'site_mode')) {
-                $categoriesQuery->where('site_mode', site_mode());
-            }
-
-            $categories = $categoriesQuery->get();
+                ->orderBy('id')
+                ->get();
         }
 
         if (Schema::hasTable('site_settings')) {
@@ -97,9 +152,10 @@ class AppServiceProvider extends ServiceProvider
                 ->where('key', 'header_brand_text_en')
                 ->value('value') ?: $siteBrandEn;
 
-            if ($logoPath) {
-                $siteLogoUrl = Storage::disk('public')->url($logoPath);
-            }
+        }
+
+        if (function_exists('site_logo_url')) {
+            $siteLogoUrl = site_logo_url();
         }
 
         View::share('categories', $categories);
@@ -134,27 +190,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton('wechat_pay', function () {
             $config = config('pay.wechat');
             $config['notify_url'] = route('payment.wechat.notify');
-            $config['http'] = isset($config['http']) && is_array($config['http']) ? $config['http'] : [];
-            if (array_key_exists('verify', $config['http']) && is_string($config['http']['verify'])) {
-                $normalized = filter_var($config['http']['verify'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-                if ($normalized !== null) {
-                    $config['http']['verify'] = $normalized;
-                }
-            }
-            $verifyConfigured = array_key_exists('verify', $config['http'])
-                && $config['http']['verify'] !== null
-                && $config['http']['verify'] !== '';
             if (app()->environment() !== 'production') {
                 $config['log']['level'] = Logger::DEBUG;
-                // 本地开发机常见 CA 链缺失，默认关闭证书校验避免阻断调试流程。
-                if (!$verifyConfigured) {
-                    $config['http']['verify'] = false;
-                }
             } else {
                 $config['log']['level'] = Logger::WARNING;
-                if (!$verifyConfigured) {
-                    $config['http']['verify'] = true;
-                }
             }
             // 调用 Yansongda\Pay 来创建一个微信支付对象
             return Pay::wechat($config);

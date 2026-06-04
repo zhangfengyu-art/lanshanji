@@ -6,27 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class Category extends Model
 {
-    const SITE_MODE_A = 'A';
-    const SITE_MODE_B = 'B';
-
     protected $fillable = [
         'name',
         'is_directory',
         'parent_id',
-        'site_mode',
+        'default_shipping_mode',
     ];
 
     protected $casts = [
         'is_directory' => 'boolean',
     ];
-
-    public static function siteModeOptions()
-    {
-        return [
-            self::SITE_MODE_A => 'A站（香烟）',
-            self::SITE_MODE_B => 'B站（代购）',
-        ];
-    }
 
     public function parent()
     {
@@ -53,19 +42,9 @@ class Category extends Model
         return $query->whereNull('parent_id');
     }
 
-    public function scopeForSite($query, $siteMode)
-    {
-        $siteMode = strtoupper((string) $siteMode);
-        $siteMode = $siteMode === self::SITE_MODE_B ? self::SITE_MODE_B : self::SITE_MODE_A;
-
-        return $query->where('site_mode', $siteMode);
-    }
-
     public function descendantIds()
     {
-        $rows = self::query()
-            ->forSite((string) $this->site_mode)
-            ->get(['id', 'parent_id']);
+        $rows = self::query()->get(['id', 'parent_id']);
         $childrenMap = [];
 
         foreach ($rows as $row) {

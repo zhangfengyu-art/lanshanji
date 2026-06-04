@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\InvalidRequestException;
-use App\Models\CourierApplication;
 use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\ProductSku;
@@ -11,57 +10,15 @@ use App\Models\OrderItem;
 use App\Models\Category;
 use App\Models\ProcurementOrder;
 use App\Models\ProcurementReferenceItem;
-use App\Models\ProcurementReferenceGallery;
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 
 class ProductsController extends Controller
 {
-    protected function categoryQueryForCurrentSite()
-    {
-        $query = Category::query();
-
-        if (Schema::hasColumn('categories', 'site_mode')) {
-            $query->where('site_mode', is_site_mode_b() ? 'B' : 'A');
-        }
-
-        return $query;
-    }
-
-    protected function siteView(string $name, array $data = [], ?string $fallback = null)
-    {
-        $candidates = [];
-
-        if (is_site_mode_b()) {
-            $candidates[] = 'b_mode.' . ltrim($name, '.');
-        }
-
-        $candidates[] = ltrim($name, '.');
-
-        if ($fallback) {
-            $candidates[] = ltrim($fallback, '.');
-        }
-
-        return view()->first($candidates, $data);
-    }
-
     public function index(Request $request)
     {
         // 创建一个查询构造器
         $builder = Product::query()->with('skus')->where('on_sale', true);
-
-        // A/B 商品硬隔离：A 站只显示常规商品，B 站只显示原生求购商品。
-        if (Schema::hasColumn('products', 'is_from_native_procurement')) {
-            if (is_site_mode_b()) {
-                $builder->where('is_from_native_procurement', true);
-            } else {
-                $builder->where(function ($query) {
-                    $query->whereNull('is_from_native_procurement')
-                        ->orWhere('is_from_native_procurement', false);
-                });
-            }
-        }
-
         $categoryId = $request->input('category');
         $search = $request->input('search', '');
         $order = $request->input('order', '');
@@ -69,12 +26,12 @@ class ProductsController extends Controller
         $breadcrumbChild = null;
 
         if ($categoryId) {
-            $currentCategory = $this->categoryQueryForCurrentSite()->find((int) $categoryId);
+            $currentCategory = Category::find((int) $categoryId);
             if ($currentCategory) {
                 $builder->whereIn('category_id', $currentCategory->selfAndDescendantIds());
 
                 if ($currentCategory->parent_id) {
-                    $breadcrumbParent = $this->categoryQueryForCurrentSite()->find((int) $currentCategory->parent_id);
+                    $breadcrumbParent = Category::find((int) $currentCategory->parent_id);
                     $breadcrumbChild = $currentCategory;
                 } else {
                     $breadcrumbParent = $currentCategory;
@@ -120,19 +77,10 @@ class ProductsController extends Controller
 
         $products = $builder->paginate(16);
         $procurementOrders = collect();
-        $referenceGallery = collect();
         $demoModeEnabled = in_array(strtolower((string) env('DEMO_MODE', 'false')), ['1', 'true', 'yes', 'on'], true);
         if (is_site_mode_b() && Schema::hasTable('procurement_orders')) {
             // Mixed feed: show fresh reference seeds first, then real/mock procurement orders.
             $procurementOrders = ProcurementOrder::query()->orderBy('created_at', 'desc')->limit(42)->get();
-
-            if (Schema::hasTable('procurement_reference_gallery')) {
-                $referenceGallery = ProcurementReferenceGallery::query()
-                    ->with('category')
-                    ->orderBy('updated_at', 'desc')
-                    ->limit(8)
-                    ->get();
-            }
 
             $referenceSeeds = collect();
             if (Schema::hasTable('procurement_reference_items')) {
@@ -168,10 +116,9 @@ class ProductsController extends Controller
             });
         }
 
-        return $this->siteView('products.index', [
+        return view('products.index', [
             'products' => $products,
             'procurementOrders' => $procurementOrders,
-            'referenceGallery' => $referenceGallery,
             'demoModeEnabled' => $demoModeEnabled,
             'breadcrumbParent' => $breadcrumbParent,
             'breadcrumbChild' => $breadcrumbChild,
@@ -187,17 +134,6 @@ class ProductsController extends Controller
     {
         if (!$product->on_sale) {
             throw new InvalidRequestException('商品未上架');
-        }
-
-        if (Schema::hasColumn('products', 'is_from_native_procurement')) {
-            $isNativeProcurement = (bool) $product->is_from_native_procurement;
-            // 详情页同样遵守 A/B 隔离，避免通过直链绕过列表过滤。
-            if (is_site_mode_b() && !$isNativeProcurement) {
-                throw new InvalidRequestException('商品不存在');
-            }
-            if (!is_site_mode_b() && $isNativeProcurement) {
-                throw new InvalidRequestException('商品不存在');
-            }
         }
 
         $favored = false;
@@ -221,19 +157,16 @@ class ProductsController extends Controller
         $breadcrumbChild = null;
 
         if ($product->category) {
-            $siteCategory = $this->categoryQueryForCurrentSite()->find((int) $product->category->id);
-            if ($siteCategory) {
-                if ($siteCategory->parent_id) {
-                    $breadcrumbParent = $this->categoryQueryForCurrentSite()->find((int) $siteCategory->parent_id);
-                    $breadcrumbChild = $siteCategory;
-                } else {
-                    $breadcrumbParent = $siteCategory;
-                }
+            if ($product->category->parent_id) {
+                $breadcrumbParent = Category::find((int) $product->category->parent_id);
+                $breadcrumbChild = $product->category;
+            } else {
+                $breadcrumbParent = $product->category;
             }
         }
         
         // 最后别忘了注入到模板中
-        return $this->siteView('products.show', [
+        return view('products.show', [
             'product' => $product,
             'favored' => $favored,
             'reviews' => $reviews,
@@ -266,31 +199,49 @@ class ProductsController extends Controller
     {
         $products = $request->user()->favoriteProducts()->paginate(16);
 
-        return $this->siteView('products.favorites', ['products' => $products]);
+        return view('products.favorites', ['products' => $products]);
     }
 
     public function procurementDetail(Request $request)
     {
-        $procurementOrderId = (int) $request->input('procurement_order_id', 0);
-        $courierStatus = 'guest';
+        $orderId = (int) $request->input('id', $request->input('procurement_order_id', 0));
+        if ($orderId > 0 && Schema::hasTable('procurement_orders')) {
+            $order = ProcurementOrder::query()->find($orderId);
+            if ($order) {
+                return redirect()->route('procurement.show', ['procurementOrder' => $order->id]);
+            }
+        }
+
         $itemName = trim((string) $request->input('item_name', '未命名求购'));
         $itemImage = trim((string) $request->input('item_image', ''));
         $budgetAmount = (float) $request->input('budget_amount', 0);
         $narrative = trim((string) $request->input('narrative', ''));
-        $nativeRequest = filter_var($request->input('native_request', false), FILTER_VALIDATE_BOOLEAN);
+        $nativeRequest = (bool) $request->input('native_request', false);
 
-        if ($request->user()) {
-            $application = CourierApplication::query()
-                ->where('user_id', (int) $request->user()->id)
-                ->orderBy('id', 'desc')
-                ->first();
+        if (Schema::hasTable('procurement_orders') && $itemName !== '' && $budgetAmount > 0) {
+            $matchedOrderQuery = ProcurementOrder::query()
+                ->where('item_name', $itemName)
+                ->where('budget_amount', $budgetAmount);
 
-            $courierStatus = $application ? (string) $application->status : 'none';
+            if ($narrative !== '') {
+                $matchedOrderQuery->where('order_narrative', $narrative);
+            }
+
+            $matchedOrder = $matchedOrderQuery->orderBy('created_at', 'desc')->first();
+            if ($matchedOrder) {
+                return redirect()->route('procurement.show', ['procurementOrder' => $matchedOrder->id]);
+            }
         }
 
-        $recommendedProducts = $nativeRequest ? collect() : $this->findRecommendedProducts($itemName);
-        $matchedProduct = $nativeRequest ? null : $recommendedProducts->first();
-        $quickPayProduct = $nativeRequest ? null : ($matchedProduct ?: $recommendedProducts->first());
+        if ($nativeRequest) {
+            $recommendedProducts = collect();
+            $matchedProduct = null;
+            $quickPayProduct = null;
+        } else {
+            $recommendedProducts = $this->findRecommendedProducts($itemName);
+            $matchedProduct = $recommendedProducts->first();
+            $quickPayProduct = $matchedProduct ?: $recommendedProducts->first();
+        }
 
         $procurementMeta = [
             'item_name' => $itemName,
@@ -300,14 +251,12 @@ class ProductsController extends Controller
             'has_match' => $matchedProduct !== null,
         ];
 
-        return $this->siteView('products.procurement_show', [
+        return view('products.procurement_show', [
             'itemName' => $itemName,
             'itemImage' => $itemImage,
             'budgetAmount' => $budgetAmount,
             'narrative' => $narrative,
             'nativeRequest' => $nativeRequest,
-            'procurementOrderId' => $procurementOrderId,
-            'courierStatus' => $courierStatus,
             'procurementMeta' => $procurementMeta,
             'matchedProduct' => $matchedProduct,
             'recommendedProducts' => $recommendedProducts,
@@ -317,41 +266,6 @@ class ProductsController extends Controller
 
     public function procurementCheckout(Request $request)
     {
-        $nativeRequest = filter_var($request->input('native_request', false), FILTER_VALIDATE_BOOLEAN);
-        $procurementOrderId = (int) $request->input('procurement_order_id', 0);
-
-        if ($nativeRequest || $procurementOrderId > 0) {
-            $procurementOrder = ProcurementOrder::query()->find($procurementOrderId);
-            if (!$procurementOrder) {
-                throw new InvalidRequestException('求购委托不存在');
-            }
-
-            if ((int) data_get($procurementOrder, 'user_id') !== (int) $request->user()->id) {
-                throw new InvalidRequestException('无权查看该求购委托');
-            }
-
-            $addresses = $request->user()->addresses()->orderBy('last_used_at', 'desc')->orderBy('id', 'desc')->get();
-            if ($addresses->isEmpty()) {
-                return redirect()->route('user_addresses.create', [
-                    'redirect' => route('procurement.checkout', [
-                        'procurement_order_id' => $procurementOrderId,
-                        'native_request' => 1,
-                    ]),
-                ]);
-            }
-
-            return $this->siteView('products.procurement_checkout_native', [
-                'procurementOrder' => $procurementOrder,
-                'itemName' => (string) $procurementOrder->item_name,
-                'budgetAmount' => (float) $procurementOrder->budget_amount,
-                'narrative' => (string) $procurementOrder->order_narrative,
-                'serviceRate' => 0.13,
-                'packagingFee' => 300,
-                'shippingFee' => 0,
-                'addresses' => $addresses,
-            ]);
-        }
-
         $productId = (int) $request->input('product_id');
         $product = Product::query()->with(['skus' => function ($query) {
             $query->orderBy('price', 'asc');
@@ -373,7 +287,7 @@ class ProductsController extends Controller
             throw new InvalidRequestException('该商品暂无可售规格');
         }
 
-        return $this->siteView('products.procurement_checkout', [
+        return view('products.procurement_checkout', [
             'product' => $product,
             'addresses' => $addresses,
             'defaultSku' => $defaultSku,
@@ -408,7 +322,7 @@ class ProductsController extends Controller
             ]);
         }
 
-        return $this->siteView('products.procurement_agreement', [
+        return view('products.procurement_agreement', [
             'product' => $product,
             'defaultSku' => $defaultSku,
             'addresses' => $addresses,
@@ -431,92 +345,6 @@ class ProductsController extends Controller
         return view('products.procurement_create', [
             'categories' => $categories,
         ]);
-    }
-
-    public function procurementAccept(Request $request)
-    {
-        abort_unless(is_site_mode_b(), 404);
-
-        $procurementOrderId = (int) $request->input('procurement_order_id', 0);
-        $user = $request->user();
-
-        $application = CourierApplication::query()
-            ->where('user_id', (int) $user->id)
-            ->orderBy('id', 'desc')
-            ->first();
-
-        if (!$application) {
-            return redirect()->route('procurement.apply')
-                ->with('warning', '承接任务前请先完成代购资质申请');
-        }
-
-        if ($application->status === CourierApplication::STATUS_PENDING) {
-            return redirect()->back()->with('warning', '您的代购资质正在审核中，请耐心等待');
-        }
-
-        if ($application->status !== CourierApplication::STATUS_APPROVED) {
-            return redirect()->route('procurement.apply')
-                ->with('warning', '您的代购资质未通过审核，请重新提交资料');
-        }
-
-        // 如果没有传递 procurement_order_id，尝试按 item_name 和 budget_amount 查找
-        if (! $procurementOrderId) {
-            $itemName = trim((string) $request->input('item_name', ''));
-            $budgetAmount = (float) $request->input('budget_amount', 0);
-            $nativeRequest = filter_var($request->input('native_request', false), FILTER_VALIDATE_BOOLEAN);
-
-            if ($itemName === '' || $budgetAmount <= 0) {
-                throw new InvalidRequestException('无效的求购信息');
-            }
-
-            // 按参数查找对应的 ProcurementOrder
-            $procurementOrder = ProcurementOrder::query()
-                ->where('item_name', $itemName)
-                ->where('budget_amount', $budgetAmount)
-                ->where('proxy_status', ProcurementOrder::STATUS_PENDING)
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            if (! $procurementOrder) {
-                throw new InvalidRequestException('求购需求不存在或已被接单');
-            }
-        } else {
-            $procurementOrder = ProcurementOrder::query()->find($procurementOrderId);
-            if (! $procurementOrder) {
-                throw new InvalidRequestException('求购需求不存在');
-            }
-        }
-
-        // 验证：代购方不能是需求方
-        if ((int) $procurementOrder->user_id === (int) $user->id) {
-            throw new InvalidRequestException('你不能接自己发起的需求');
-        }
-
-        // 验证：已接单的需求不能再接单
-        if ($procurementOrder->proxy_status !== ProcurementOrder::STATUS_PENDING) {
-            throw new InvalidRequestException('该求购需求已被接单或已完成，无法重复接单');
-        }
-
-        // 验证：已有接单人的需求不能再接单
-        if ($procurementOrder->accepted_by !== null) {
-            throw new InvalidRequestException('该求购需求已被其他代购人接单');
-        }
-
-        // 标记为已接单
-        $procurementOrder->update([
-            'accepted_by' => $user->id,
-            'accepted_at' => now(),
-            'proxy_status' => ProcurementOrder::STATUS_ACCEPTED,
-        ]);
-
-        return redirect()->route('procurement.detail', [
-            'procurement_order_id' => (int) $procurementOrder->id,
-            'item_name' => (string) $procurementOrder->item_name,
-            'item_image' => (string) $procurementOrder->item_image,
-            'budget_amount' => (float) $procurementOrder->budget_amount,
-            'narrative' => (string) $procurementOrder->order_narrative,
-            'native_request' => 1,
-        ])->with('success', '接单成功！订单号：' . $procurementOrder->no . '，请等待需求方支付');
     }
 
     public function procurementStore(Request $request)
@@ -556,7 +384,7 @@ class ProductsController extends Controller
             $buyerNickname = '用户' . (string) data_get($actor, 'id', '');
         }
 
-        $procurementOrder = ProcurementOrder::query()->create([
+        ProcurementOrder::query()->create([
             'order_no' => null,
             'user_id' => data_get($actor, 'id'),
             'item_name' => trim((string) $validated['item_name']),
@@ -569,20 +397,17 @@ class ProductsController extends Controller
                 'is_demo_data' => false,
                 'is_user_generated' => true,
                 'is_native_request' => true,
+                'category_id' => (int) $validated['category_id'],
+                'category_name' => (string) data_get($category, 'name', ''),
+                'order_id' => null,
                 'budget_equals_item_amount' => true,
                 'no_sku' => true,
                 'requested_amount' => (float) $validated['budget_amount'],
                 'item_amount' => (float) $validated['budget_amount'],
-                'category_id' => (int) $validated['category_id'],
-                'category_name' => (string) data_get($category, 'name', ''),
-                'order_id' => null,
             ],
         ]);
 
-        return redirect()->route('procurement.checkout', [
-            'procurement_order_id' => $procurementOrder->id,
-            'native_request' => 1,
-        ])->with('success', '求购委托已发布，正在进入金额核算页。');
+        return redirect()->route('products.index')->with('success', '求购委托已发布，正在等待代购人响应。');
     }
 
     protected function ensureFallbackCategory()
@@ -627,9 +452,26 @@ class ProductsController extends Controller
             return route('products.index');
         }
 
+        if ($order instanceof ProcurementOrder && $order->id) {
+            return route('procurement.show', ['procurementOrder' => $order->id]);
+        }
+
+        if (is_object($order) && isset($order->id) && $order->id) {
+            return route('procurement.show', ['procurementOrder' => $order->id]);
+        }
+
+        if (data_get($order, 'extra.is_reference_seed', false)) {
+            return route('procurement.detail', [
+                'item_name' => $itemName,
+                'item_image' => (string) data_get($order, 'item_image', ''),
+                'budget_amount' => (float) data_get($order, 'budget_amount', 0),
+                'narrative' => (string) data_get($order, 'order_narrative', ''),
+                'native_request' => 1,
+            ]);
+        }
+
         if (data_get($order, 'extra.is_user_generated', false)) {
-                return route('procurement.detail', [
-                    'procurement_order_id' => (int) data_get($order, 'id', 0),
+            return route('procurement.detail', [
                 'item_name' => $itemName,
                 'item_image' => (string) data_get($order, 'item_image', ''),
                 'budget_amount' => (float) data_get($order, 'budget_amount', 0),
@@ -651,11 +493,16 @@ class ProductsController extends Controller
             return route('products.show', ['product' => $product->id]);
         }
 
+        if (is_object($order) && isset($order->id) && $order->id) {
+            return route('procurement.show', ['procurementOrder' => $order->id]);
+        }
+
         return route('procurement.detail', [
             'item_name' => $itemName,
             'item_image' => (string) data_get($order, 'item_image', ''),
             'budget_amount' => (float) data_get($order, 'budget_amount', 0),
             'narrative' => (string) data_get($order, 'order_narrative', ''),
+            'native_request' => 1,
         ]);
     }
 

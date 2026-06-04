@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\CastsJsonCompat;
 use Illuminate\Database\Eloquent\Model;
 use Ramsey\Uuid\Uuid;
 
 class Order extends Model
 {
+    use CastsJsonCompat;
     const REFUND_STATUS_PENDING = 'pending';
     const REFUND_STATUS_APPLIED = 'applied';
     const REFUND_STATUS_PROCESSING = 'processing';
@@ -16,9 +18,6 @@ class Order extends Model
     const SHIP_STATUS_PENDING = 'pending';
     const SHIP_STATUS_DELIVERED = 'delivered';
     const SHIP_STATUS_RECEIVED = 'received';
-
-    const ACCEPTANCE_STATUS_PENDING = 'pending';
-    const ACCEPTANCE_STATUS_ACCEPTED = 'accepted';
 
     public static $refundStatusMap = [
         self::REFUND_STATUS_PENDING    => '未退款',
@@ -34,16 +33,11 @@ class Order extends Model
         self::SHIP_STATUS_RECEIVED  => '已收货',
     ];
 
-    public static $acceptanceStatusMap = [
-        self::ACCEPTANCE_STATUS_PENDING => '未受理',
-        self::ACCEPTANCE_STATUS_ACCEPTED => '已受理',
-    ];
-
     // 用于获取订单状态字符串的辅助方法
     public function getOrderStatusText()
     {
         if ($this->closed && data_get($this->extra, 'allocation_voided')) {
-            return 'ALLOCATION_VOIDED';
+            return '调拨作废';
         }
         if (!$this->paid_at && $this->closed) {
             return '已关闭';
@@ -54,6 +48,87 @@ class Order extends Model
                 : self::$refundStatusMap[$this->refund_status];
         }
         return '待支付';
+    }
+
+    public function getFulfillmentPhotoAttribute()
+    {
+        return (string) data_get($this->extra, 'fulfillment_photo', '');
+    }
+
+    public function hasFulfillmentPhoto()
+    {
+        $path = trim((string) $this->fulfillment_photo);
+
+        return $path !== '' && \Storage::disk('private')->exists($path);
+    }
+
+    public function getShoppingReceiptAttribute()
+    {
+        return (string) data_get($this->extra, 'shopping_receipt', '');
+    }
+
+    public function hasShoppingReceipt()
+    {
+        $path = trim((string) $this->shopping_receipt);
+
+        return $path !== '' && \Storage::disk('private')->exists($path);
+    }
+
+    public function fulfillmentService()
+    {
+        return app(\App\Services\OrderFulfillmentService::class);
+    }
+
+    public function getFulfillmentStageAttribute()
+    {
+        return $this->fulfillmentService()->resolveStage($this);
+    }
+
+    public function getFulfillmentStageLabelAttribute()
+    {
+        return $this->fulfillmentService()->stageLabel($this);
+    }
+
+    public function canSelfChangeAddress()
+    {
+        return $this->fulfillmentService()->canSelfChangeAddress($this);
+    }
+
+    public function canSelfInstantRefund()
+    {
+        return app(\App\Services\OrderRefundService::class)->canSelfInstantRefund($this);
+    }
+
+    public function shouldUseRefundFeedback()
+    {
+        return app(\App\Services\OrderRefundService::class)->shouldUseRefundFeedback($this);
+    }
+
+    public function getFormattedShippingAddressAttribute()
+    {
+        $addr = $this->address ?: [];
+
+        if (!empty($addr['province'])) {
+            return trim(
+                (string) data_get($addr, 'province', '').
+                (string) data_get($addr, 'city', '').
+                (string) data_get($addr, 'district', '').
+                (string) data_get($addr, 'address', '')
+            );
+        }
+
+        return trim((string) data_get($addr, 'full_address', data_get($addr, 'address', '')));
+    }
+
+    public function getAddressDistrictInitAttribute()
+    {
+        $addr = $this->address ?: [];
+
+        return [
+            (string) data_get($addr, 'province', ''),
+            (string) data_get($addr, 'city', ''),
+            (string) data_get($addr, 'district', ''),
+        ];
     }
 
     public function getDisplayStatusAttribute()
@@ -150,77 +225,6 @@ class Order extends Model
         return (bool) data_get($this->extra, 'allocation_voided', false);
     }
 
-    // A站订单在已支付但尚未正式受理前，允许变更收货信息
-    public function canChangeInfo()
-    {
-        if (is_site_mode_b()) {
-            return false;
-        }
-
-        return (bool) $this->paid_at
-            && !$this->closed
-            && $this->ship_status === self::SHIP_STATUS_PENDING
-            && !$this->isAllocationVoided();
-    }
-
-    public function canSwapItem()
-    {
-        return (bool) $this->paid_at
-            && !$this->closed
-            && !$this->isAllocationVoided()
-            && $this->ship_status === self::SHIP_STATUS_PENDING
-            && $this->isPendingAcceptance()
-            && !is_site_mode_b();
-    }
-
-    public function getEditableAddressSnapshot()
-    {
-        return [
-            'contact_name' => (string) data_get($this->address, 'contact_name', ''),
-            'contact_phone' => (string) data_get($this->address, 'contact_phone', ''),
-            'zip' => (string) data_get($this->address, 'zip', ''),
-            'address' => (string) data_get($this->address, 'address', ''),
-        ];
-    }
-
-    public function getAcceptanceStatusAttribute()
-    {
-        $status = (string) data_get($this->extra, 'acceptance.status', '');
-        if (in_array($status, [self::ACCEPTANCE_STATUS_PENDING, self::ACCEPTANCE_STATUS_ACCEPTED], true)) {
-            return $status;
-        }
-
-        return $this->ship_status === self::SHIP_STATUS_PENDING
-            ? self::ACCEPTANCE_STATUS_PENDING
-            : self::ACCEPTANCE_STATUS_ACCEPTED;
-    }
-
-    public function isAccepted()
-    {
-        return $this->acceptance_status === self::ACCEPTANCE_STATUS_ACCEPTED;
-    }
-
-    public function isPendingAcceptance()
-    {
-        return $this->acceptance_status === self::ACCEPTANCE_STATUS_PENDING;
-    }
-
-    public function markAcceptance($status, $operatorId = null)
-    {
-        if (!in_array($status, [self::ACCEPTANCE_STATUS_PENDING, self::ACCEPTANCE_STATUS_ACCEPTED], true)) {
-            return false;
-        }
-
-        $extra = $this->extra ?: [];
-        $extra['acceptance'] = [
-            'status' => $status,
-            'updated_at' => now()->toDateTimeString(),
-            'updated_by' => $operatorId,
-        ];
-
-        return $this->update(['extra' => $extra]);
-    }
-
     protected $fillable = [
         'no',
         'address',
@@ -235,8 +239,6 @@ class Order extends Model
         'reviewed',
         'ship_status',
         'ship_data',
-        'fulfillment_photo',
-        'tracking_no',
         'extra',
     ];
 
@@ -284,24 +286,36 @@ class Order extends Model
         return $this->belongsTo(CouponCode::class);
     }
 
-    // 兼容历史数据与中间层重复转换：当值已是数组/对象时直接返回，避免 json_decode(array) 报错。
-    public function fromJson($value, $asObject = false)
+    public function getAmountJpy()
     {
-        if (is_array($value)) {
-            return $asObject ? (object) $value : $value;
+        $stored = data_get($this->extra, 'amount_jpy');
+        if ($stored !== null && $stored !== '') {
+            return round((float) $stored, 2);
         }
 
-        if (is_object($value)) {
-            if ($asObject) {
-                return $value;
-            }
-
-            return json_decode(json_encode($value), true);
-        }
-
-        return parent::fromJson($value, $asObject);
+        return round((float) $this->total_amount, 2);
     }
-    
+
+    public function getPaymentAmountCny()
+    {
+        $stored = data_get($this->extra, 'payment_amount_cny');
+        if ($stored !== null && $stored !== '') {
+            return round((float) $stored, 2);
+        }
+
+        return app(\App\Services\ExchangeRateService::class)->jpyToCny($this->getAmountJpy());
+    }
+
+    public function getExchangeRateJpyPerCny()
+    {
+        $stored = data_get($this->extra, 'exchange_rate_jpy_per_cny');
+        if ($stored !== null && $stored !== '') {
+            return round((float) $stored, 6);
+        }
+
+        return round(app(\App\Services\ExchangeRateService::class)->getJpyPerCny(), 6);
+    }
+
     public static function findAvailableNo()
     {
         // 订单流水号前缀

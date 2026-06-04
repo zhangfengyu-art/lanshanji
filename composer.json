@@ -6,7 +6,6 @@
     "type": "project",
     "require": {
         "php": ">=7.0.0",
-        "barryvdh/laravel-dompdf": "0.8.6",
         "encore/laravel-admin": "1.5.*",
         "endroid/qr-code": "^3.2",
         "fideloper/proxy": "~3.3",
@@ -61,9 +60,6 @@
     "config": {
         "preferred-install": "dist",
         "sort-packages": true,
-        "optimize-autoloader": true,
-        "audit": {
-            "block-insecure": false
-        }
+        "optimize-autoloader": true
     }
 }

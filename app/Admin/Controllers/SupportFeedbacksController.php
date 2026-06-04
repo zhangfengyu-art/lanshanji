@@ -2,240 +2,160 @@
 
 namespace App\Admin\Controllers;
 
-use App\Exceptions\InvalidRequestException;
-use App\Models\Order;
+use App\Http\Controllers\Controller;
 use App\Models\SupportFeedback;
-use App\Models\UserAddress;
-use Carbon\Carbon;
-use Encore\Admin\Controllers\ModelForm;
+use App\Services\AdminCsvExport;
+use App\Services\SupportFeedbackAdminExportService;
 use Encore\Admin\Facades\Admin;
 use Encore\Admin\Form;
 use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
-use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 
 class SupportFeedbacksController extends Controller
 {
-    use ModelForm;
-
     public function index()
     {
         return Admin::content(function (Content $content) {
-            $content->header('客服反馈管理');
-            $content->description('查看用户咨询并推进处理状态');
+            $content->header('客户反馈');
+            $content->description('查看并回复用户提交的问题');
             $content->body($this->grid());
         });
-    }
-
-    public function show($id)
-    {
-        return $this->edit($id);
     }
 
     public function edit($id)
     {
         return Admin::content(function (Content $content) use ($id) {
-            $content->header('处理客服反馈');
+            $content->header('处理客户反馈');
             $content->body($this->form()->edit($id));
         });
+    }
+
+    public function update($id)
+    {
+        return $this->form()->update($id);
+    }
+
+    public function export(Request $request)
+    {
+        $scope = (string) $request->query('scope', 'all');
+        $options = SupportFeedbackAdminExportService::scopeOptions();
+        if (!array_key_exists($scope, $options)) {
+            $scope = 'all';
+        }
+
+        $rows = [];
+        SupportFeedbackAdminExportService::buildQuery($scope)->chunk(200, function ($items) use (&$rows) {
+            foreach ($items as $feedback) {
+                $rows[] = SupportFeedbackAdminExportService::row($feedback);
+            }
+        });
+
+        return AdminCsvExport::download(
+            SupportFeedbackAdminExportService::filename($scope),
+            SupportFeedbackAdminExportService::headers(),
+            $rows
+        );
     }
 
     protected function grid()
     {
         return Admin::grid(SupportFeedback::class, function (Grid $grid) {
-            $quickStatus = $this->getQuickStatusFromRequest();
-
-            $grid->model()->orderBy('created_at', 'desc');
-            if ($quickStatus !== null) {
-                $grid->model()->where('status', $quickStatus);
-            }
-
-            $grid->id('编号')->sortable();
-            $grid->order_no('订单编号');
-            $grid->contact_name('联系人');
-            $grid->contact_phone('联系方式')->display(function ($value) {
-                $phone = trim((string) $value);
-                if ($phone !== '' && strtoupper($phone) !== 'N/A') {
-                    return $phone;
-                }
-
-                $fallbackPhone = trim((string) UserAddress::query()
-                    ->where('user_id', $this->user_id)
-                    ->orderByDesc('is_default')
-                    ->orderByDesc('last_used_at')
-                    ->orderByDesc('updated_at')
-                    ->orderByDesc('id')
-                    ->value('contact_phone'));
-
-                if ($fallbackPhone !== '' && strtoupper($fallbackPhone) !== 'N/A') {
-                    return $fallbackPhone;
-                }
-
-                $order = Order::query()
-                    ->where('no', (string) $this->order_no)
-                    ->where('user_id', $this->user_id)
-                    ->first(['address']);
-                $snapshotPhone = trim((string) data_get(optional($order)->address, 'contact_phone', ''));
-
-                return $snapshotPhone !== '' ? $snapshotPhone : 'N/A';
-            });
-            $grid->question_type('问题类型')->display(function ($value) {
-                return SupportFeedback::$questionTypeMap[$value] ?? $value;
-            });
-            $grid->status('处理状态')->display(function ($value) {
-                $text = SupportFeedback::$statusMap[$value] ?? $value;
-                $classMap = [
-                    SupportFeedback::STATUS_PENDING_REVIEW => 'warning',
-                    SupportFeedback::STATUS_UNDER_INVESTIGATION => 'info',
-                    SupportFeedback::STATUS_OFFICIALLY_RESOLVED => 'success',
-                ];
-                $class = $classMap[$value] ?? 'default';
-
-                return '<span class="label label-'.$class.'">'.$text.'</span>';
-            });
-            $grid->created_at('提交时间')->sortable();
-
-            $grid->filter(function ($filter) {
-                $filter->disableIdFilter();
-                $filter->like('order_no', '订单编号');
-                $filter->like('contact_name', '联系人');
-                $filter->like('contact_phone', '联系方式');
-                $filter->equal('status', '处理状态')->select(SupportFeedback::$statusMap);
-                $filter->between('created_at', '提交时间')->datetime();
-            });
+            $grid->model()->with('user')->orderBy('created_at', 'desc');
 
             $grid->disableCreateButton();
-            $grid->actions(function ($actions) {
-                $actions->disableDelete();
-            });
-            $grid->tools(function ($tools) use ($quickStatus) {
-                $tools->append($this->renderStatusQuickTools($quickStatus));
+            $grid->disableExport();
+
+            $grid->tools(function ($tools) {
+                $tools->append(view('admin.support_feedbacks._batch_tools'));
+                $tools->append(view('admin.partials.export_dropdown', [
+                    'exportBaseUrl' => route('admin.support_feedbacks.export'),
+                    'scopeOptions' => SupportFeedbackAdminExportService::scopeOptions(),
+                    'dropdownLabel' => '导出反馈',
+                ]));
                 $tools->batch(function ($batch) {
                     $batch->disableDelete();
                 });
             });
+
+            Admin::script(view('admin.partials._batch_helper_script')->render());
+            Admin::script(view('admin.support_feedbacks._batch_tools_script')->render());
+
+            $grid->filter(function ($filter) {
+                $filter->disableIdFilter();
+                $filter->equal('status', '状态')->select([
+                    '' => '全部',
+                    SupportFeedback::STATUS_PENDING => '待处理',
+                    SupportFeedback::STATUS_HANDLED => '已回复',
+                ]);
+            });
+
+            $grid->column('id', 'ID')->sortable();
+            $grid->column('contact_name', '用户')->display(function ($contactName) {
+                // laravel-admin 用 newFromBuilder 渲染行时，预加载的 user 常为数组而非模型
+                $userName = data_get($this->user, 'name');
+                $userEmail = data_get($this->user, 'email');
+                if ($userName !== null && $userName !== '') {
+                    $label = trim((string) $userName);
+                    if ($userEmail) {
+                        $label .= ' ('.$userEmail.')';
+                    }
+
+                    return htmlspecialchars($label);
+                }
+
+                $label = trim((string) $contactName);
+                if ($label === '' && $this->contact_phone) {
+                    $label = (string) $this->contact_phone;
+                }
+
+                return htmlspecialchars($label !== '' ? $label : '-');
+            });
+            $grid->column('order_no', '订单号');
+            $grid->column('question_type', '类型')->display(function ($value) {
+                return SupportFeedback::questionTypeOptions()[$value] ?? $value;
+            });
+            $grid->column('message', '反馈内容')->limit(60);
+            $grid->column('status', '状态')->display(function ($value) {
+                if ($value === SupportFeedback::STATUS_HANDLED) {
+                    return '<span class="label label-success">已回复</span>';
+                }
+
+                return '<span class="label label-warning">待处理</span>';
+            });
+            $grid->column('created_at', '提交时间')->sortable();
+
+            $grid->actions(function ($actions) {
+                $actions->disableDelete();
+                $actions->disableView();
+                $actions->prepend(
+                    '<a href="'.admin_url('support-feedbacks/'.$actions->getKey().'/edit').'" class="btn btn-xs btn-primary" style="margin-right:4px;">'
+                    .'<i class="fa fa-reply"></i> 回复</a>'
+                );
+            });
         });
-    }
-
-    protected function getQuickStatusFromRequest()
-    {
-        $status = request()->query('status_quick');
-        $allowed = [
-            SupportFeedback::STATUS_PENDING_REVIEW,
-            SupportFeedback::STATUS_UNDER_INVESTIGATION,
-            SupportFeedback::STATUS_OFFICIALLY_RESOLVED,
-        ];
-
-        return in_array($status, $allowed, true) ? $status : null;
-    }
-
-    protected function renderStatusQuickTools($activeStatus)
-    {
-        $buttons = [
-            '全部' => null,
-            '待审核' => SupportFeedback::STATUS_PENDING_REVIEW,
-            '调查中' => SupportFeedback::STATUS_UNDER_INVESTIGATION,
-            '已结案' => SupportFeedback::STATUS_OFFICIALLY_RESOLVED,
-        ];
-
-        $baseQuery = request()->query();
-        unset($baseQuery['page']);
-
-        $html = '<div class="btn-group" style="margin-right:10px;">';
-        foreach ($buttons as $label => $status) {
-            $query = $baseQuery;
-            if ($status === null) {
-                unset($query['status_quick']);
-            } else {
-                $query['status_quick'] = $status;
-            }
-
-            $url = url()->current().(empty($query) ? '' : '?'.http_build_query($query));
-            $isActive = ($status === null && $activeStatus === null) || ($status !== null && $activeStatus === $status);
-            $class = $isActive ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-default';
-            $html .= '<a class="'.$class.'" href="'.$url.'">'.$label.'</a>';
-        }
-        $html .= '</div>';
-
-        return $html;
     }
 
     protected function form()
     {
         return Admin::form(SupportFeedback::class, function (Form $form) {
-            $form->display('id', '编号');
-            $form->display('order_no', '订单编号');
+            $form->display('id', 'ID');
             $form->display('contact_name', '联系人');
-            $form->display('contact_phone', '联系方式');
-            $form->display('question_type', '问题类型')->with(function ($value) {
-                return SupportFeedback::$questionTypeMap[$value] ?? $value;
-            });
-            $form->display('message', '问题描述');
-            $imagesField = $form->display('images', '凭证图片');
-            $imagesField->with(function ($value) {
-                $images = is_array($value) ? $value : [];
-                if (empty($images)) {
-                    return '未上传';
-                }
+            $form->display('contact_phone', '联系电话');
+            $form->display('order_no', '订单号');
+            $form->display('question_type', '问题类型');
+            $form->display('message', '用户反馈');
 
-                $html = '';
-                foreach ($images as $image) {
-                    $url = \Storage::disk('public')->url($image);
-                    $html .= '<a href="'.$url.'" target="_blank" style="display:inline-block;margin-right:8px;margin-bottom:8px;">';
-                    $html .= '<img src="'.$url.'" style="width:96px;height:96px;object-fit:cover;border:1px solid #ddd;" />';
-                    $html .= '</a>';
-                }
-
-                return $html;
-            });
-            if (method_exists($imagesField, 'help')) {
-                $imagesField->help('点击图片可查看大图。');
-            }
-
-            $form->select('status', '处理状态')
-                ->options(SupportFeedback::$statusMap)
-                ->rules('required');
-            $adminReplyField = $form->textarea('admin_reply', '处理结论/回复');
-            if (method_exists($adminReplyField, 'rows')) {
-                $adminReplyField->rows(5);
-            }
-            if (method_exists($adminReplyField, 'help')) {
-                $adminReplyField->help('结案时必须填写。');
-            }
-            $form->display('handled_by', '处理人编号');
-            $form->display('handled_at', '处理时间');
-            $form->display('created_at', '提交时间');
+            $form->textarea('admin_reply', '管理员回复')->rules('required');
+            $form->select('status', '状态')->options([
+                SupportFeedback::STATUS_PENDING => '待处理',
+                SupportFeedback::STATUS_HANDLED => '已回复',
+            ])->default(SupportFeedback::STATUS_HANDLED);
 
             $form->saving(function (Form $form) {
-                $oldStatus = $form->model()->status;
-                $newStatus = $form->status;
-
-                $allowedTransitions = [
-                    SupportFeedback::STATUS_PENDING_REVIEW => [
-                        SupportFeedback::STATUS_PENDING_REVIEW,
-                        SupportFeedback::STATUS_UNDER_INVESTIGATION,
-                        SupportFeedback::STATUS_OFFICIALLY_RESOLVED,
-                    ],
-                    SupportFeedback::STATUS_UNDER_INVESTIGATION => [
-                        SupportFeedback::STATUS_UNDER_INVESTIGATION,
-                        SupportFeedback::STATUS_OFFICIALLY_RESOLVED,
-                    ],
-                    SupportFeedback::STATUS_OFFICIALLY_RESOLVED => [
-                        SupportFeedback::STATUS_OFFICIALLY_RESOLVED,
-                    ],
-                ];
-
-                if (!in_array($newStatus, $allowedTransitions[$oldStatus] ?? [], true)) {
-                    throw new InvalidRequestException('状态流转不合法，不允许回退');
-                }
-
-                if ($newStatus === SupportFeedback::STATUS_OFFICIALLY_RESOLVED && !trim((string) $form->admin_reply)) {
-                    throw new InvalidRequestException('已结案状态必须填写处理结论');
-                }
-
-                if ($newStatus !== $oldStatus || trim((string) $form->admin_reply) !== trim((string) $form->model()->admin_reply)) {
-                    $form->handled_at = Carbon::now();
-                    $form->handled_by = Admin::user()->id;
+                if ($form->status === SupportFeedback::STATUS_HANDLED) {
+                    $form->model()->handled_by = Admin::user()->id;
+                    $form->model()->handled_at = now();
                 }
             });
         });

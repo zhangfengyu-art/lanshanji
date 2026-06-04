@@ -7,15 +7,35 @@ use App\Http\Requests\AddCartRequest;
 use App\Http\Requests\UpdateCartRequest;
 use App\Models\ProductSku;
 use App\Services\CartService;
+use App\Services\EmsShippingFeeService;
+use App\Services\OrderCheckoutQuoteService;
+use App\Services\OrderTobaccoLimitService;
+use App\Services\ShippingModeService;
 
 class CartController extends Controller
 {
     protected $cartService;
 
-    // 利用 Laravel 的自动解析功能注入 CartService 类
-    public function __construct(CartService $cartService)
-    {
+    protected $tobaccoLimits;
+
+    protected $emsShipping;
+
+    protected $checkoutQuote;
+
+    protected $shippingModes;
+
+    public function __construct(
+        CartService $cartService,
+        OrderTobaccoLimitService $tobaccoLimits,
+        EmsShippingFeeService $emsShipping,
+        OrderCheckoutQuoteService $checkoutQuote,
+        ShippingModeService $shippingModes
+    ) {
         $this->cartService = $cartService;
+        $this->tobaccoLimits = $tobaccoLimits;
+        $this->emsShipping = $emsShipping;
+        $this->checkoutQuote = $checkoutQuote;
+        $this->shippingModes = $shippingModes;
     }
 
     public function index(Request $request)
@@ -26,7 +46,16 @@ class CartController extends Controller
             ->orderBy('last_used_at', 'desc')
             ->get();
 
-        return view('cart.index', ['cartItems' => $cartItems, 'addresses' => $addresses]);
+        return view('cart.index', [
+            'cartItems' => $cartItems,
+            'addresses' => $addresses,
+            'emsTiers' => $this->emsShipping->tiers(),
+            'tobaccoLimits' => [
+                'max_sticks' => $this->tobaccoLimits->maxCigaretteSticks(),
+                'max_rolling_grams' => $this->tobaccoLimits->maxRollingTobaccoGrams(),
+                'max_billable_grams' => $this->emsShipping->maxBillableGrams(),
+            ],
+        ]);
     }
 
     public function add(AddCartRequest $request)
@@ -39,45 +68,78 @@ class CartController extends Controller
     public function summary(Request $request)
     {
         $items = $this->cartService->get();
-        $limits = $this->cartService->validateLogisticsLimits($items);
-
-        $sticksProgress = $limits['sticks_limit'] > 0
-            ? round(($limits['total_sticks'] / $limits['sticks_limit']) * 100, 1)
-            : 0;
-        $weightProgress = $limits['weight_limit'] > 0
-            ? round(($limits['total_weight'] / $limits['weight_limit']) * 100, 1)
-            : 0;
 
         $payload = $items->map(function ($item) {
-            $sku = $item->productSku;
-            $product = $sku ? $sku->product : null;
+            $product = $item->productSku->product;
 
             return [
                 'sku_id' => $item->product_sku_id,
                 'amount' => $item->amount,
-                'price' => $sku ? $sku->price : 0,
-                'stock' => $sku ? $sku->stock : 0,
-                'title' => $product ? $product->title : '商品已失效',
-                'sku_title' => $sku ? $sku->title : '',
-                'image_url' => $product ? $product->image_url : '/images/b_mode/proc-placeholder.svg',
-                'product_url' => $product ? route('products.show', ['product' => $sku->product_id]) : null,
+                'price' => $item->productSku->price,
+                'sale_status' => $product->inventory_status,
+                'max_qty' => $item->productSku->getOrderMaxQty(),
+                'title' => $product->title,
+                'sku_title' => $item->productSku->title,
+                'image_url' => $product->image_url,
+                'product_url' => route('products.show', ['product' => $item->productSku->product_id]),
+                'tobacco_type' => $product->tobacco_type,
+                'shipping_mode' => $this->shippingModes->resolveForProduct($product),
+                'unit_weight_grams' => (int) $product->unit_weight_grams,
+                'unit_sticks' => (int) $product->unit_sticks,
             ];
         })->values();
 
         return [
             'count' => (int) $items->sum('amount'),
             'items' => $payload,
-            'logistics_summary' => [
-                'total_sticks' => (int) $limits['total_sticks'],
-                'sticks_limit' => (int) $limits['sticks_limit'],
-                'sticks_progress' => $sticksProgress,
-                'total_weight' => (int) $limits['total_weight'],
-                'weight_limit' => (int) $limits['weight_limit'],
-                'weight_progress' => $weightProgress,
-                'exceeded' => (bool) $limits['exceeded'],
-                'reason' => $limits['reason'],
-            ],
         ];
+    }
+
+    public function quote(Request $request)
+    {
+        $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.sku_id' => ['required', 'integer'],
+            'items.*.amount' => ['required', 'integer', 'min:1'],
+        ]);
+
+        if (!is_site_mode_a()) {
+            return response()->json([
+                'products_total' => 0,
+                'service_fee' => 0,
+                'packaging_fee' => 0,
+                'ems_shipping_fee' => 0,
+                'payable' => 0,
+                'valid' => true,
+            ]);
+        }
+
+        $items = $request->input('items', []);
+
+        try {
+            $data = $this->checkoutQuote->quote($items);
+            $data['valid'] = true;
+
+            return response()->json($data);
+        } catch (\App\Exceptions\InvalidRequestException $e) {
+            $productsTotal = 0;
+            foreach ($items as $row) {
+                $sku = ProductSku::query()->find((int) data_get($row, 'sku_id'));
+                if ($sku) {
+                    $productsTotal += ((float) $sku->price) * (int) data_get($row, 'amount', 0);
+                }
+            }
+
+            return response()->json([
+                'valid' => false,
+                'message' => $e->getMessage(),
+                'products_total' => round($productsTotal, 2),
+                'service_fee' => 0,
+                'packaging_fee' => 0,
+                'ems_shipping_fee' => 0,
+                'payable' => round($productsTotal, 2),
+            ], 422);
+        }
     }
 
     public function remove(ProductSku $sku, Request $request)

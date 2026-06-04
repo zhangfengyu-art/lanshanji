@@ -11,34 +11,52 @@ class ProductSku extends Model
     const STATUS_LIMITED = 'LIMITED';
     const STATUS_DEPLETED = 'DEPLETED';
 
-    protected $fillable = ['title', 'description', 'price', 'stock', 'limit_qty', 'item_type', 'unit_sticks', 'unit_weight'];
+    /** 正常购买时单笔可购上限（不扣库存，仅防滥用） */
+    const UNLIMITED_ORDER_MAX = 999;
+
+    protected $fillable = ['title', 'description', 'price', 'stock', 'limit_qty'];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function (ProductSku $sku) {
+            if (!isset($sku->attributes['stock'])) {
+                $sku->stock = 0;
+            }
+        });
+    }
 
     public function product()
     {
         return $this->belongsTo(Product::class);
     }
 
+    public function isDepleted()
+    {
+        $product = $this->product;
+
+        return $product ? $product->isDepleted() : false;
+    }
+
     public function decreaseStock($amount)
     {
-        if ($amount < 0) {
-            throw new InternalException('减库存不可小于0');
-        }
-
-        return $this->newQuery()->where('id', $this->id)->where('stock', '>=', $amount)->decrement('stock', $amount);
+        // 代购模式不维护实物库存，下单不扣减
+        return 1;
     }
 
     public function addStock($amount)
     {
-        if ($amount < 0) {
-            throw new InternalException('加库存不可小于0');
-        }
-        $this->increment('stock', $amount);
+        // 保留方法以兼容旧代码，不再使用
     }
 
     public function getOrderMaxQty()
     {
-        // 使用 limit_qty 作为单笔订单最大数量，如果为 0 或 null 则不限制
-        $limitQty = (int) $this->limit_qty;
-        return $limitQty > 0 ? $limitQty : $this->stock;
+        $product = $this->product;
+        if (!$product) {
+            return 0;
+        }
+
+        return $product->getMaxPurchaseQty();
     }
 }

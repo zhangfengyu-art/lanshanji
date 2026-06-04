@@ -14,5 +14,24 @@ yarn-error.log
 /public/css
 /public/fonts
 /public/mix-manifest.json
-/.tmp_*.php
+
+# 本地工具与调试产物（勿提交）
+/.tools/
 /composer-local.phar
+/tmp/
+*.log
+server_err*.log
+server_out*.log
+server_err*.txt
+server_out*.txt
+tinker_out.txt
+debug_output.html
+fee_match_context.txt
+large_context_search.txt
+points_five_search.txt
+search_results.txt
+.tmp_sku_health.php
+db_check.php
+create_test_user.php
+create_user.php
+/laravel11-beta/

@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', (($address->id ? trans('frontend.address.edit') : trans('frontend.address.create')) . trans('frontend.address.address_suffix')))
+@section('title', is_site_mode_b() ? (($address->id ? '编辑' : '新增') . '国内转寄地址') : (($address->id ? trans('frontend.address.edit') : trans('frontend.address.create')) . trans('frontend.address.address_suffix')))
 
 @section('content')
 <div class="row">
@@ -7,7 +7,7 @@
 <div class="panel panel-default">
   <div class="panel-heading">
     <h2 class="text-center">
-      {{ ($address->id ? trans('frontend.address.edit') : trans('frontend.address.create')) . trans('frontend.address.address_suffix') }}
+      {{ is_site_mode_b() ? (($address->id ? '编辑' : '新增') . '国内转寄地址（Domestic Forwarding Address）') : (($address->id ? trans('frontend.address.edit') : trans('frontend.address.create')) . trans('frontend.address.address_suffix')) }}
     </h2>
   </div>
   <div class="panel-body">
@@ -69,10 +69,13 @@
         <input type="hidden" name="city" v-model="city">
         <input type="hidden" name="district" v-model="district">
         <div class="form-group">
-          <label class="control-label col-sm-2">{{ trans('frontend.address.detail_address') }}</label>
+          <label class="control-label col-sm-2">{{ is_site_mode_b() ? '国内转寄地址' : trans('frontend.address.detail_address') }}</label>
           <div class="col-sm-9">
             <input type="text" class="form-control" name="address" minlength="5" value="{{ old('address', $address->address) }}" placeholder="{{ trans('frontend.address.detail_placeholder') }}">
             <p class="help-block">{{ trans('frontend.address.mainland_only') }}</p>
+            @if(is_site_mode_b())
+              <p class="help-block">请确保填写准确，代购人在完成境外代买并入境后，将通过国内顺丰/邮政转寄至此地址。</p>
+            @endif
           </div>
         </div>
         <div class="form-group">

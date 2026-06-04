@@ -10,7 +10,7 @@ class UserAddressesController extends Controller
 {
     public function index(Request $request)
     {
-        return view($this->addressView('index'), [
+        return view('user_addresses.index', [
             'addresses' => $request->user()->addresses()
                 ->orderBy('is_default', 'desc')
                 ->orderBy('last_used_at', 'desc')
@@ -20,7 +20,7 @@ class UserAddressesController extends Controller
 
     public function create()
     {
-        return view($this->addressView('create_and_edit'), [
+        return view('user_addresses.create_and_edit', [
             'address' => new UserAddress(),
             'redirectTo' => (string) request()->query('redirect', ''),
         ]);
@@ -62,7 +62,7 @@ class UserAddressesController extends Controller
     {
         $this->authorize('own', $user_address);
 
-        return view($this->addressView('create_and_edit'), [
+        return view('user_addresses.create_and_edit', [
             'address' => $user_address,
             'redirectTo' => (string) request()->query('redirect', ''),
         ]);
@@ -128,14 +128,5 @@ class UserAddressesController extends Controller
         }
 
         return $redirectTo;
-    }
-
-    protected function addressView($name)
-    {
-        if (is_site_mode_b()) {
-            return 'b_mode.user_addresses.' . $name;
-        }
-
-        return 'user_addresses.' . $name;
     }
 }

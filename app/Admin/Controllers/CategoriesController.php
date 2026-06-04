@@ -9,7 +9,6 @@ use Encore\Admin\Facades\Admin;
 use Encore\Admin\Layout\Content;
 use App\Http\Controllers\Controller;
 use Encore\Admin\Controllers\ModelForm;
-use Illuminate\Support\Facades\Schema;
 
 class CategoriesController extends Controller
 {
@@ -63,21 +62,10 @@ class CategoriesController extends Controller
     protected function grid()
     {
         return Admin::grid(Category::class, function (Grid $grid) {
-            $activeSiteMode = strtoupper((string) request('site_mode', site_mode()));
-            $activeSiteMode = $activeSiteMode === Category::SITE_MODE_B ? Category::SITE_MODE_B : Category::SITE_MODE_A;
-
             $grid->model()->with('parent')->withCount(['products', 'children'])->orderBy('id', 'desc');
-            if (Schema::hasColumn('categories', 'site_mode')) {
-                $grid->model()->where('site_mode', $activeSiteMode);
-            }
 
             $grid->id('ID')->sortable();
             $grid->name('分类名称');
-            if (Schema::hasColumn('categories', 'site_mode')) {
-                $grid->column('site_mode', '站点')->display(function ($value) {
-                    return $value === Category::SITE_MODE_B ? 'B站（代购）' : 'A站（香烟）';
-                });
-            }
             $grid->column('parent_id', '父级分类')->display(function ($parentId) {
                 if (!$parentId) {
                     return '根分类';
@@ -116,15 +104,19 @@ class CategoriesController extends Controller
             });
             $grid->created_at('创建时间');
 
-            if (Schema::hasColumn('categories', 'site_mode')) {
-                $grid->filter(function ($filter) {
-                    $filter->equal('site_mode', '站点')->select(Category::siteModeOptions());
-                });
-            }
-
             $grid->actions(function ($actions) {
                 $actions->disableView();
             });
+
+            $grid->tools(function ($tools) {
+                $tools->append(view('admin.categories._batch_tools'));
+                $tools->batch(function ($batch) {
+                    $batch->disableDelete();
+                });
+            });
+
+            Admin::script(view('admin.partials._batch_helper_script')->render());
+            Admin::script(view('admin.categories._batch_tools_script')->render());
         });
     }
 
@@ -139,23 +131,11 @@ class CategoriesController extends Controller
             $form->display('id', 'ID');
             $form->text('name', '分类名称')->rules('required|max:50');
 
-            $activeSiteMode = strtoupper((string) request('site_mode', site_mode()));
-            $activeSiteMode = $activeSiteMode === Category::SITE_MODE_B ? Category::SITE_MODE_B : Category::SITE_MODE_A;
-
-            if (Schema::hasColumn('categories', 'site_mode')) {
-                $form->select('site_mode', '站点')
-                    ->options(Category::siteModeOptions())
-                    ->default($activeSiteMode)
-                    ->rules('required|in:A,B')
-                    ->help('分类仅在对应站点可见。');
-            }
-
             $defaultParentId = (int) request('parent_id', 0);
-            $parentQuery = Category::query()->whereNull('parent_id');
-            if (Schema::hasColumn('categories', 'site_mode')) {
-                $parentQuery->where('site_mode', $activeSiteMode);
-            }
-            $parentOptions = $parentQuery->pluck('name', 'id')->toArray();
+            $parentOptions = Category::query()
+                ->whereNull('parent_id')
+                ->pluck('name', 'id')
+                ->toArray();
             if ($form->model()->id) {
                 unset($parentOptions[$form->model()->id]);
             }
@@ -170,21 +150,14 @@ class CategoriesController extends Controller
                 'off' => ['value' => 0, 'text' => '否', 'color' => 'default'],
             ])->default(0);
 
+            $form->select('default_shipping_mode', '默认寄送模式')
+                ->options(\App\Models\Product::shippingModeOptions())
+                ->default(\App\Services\ShippingModeService::MODE_EMS)
+                ->help('该分类下商品未单独指定寄送模式时使用；EMS 自缴税与含税包邮不可混单');
+
             $form->saving(function (Form $form) {
                 if ((int) $form->parent_id === 0) {
                     $form->parent_id = null;
-                }
-
-                if (Schema::hasColumn('categories', 'site_mode')) {
-                    $siteMode = strtoupper((string) $form->site_mode);
-                    $form->site_mode = $siteMode === Category::SITE_MODE_B ? Category::SITE_MODE_B : Category::SITE_MODE_A;
-
-                    if ($form->parent_id) {
-                        $parent = Category::query()->find((int) $form->parent_id);
-                        if ($parent && strtoupper((string) $parent->site_mode) !== strtoupper((string) $form->site_mode)) {
-                            throw new \Exception('父级分类与当前分类站点不一致');
-                        }
-                    }
                 }
             });
         });

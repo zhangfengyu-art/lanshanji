@@ -1,17 +1,91 @@
 <?php
 
 namespace App\Models;
-use Illuminate\Support\Str;
 
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    protected $fillable = ['title', 'description', 'image', 'on_sale', 'rating', 'sold_count', 'review_count', 'price', 'category_id', 'is_from_native_procurement', 'procurement_order_id'];
-    protected $casts = [
-        'on_sale' => 'boolean', // on_sale 是一个布尔类型的字段
+    protected $fillable = [
+        'title',
+        'description',
+        'image',
+        'on_sale',
+        'rating',
+        'sold_count',
+        'review_count',
+        'price',
+        'category_id',
+        'shipping_mode',
+        'tobacco_type',
+        'unit_weight_grams',
+        'unit_sticks',
+        'sale_status',
+        'purchase_limit',
     ];
-    // 与商品SKU关联
+
+    protected $casts = [
+        'on_sale' => 'boolean',
+        'purchase_limit' => 'integer',
+        'unit_weight_grams' => 'integer',
+        'unit_sticks' => 'integer',
+    ];
+
+    public static function saleStatusOptions()
+    {
+        return [
+            ProductSku::STATUS_ACTIVE => '正常购买',
+            ProductSku::STATUS_LIMITED => '限购',
+            ProductSku::STATUS_DEPLETED => '售罄',
+        ];
+    }
+
+    public static function tobaccoTypeOptions()
+    {
+        return \App\Services\OrderTobaccoLimitService::tobaccoTypeOptions();
+    }
+
+    public function getTobaccoTypeLabelAttribute()
+    {
+        return data_get(self::tobaccoTypeOptions(), $this->tobacco_type, '—');
+    }
+
+    public function isCigarette()
+    {
+        return $this->tobacco_type === \App\Services\OrderTobaccoLimitService::TYPE_CIGARETTE;
+    }
+
+    public function isHeatedTobacco()
+    {
+        return $this->tobacco_type === \App\Services\OrderTobaccoLimitService::TYPE_HEATED_TOBACCO;
+    }
+
+    public function countsTowardStickLimit()
+    {
+        return \App\Services\OrderTobaccoLimitService::countsTowardStickLimit($this->tobacco_type);
+    }
+
+    public function isRollingTobacco()
+    {
+        return $this->tobacco_type === \App\Services\OrderTobaccoLimitService::TYPE_ROLLING_TOBACCO;
+    }
+
+    public static function shippingModeOptions()
+    {
+        return \App\Services\ShippingModeService::options();
+    }
+
+    public function getShippingModeResolvedAttribute()
+    {
+        return app(\App\Services\ShippingModeService::class)->resolveForProduct($this);
+    }
+
+    public function getShippingModeLabelAttribute()
+    {
+        return app(\App\Services\ShippingModeService::class)->label($this->shipping_mode_resolved);
+    }
+
     public function skus()
     {
         return $this->hasMany(ProductSku::class);
@@ -22,83 +96,59 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
-    public function getStockAttribute()
+    public function isDepleted()
     {
-        if ($this->relationLoaded('skus')) {
-            return (int) $this->skus->sum('stock');
-        }
+        return $this->inventory_status === ProductSku::STATUS_DEPLETED;
+    }
 
-        return (int) $this->skus()->sum('stock');
+    public function isLimited()
+    {
+        return $this->inventory_status === ProductSku::STATUS_LIMITED;
     }
 
     public function getImageUrlAttribute()
     {
-        $image = trim((string) data_get($this->attributes, 'image', ''));
-
-        if ($image === '') {
-            return asset('images/brand-logo.svg');
+        if (Str::startsWith($this->attributes['image'], ['http://', 'https://'])) {
+            return $this->attributes['image'];
         }
 
-        // 如果 image 字段本身就已经是完整的 url 就直接返回
-        if (Str::startsWith($image, ['http://', 'https://'])) {
-            return $image;
-        }
-        return \Storage::disk('public')->url($image);
+        return \Storage::disk('public')->url($this->attributes['image']);
     }
 
     public function getInventoryStatusAttribute()
     {
-        if ($this->stock <= 0) {
-            return ProductSku::STATUS_DEPLETED;
+        $status = (string) ($this->attributes['sale_status'] ?? ProductSku::STATUS_ACTIVE);
+
+        if (!array_key_exists($status, self::saleStatusOptions())) {
+            return ProductSku::STATUS_ACTIVE;
         }
 
-        $skus = $this->relationLoaded('skus')
-            ? $this->skus
-            : $this->skus()->get(['stock', 'limit_qty']);
-
-        $hasLimited = $skus->contains(function ($sku) {
-            return (int) $sku->stock > 0 && (int) $sku->limit_qty > 0;
-        });
-
-        return $hasLimited ? ProductSku::STATUS_LIMITED : ProductSku::STATUS_ACTIVE;
+        return $status;
     }
 
     public function getLimitQtyAttribute()
     {
-        $skus = $this->relationLoaded('skus')
-            ? $this->skus
-            : $this->skus()->get(['stock', 'limit_qty']);
-
-        $qtyList = $skus->filter(function ($sku) {
-            return (int) $sku->stock > 0 && (int) $sku->limit_qty > 0;
-        })->pluck('limit_qty')->map(function ($qty) {
-            return (int) $qty;
-        });
-
-        return $qtyList->isEmpty() ? null : $qtyList->min();
-    }
-
-    public function getMappedCategoryAttribute()
-    {
-        $seed = $this->category_id ?: $this->id;
-
-        if (!is_site_mode_b()) {
-            return optional($this->category)->name;
+        if ($this->inventory_status !== ProductSku::STATUS_LIMITED) {
+            return null;
         }
 
-        return b2b_fixed_category_name($seed);
+        $limit = (int) $this->purchase_limit;
+
+        return $limit > 0 ? $limit : null;
     }
 
-    public function getMappedCategoryPathAttribute()
+    public function getMaxPurchaseQty()
     {
-        if (!is_site_mode_b()) {
-            $category = $this->category;
-            $categoryParentName = optional(optional($category)->parent)->name;
-            $categoryName = optional($category)->name;
-
-            return trim(($categoryParentName ? $categoryParentName . ' ' : '') . ($categoryName ?: ''));
+        if ($this->isDepleted()) {
+            return 0;
         }
 
-        return $this->mapped_category;
+        if ($this->isLimited()) {
+            $limit = (int) $this->purchase_limit;
+
+            return $limit > 0 ? $limit : 1;
+        }
+
+        return 999;
     }
 }

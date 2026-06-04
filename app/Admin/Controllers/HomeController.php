@@ -15,8 +15,8 @@ class HomeController extends Controller
     {
         return Admin::content(function (Content $content) {
 
-            $content->header('Dashboard');
-            $content->description('Description...');
+            $content->header('后台总览');
+            $content->description('查看运行环境、扩展组件与依赖状态');
 
             $content->row(Dashboard::title());
 

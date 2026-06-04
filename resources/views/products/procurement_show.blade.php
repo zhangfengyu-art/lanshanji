@@ -1,20 +1,11 @@
-@extends(is_site_mode_b() ? 'b_mode.layouts.app' : 'layouts.app')
+@extends('layouts.app')
 @section('title', '求购需求详情')
 
 @section('content')
 @php
-  $bModePlaceholder = asset('images/b_mode/proc-placeholder.svg');
   $imageRaw = (string) ($itemImage ?? '');
-  $imageRawLower = strtolower($imageRaw);
-  $isBlockedImage = $imageRaw !== '' && (
-    strpos($imageRawLower, 'brand-logo') !== false ||
-    strpos($imageRawLower, 'yanwusuo') !== false ||
-    strpos($imageRawLower, '%E5%B2%9A%E5%B1%B1') !== false ||
-    strpos($imageRawLower, 'cigarette') !== false ||
-    strpos($imageRawLower, 'tobacco') !== false
-  );
-  if ($imageRaw === '' || $isBlockedImage) {
-    $imageSrc = $bModePlaceholder;
+  if ($imageRaw === '') {
+    $imageSrc = asset('images/default.png');
   } elseif (\Illuminate\Support\Str::startsWith($imageRaw, ['http://', 'https://', '//'])) {
     $imageSrc = $imageRaw;
   } elseif (\Illuminate\Support\Str::startsWith($imageRaw, '/')) {
@@ -30,8 +21,6 @@
   $recommendations = isset($recommendedProducts) ? $recommendedProducts : collect();
   $match = isset($matchedProduct) ? $matchedProduct : null;
   $isLoggedIn = auth()->check();
-  $courierStatus = isset($courierStatus) ? (string) $courierStatus : 'guest';
-  $pendingAuditMessage = '您的代购资质正在审核中，请耐心等待';
 @endphp
 
 <link rel="stylesheet" href="{{ asset('css/procurement-detail.css') }}?v=20260411c">
@@ -48,31 +37,6 @@
     --proc-shadow: 0 10px 30px rgba(21, 24, 31, 0.06);
     --proc-radius-lg: 18px;
     --proc-radius-md: 12px;
-  }
-
-  body.site-mode-b .proc-page {
-    background:
-      radial-gradient(circle at 8% 10%, rgba(44, 123, 229, 0.12), transparent 32%),
-      radial-gradient(circle at 90% 0%, rgba(37, 99, 235, 0.1), transparent 30%),
-      linear-gradient(180deg, #f8fbff 0%, #f2f7ff 56%, #eef4ff 100%);
-  }
-
-  body.site-mode-b .proc-badge {
-    border: 1px solid rgba(44, 123, 229, 0.24);
-    background: rgba(44, 123, 229, 0.1);
-    color: #1d4ed8;
-  }
-
-  body.site-mode-b .proc-btn-primary,
-  body.site-mode-b .proc-reco-btn-dark {
-    background: linear-gradient(180deg, #2c7be5 0%, #1d4ed8 100%);
-    box-shadow: 0 8px 16px rgba(44, 123, 229, 0.24);
-  }
-
-  body.site-mode-b .proc-btn-light,
-  body.site-mode-b .proc-reco-btn-light {
-    border-color: rgba(44, 123, 229, 0.2);
-    background: rgba(44, 123, 229, 0.06);
   }
 
   .proc-page {
@@ -462,7 +426,7 @@
 
     <div class="proc-detail-card">
       <div class="proc-detail-media" style="width:100%;height:420px;max-height:420px;overflow:hidden;">
-        <img src="{{ $imageSrc }}" alt="{{ $itemName }}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='{{ $bModePlaceholder }}';" style="width:100% !important;height:100% !important;max-width:none !important;object-fit:cover !important;display:block !important;">
+        <img src="{{ $imageSrc }}" alt="{{ $itemName }}" loading="lazy" decoding="async" style="width:100% !important;height:100% !important;max-width:none !important;object-fit:cover !important;display:block !important;">
       </div>
       <div class="proc-detail-body">
         <span class="proc-badge">C2C 求购需求</span>
@@ -485,24 +449,15 @@
         </div>
 
         <div class="proc-detail-actions">
-          @if(!empty($quickPayProduct))
-            @if(!$isLoggedIn)
-              <a class="proc-btn proc-btn-primary" href="{{ route('login') }}">登录后我能带</a>
-            @elseif($courierStatus === \App\Models\CourierApplication::STATUS_APPROVED)
-              <a class="proc-btn proc-btn-primary" href="{{ route('procurement.accept.get', ['procurement_order_id' => $procurementOrderId ?? 0, 'product_id' => $quickPayProduct->id, 'item_name' => $itemName, 'budget_amount' => $budgetAmount, 'narrative' => $narrative, 'native_request' => !empty($nativeRequest) ? 1 : 0]) }}">我能带</a>
-            @elseif($courierStatus === \App\Models\CourierApplication::STATUS_PENDING)
-              <a class="proc-btn proc-btn-light" href="#" onclick="alert('{{ $pendingAuditMessage }}'); return false;">审核中</a>
-            @elseif($courierStatus === \App\Models\CourierApplication::STATUS_REJECTED)
-              <a class="proc-btn proc-btn-primary" href="{{ route('procurement.apply') }}">重新提交资质</a>
-            @else
-              <a class="proc-btn proc-btn-primary" href="{{ route('procurement.apply') }}">立即申请资质</a>
-            @endif
+          @if(!empty($nativeRequest))
+            <p class="proc-detail-desc" style="margin-bottom:12px;">您是代购人：接单后由求购方预付托管，您无需在本站付款。</p>
           @endif
-          <a class="proc-btn proc-btn-primary" href="{{ route('products.index', ['search' => $itemName]) }}">去商品列表选购</a>
+          <a class="proc-btn proc-btn-primary" href="{{ route('products.index') }}">返回求购大厅接单</a>
+          <a class="proc-btn proc-btn-light" href="{{ route('products.index', ['search' => $itemName]) }}">去商品列表搜索</a>
           @if($match)
             <a class="proc-btn proc-btn-light" href="{{ route('products.show', ['product' => $match->id]) }}">查看匹配商品详情</a>
           @endif
-          <a class="proc-btn proc-btn-light" href="{{ route('products.index') }}">返回代购互助广场</a>
+          <a class="proc-btn proc-btn-light" href="{{ route('products.index') }}">返回求购大厅</a>
         </div>
       </div>
     </div>
@@ -539,18 +494,8 @@
                   @endif
                 </p>
                 <div class="proc-reco-actions">
-                  @if(!$isLoggedIn)
-                    <a class="proc-reco-btn proc-reco-btn-dark" href="{{ route('login') }}">登录后我能带</a>
-                  @elseif($courierStatus === \App\Models\CourierApplication::STATUS_APPROVED)
-                    <a class="proc-reco-btn proc-reco-btn-dark" href="{{ route('procurement.accept.get', ['procurement_order_id' => $procurementOrderId ?? 0, 'product_id' => $product->id, 'item_name' => $itemName, 'budget_amount' => $budgetAmount, 'narrative' => $narrative, 'native_request' => !empty($nativeRequest) ? 1 : 0]) }}">我能带</a>
-                  @elseif($courierStatus === \App\Models\CourierApplication::STATUS_PENDING)
-                    <a class="proc-reco-btn proc-reco-btn-light" href="#" onclick="alert('{{ $pendingAuditMessage }}'); return false;">审核中</a>
-                  @elseif($courierStatus === \App\Models\CourierApplication::STATUS_REJECTED)
-                    <a class="proc-reco-btn proc-reco-btn-dark" href="{{ route('procurement.apply') }}">重新提交资质</a>
-                  @else
-                    <a class="proc-reco-btn proc-reco-btn-dark" href="{{ route('procurement.apply') }}">立即申请资质</a>
-                  @endif
-                  <a class="proc-reco-btn proc-reco-btn-light" href="{{ route('products.show', ['product' => $product->id]) }}">查看详情</a>
+                  <a class="proc-reco-btn proc-reco-btn-light" href="{{ route('products.show', ['product' => $product->id]) }}">查看商品详情</a>
+                  <a class="proc-reco-btn proc-reco-btn-dark" href="{{ route('products.index') }}">去大厅接单</a>
                 </div>
               </div>
             </article>

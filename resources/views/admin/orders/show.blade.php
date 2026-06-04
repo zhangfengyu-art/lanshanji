@@ -12,49 +12,21 @@
       <tbody>
       <tr>
         <td>买家：</td>
-      @php
-        $currentTrackingNo = trim((string) ($order->tracking_no ?: data_get($order->ship_data, 'express_no', '')));
-      @endphp
-      @if($order->paid_at && $currentTrackingNo === '')
-      <tr>
-        <td>运单提醒</td>
-        <td colspan="3">
-          <div class="alert alert-danger" style="margin-bottom: 0; padding: 8px 12px;">
-            当前订单尚未填写运单号。用户端订单列表会显示“待上传”，请尽快在上方“履约操作”中补充物流单号并保存。
-          </div>
-        </td>
-      </tr>
-      @endif
-      <tr>
-        <td>履约操作</td>
-        <td colspan="3">
-          <form action="{{ route('admin.orders.update_fulfillment', [$order->id]) }}" method="post" enctype="multipart/form-data" class="form-horizontal">
-            <input type="hidden" name="_token" value="{{ csrf_token() }}">
-            <div class="form-group">
-              <label class="col-sm-2 control-label">实物照片</label>
-              <div class="col-sm-10">
-                <input type="file" name="fulfillment_photo" accept="image/*" class="form-control" style="padding-top: 3px;">
-                <p class="help-block" style="margin-bottom: 0;">上传商品实拍图，文件将保存到 storage/app/private/orders。</p>
-                @if(!empty($order->fulfillment_photo))
-                  <p class="help-block" style="margin-top: 6px;">当前已上传：{{ $order->fulfillment_photo }}</p>
-                @endif
-              </div>
-            </div>
-            <div class="form-group" style="margin-bottom: 0;">
-              <div class="col-sm-offset-2 col-sm-10">
-                <button type="submit" class="btn btn-success">保存履约信息</button>
-              </div>
-            </div>
-          </form>
-        </td>
-      </tr>
         <td>{{ $order->user->name }}</td>
         <td>支付时间：</td>
         <td>{{ $order->paid_at->format('Y-m-d H:i:s') }}</td>
       </tr>
       <tr>
         <td>支付方式：</td>
-        <td>{{ $order->payment_method }}</td>
+        <td>
+          @if($order->payment_method === 'wechat')
+            微信支付
+          @elseif($order->payment_method === 'alipay')
+            支付宝
+          @else
+            {{ $order->payment_method }}
+          @endif
+        </td>
         <td>支付渠道单号：</td>
         <td>{{ $order->payment_no }}</td>
       </tr>
@@ -62,145 +34,6 @@
         <td>{{ is_site_mode_b() ? '国内转寄地址' : '收货地址' }}</td>
         <td colspan="3">{{ $order->address['address'] }} {{ $order->address['zip'] }} {{ $order->address['contact_name'] }} {{ $order->address['contact_phone'] }}</td>
       </tr>
-      <tr>
-        <td>受理状态</td>
-        <td>
-          @php
-            $acceptanceStatus = $order->acceptance_status;
-            $acceptanceText = data_get(\App\Models\Order::$acceptanceStatusMap, $acceptanceStatus, '未受理');
-            $acceptanceLabelClass = $acceptanceStatus === \App\Models\Order::ACCEPTANCE_STATUS_ACCEPTED ? 'label-success' : 'label-warning';
-          @endphp
-          <span class="label {{ $acceptanceLabelClass }}">{{ $acceptanceText }}</span>
-        </td>
-        <td colspan="2">
-          @if($order->paid_at)
-            <button type="button" class="btn btn-xs btn-success" id="btn-mark-accepted">标注为已受理</button>
-            <button type="button" class="btn btn-xs btn-warning" id="btn-mark-pending" style="margin-left: 6px;">标注为未受理</button>
-          @else
-            <span class="text-muted">未支付订单不可标注</span>
-          @endif
-        </td>
-      </tr>
-      @php
-        $changeHistory = collect(data_get($order->extra, 'change_info_history', []))->values()->reverse();
-      @endphp
-      @if($changeHistory->count() > 0)
-      <tr>
-        <td>信息变更历史</td>
-        <td colspan="3">
-          <div style="max-height: 420px; overflow-y: auto;">
-            @foreach($changeHistory as $index => $entry)
-              @php
-                $beforeAddress = data_get($entry, 'before.address', []);
-                $afterAddress = data_get($entry, 'after.address', []);
-                $beforeRemark = data_get($entry, 'before.remark', null);
-                $afterRemark = data_get($entry, 'after.remark', null);
-
-                if (empty($beforeAddress) && empty($afterAddress) && isset($entry['address'])) {
-                    $afterAddress = (array) data_get($entry, 'address', []);
-                    $afterRemark = data_get($entry, 'remark', null);
-                }
-
-                $beforeText = trim(implode(' ', array_filter([
-                    data_get($beforeAddress, 'address'),
-                    data_get($beforeAddress, 'zip'),
-                    data_get($beforeAddress, 'contact_name'),
-                    data_get($beforeAddress, 'contact_phone'),
-                ])));
-                $afterText = trim(implode(' ', array_filter([
-                    data_get($afterAddress, 'address'),
-                    data_get($afterAddress, 'zip'),
-                    data_get($afterAddress, 'contact_name'),
-                    data_get($afterAddress, 'contact_phone'),
-                ])));
-              @endphp
-
-              <div style="border: 1px solid #f0f0f0; border-radius: 6px; padding: 10px; margin-bottom: 10px; background: #fafafa;">
-                <div style="font-weight: 600; margin-bottom: 8px;">
-                  变更 #{{ $changeHistory->count() - $index }}
-                  <span style="font-weight: 400; color: #888; margin-left: 8px;">
-                    时间：{{ data_get($entry, 'changed_at', '-') }}
-                  </span>
-                  <span style="font-weight: 400; color: #888; margin-left: 8px;">
-                    用户ID：{{ data_get($entry, 'changed_by', '-') }}
-                  </span>
-                </div>
-
-                <table class="table table-condensed" style="margin-bottom: 0; background: #fff;">
-                  <thead>
-                    <tr>
-                      <th style="width: 90px;">字段</th>
-                      <th>变更前</th>
-                      <th>变更后</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>收货信息</td>
-                      <td>{{ $beforeText !== '' ? $beforeText : '-' }}</td>
-                      <td>{{ $afterText !== '' ? $afterText : '-' }}</td>
-                    </tr>
-                    <tr>
-                      <td>备注</td>
-                      <td>{{ $beforeRemark !== null && $beforeRemark !== '' ? $beforeRemark : '-' }}</td>
-                      <td>{{ $afterRemark !== null && $afterRemark !== '' ? $afterRemark : '-' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            @endforeach
-          </div>
-        </td>
-      </tr>
-      @endif
-      @php
-        $swapHistory = collect(data_get($order->extra, 'swap_item_history', []))->values()->reverse();
-      @endphp
-      @if($swapHistory->count() > 0)
-      <tr>
-        <td>商品调换历史</td>
-        <td colspan="3">
-          <div style="max-height: 420px; overflow-y: auto;">
-            @foreach($swapHistory as $index => $entry)
-              @php
-                $before = (array) data_get($entry, 'before', []);
-                $after = (array) data_get($entry, 'after', []);
-              @endphp
-
-              <div style="border: 1px solid #f0f0f0; border-radius: 6px; padding: 10px; margin-bottom: 10px; background: #fafafa;">
-                <div style="font-weight: 600; margin-bottom: 8px;">
-                  调换 #{{ $swapHistory->count() - $index }}
-                  <span style="font-weight: 400; color: #888; margin-left: 8px;">时间：{{ data_get($entry, 'changed_at', '-') }}</span>
-                  <span style="font-weight: 400; color: #888; margin-left: 8px;">用户ID：{{ data_get($entry, 'changed_by', '-') }}</span>
-                </div>
-
-                <table class="table table-condensed" style="margin-bottom: 0; background: #fff;">
-                  <thead>
-                    <tr>
-                      <th style="width: 90px;">字段</th>
-                      <th>变更前</th>
-                      <th>变更后</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>商品</td>
-                      <td>{{ trim((string) data_get($before, 'product_title', '')) }} {{ trim((string) data_get($before, 'sku_title', '')) }} / {{ data_get($before, 'price', '-') }}</td>
-                      <td>{{ trim((string) data_get($after, 'product_title', '')) }} {{ trim((string) data_get($after, 'sku_title', '')) }} / {{ data_get($after, 'price', '-') }}</td>
-                    </tr>
-                    <tr>
-                      <td>数量</td>
-                      <td>{{ data_get($before, 'amount', '-') }}</td>
-                      <td>{{ data_get($after, 'amount', '-') }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            @endforeach
-          </div>
-        </td>
-      </tr>
-      @endif
       <tr>
         <td rowspan="{{ $order->items->count() + 1 }}">商品列表</td>
         <td>商品名称</td>
@@ -210,81 +43,205 @@
       @foreach($order->items as $item)
       <tr>
         <td>{{ $item->product->title }} {{ $item->productSku->title }}</td>
-        <td>{{ number_format($item->price, 2, '.', '') }}日元</td>
+        <td>￥{{ $item->price }}</td>
         <td>{{ $item->amount }}</td>
       </tr>
       @endforeach
       <tr>
         <td>订单金额：</td>
-        <td>{{ number_format($order->total_amount, 2, '.', '') }}日元</td>
-        <!-- 这里也新增了一个发货状态 -->
+        <td>￥{{ $order->total_amount }}</td>
         <td>{{ is_site_mode_b() ? '履行状态：' : '发货状态：' }}</td>
         <td>{{ is_site_mode_b() ? $order->display_status : \App\Models\Order::$shipStatusMap[$order->ship_status] }}</td>
       </tr>
-      <!-- 订单发货开始 -->
-      <!-- 如果订单未发货，展示发货表单 -->
-      @if($order->ship_status === \App\Models\Order::SHIP_STATUS_PENDING)
-      @if($order->refund_status !== \App\Models\Order::REFUND_STATUS_SUCCESS)
+      @php
+        $shipCompany = old('express_company', data_get($order->ship_data, 'express_company', ''));
+        $shipNo = old('express_no', data_get($order->ship_data, 'express_no', ''));
+        $shipStatusValue = old('ship_status', $order->ship_status);
+        $shipStatusOptions = is_site_mode_b()
+          ? [
+              \App\Models\Order::SHIP_STATUS_PENDING => '待履行/采购中',
+              \App\Models\Order::SHIP_STATUS_DELIVERED => '已入关/转寄中',
+              \App\Models\Order::SHIP_STATUS_RECEIVED => '已签收（任务完成）',
+            ]
+          : \App\Models\Order::$shipStatusMap;
+      @endphp
+      @if($order->paid_at && !is_site_mode_b())
+      @php
+        $fulfillment = app(\App\Services\OrderFulfillmentService::class);
+        $fulfillmentStage = $fulfillment->resolveStage($order);
+        $processingStarted = trim((string) data_get($order->extra, 'processing_started_at', '')) !== '';
+        $lockedAt = trim((string) data_get($order->extra, 'locked_at', '')) !== '';
+      @endphp
+      <tr>
+        <td>履约阶段：</td>
+        <td colspan="3">
+          <strong>{{ $fulfillment->stageLabel($order) }}</strong>（{{ $fulfillmentStage }}）
+          · 自助改址已用 {{ (int) data_get($order->extra, 'address_change_count', 0) }}/2 次
+          @if($processingStarted)
+            <span class="text-muted"> · 开始处理：{{ data_get($order->extra, 'processing_started_at') }}</span>
+          @endif
+          @if($lockedAt)
+            <span class="text-muted"> · 锁定：{{ data_get($order->extra, 'locked_at') }}</span>
+          @endif
+        </td>
+      </tr>
+      <tr>
+        <td>履约操作：</td>
+        <td colspan="3" style="padding-bottom: 12px;">
+          @if(!$processingStarted && $fulfillmentStage !== \App\Services\OrderFulfillmentService::STAGE_S4)
+            <form action="{{ route('admin.orders.start_processing', $order) }}" method="post" style="display:inline-block; margin-right: 8px;">
+              <input type="hidden" name="_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('确认开始处理？用户将无法再自助改址。');">开始处理（S1→S2）</button>
+            </form>
+          @endif
+          @if(!$lockedAt && !in_array($fulfillmentStage, [\App\Services\OrderFulfillmentService::STAGE_S4], true))
+            <form action="{{ route('admin.orders.lock', $order) }}" method="post" style="display:inline-block; margin-right: 8px;">
+              <input type="hidden" name="_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-default btn-sm">锁定订单（→S3）</button>
+            </form>
+          @endif
+          @if($lockedAt && !$order->hasFulfillmentPhoto())
+            <form action="{{ route('admin.orders.unlock', $order) }}" method="post" style="display:inline-block; margin-right: 8px;">
+              <input type="hidden" name="_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-default btn-sm">解除锁定</button>
+            </form>
+          @endif
+          <span class="help-block" style="margin: 6px 0 0;">上传履约实拍图也会进入 S3。已发货为 S4。</span>
+        </td>
+      </tr>
+      @endif
+      @if($order->paid_at && $order->refund_status !== \App\Models\Order::REFUND_STATUS_SUCCESS)
       <tr>
         <td colspan="4">
-          <form action="{{ route('admin.orders.ship', [$order->id]) }}" method="post" class="form-inline">
-            <!-- 别忘了 csrf token 字段 -->
+          @if(session('success'))
+            <div class="alert alert-success alert-dismissible" style="margin-bottom: 12px;">
+              <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+              {{ session('success') }}
+            </div>
+          @endif
+          <form action="{{ route('admin.orders.ship', [$order->id]) }}" method="post" class="form-inline" style="flex-wrap: wrap; gap: 8px 12px;">
             <input type="hidden" name="_token" value="{{ csrf_token() }}">
-            @if(is_site_mode_b())
-            <div class="form-group {{ $errors->has('express_company') ? 'has-error' : '' }}">
-              <label for="express_company" class="control-label">代购人</label>
-              <input type="text" id="express_company" name="express_company" value="" class="form-control" placeholder="输入代购人">
-              @if($errors->has('express_company'))
-                @foreach($errors->get('express_company') as $msg)
-                  <span class="help-block">{{ $msg }}</span>
+            <div class="form-group {{ $errors->has('ship_status') ? 'has-error' : '' }}">
+              <label for="ship_status" class="control-label">{{ is_site_mode_b() ? '履行状态' : '发货状态' }}</label>
+              <select id="ship_status" name="ship_status" class="form-control" required>
+                @foreach($shipStatusOptions as $value => $label)
+                  <option value="{{ $value }}" {{ $shipStatusValue === $value ? 'selected' : '' }}>{{ $label }}</option>
                 @endforeach
-              @endif
-            </div>
-            @else
-            <div class="form-group {{ $errors->has('express_company') ? 'has-error' : '' }}">
-              <label for="express_company" class="control-label">物流公司</label>
-              <select id="express_company" name="express_company" class="form-control" required>
-                <option value="">-- 请选择 --</option>
-                <option value="EMS">EMS（日本邮政）</option>
-                <option value="顺丰">顺丰</option>
               </select>
+              @if($errors->has('ship_status'))
+                @foreach($errors->get('ship_status') as $msg)
+                  <span class="help-block">{{ $msg }}</span>
+                @endforeach
+              @endif
+            </div>
+            <div class="form-group {{ $errors->has('express_company') ? 'has-error' : '' }}">
+              <label for="express_company" class="control-label">{{ is_site_mode_b() ? '代购人' : '物流公司' }}</label>
+              <input type="text" id="express_company" name="express_company" value="{{ $shipCompany }}" class="form-control" placeholder="{{ is_site_mode_b() ? '请输入代购人姓名或标识' : '可手动输入，如 EMS、顺丰' }}" list="express-company-presets" style="min-width: 180px;">
+              @unless(is_site_mode_b())
+              <datalist id="express-company-presets">
+                <option value="EMS（日本邮政）"></option>
+                <option value="EMS"></option>
+                <option value="顺丰"></option>
+                <option value="佐川急便"></option>
+                <option value="黑猫宅急便"></option>
+              </datalist>
+              @endunless
               @if($errors->has('express_company'))
                 @foreach($errors->get('express_company') as $msg)
                   <span class="help-block">{{ $msg }}</span>
                 @endforeach
               @endif
             </div>
-            @endif
-            <div class="form-group {{ $errors->has('express_company') ? 'has-error' : '' }}">
+            <div class="form-group {{ $errors->has('express_no') ? 'has-error' : '' }}">
               <label for="express_no" class="control-label">{{ is_site_mode_b() ? '转寄单号' : '物流单号' }}</label>
-              <input type="text" id="express_no" name="express_no" value="" class="form-control" placeholder="{{ is_site_mode_b() ? '输入转寄单号' : '输入物流单号' }}">
+              <input type="text" id="express_no" name="express_no" value="{{ $shipNo }}" class="form-control" placeholder="{{ is_site_mode_b() ? '请输入转寄单号' : '请输入物流单号' }}" style="min-width: 220px;">
               @if($errors->has('express_no'))
                 @foreach($errors->get('express_no') as $msg)
                   <span class="help-block">{{ $msg }}</span>
                 @endforeach
               @endif
             </div>
-            <button type="submit" class="btn btn-success" id="ship-btn">{{ is_site_mode_b() ? '标记进入转寄' : '发货' }}</button>
+            <button type="submit" class="btn btn-success" id="ship-btn">保存物流信息</button>
           </form>
+          <p class="help-block" style="margin-top: 8px; margin-bottom: 0;">保存后用户订单详情页会同步显示发货状态、物流公司与运单号。</p>
+        </td>
+      </tr>
+      @elseif($order->ship_data)
+      <tr>
+        <td>{{ is_site_mode_b() ? '代购人：' : '物流公司：' }}</td>
+        <td>{{ data_get($order->ship_data, 'express_company', '-') }}</td>
+        <td>{{ is_site_mode_b() ? '转寄单号：' : '物流单号：' }}</td>
+        <td>{{ data_get($order->ship_data, 'express_no', '-') }}</td>
+      </tr>
+      @endif
+      @if($order->paid_at)
+      <tr>
+        <td colspan="4">
+          <h4 style="margin-top: 8px;">订单实拍图（用户端可见）</h4>
+          @if($order->hasFulfillmentPhoto())
+            <div style="margin-bottom: 12px;">
+              <a href="{{ route('admin.orders.fulfillment_photo', $order) }}" target="_blank">
+                <img src="{{ route('admin.orders.fulfillment_photo', $order) }}" alt="实拍预览" style="max-width: 240px; max-height: 180px; border: 1px solid #ddd; border-radius: 4px;">
+              </a>
+              <div style="margin-top: 6px;">
+                <a href="{{ route('admin.orders.fulfillment_photo', $order) }}" target="_blank" class="btn btn-xs btn-default">查看原图</a>
+              </div>
+            </div>
+          @else
+            <p class="text-muted">尚未上传实拍图，用户订单页将显示「待上传」。</p>
+          @endif
+          <form action="{{ route('admin.orders.fulfillment_photo.upload', $order) }}" method="post" enctype="multipart/form-data" class="form-inline" style="margin-bottom: 8px;">
+            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+              <label for="fulfillment_photo" class="control-label">上传/更换实拍图</label>
+              <input type="file" id="fulfillment_photo" name="photo" accept="image/jpeg,image/png,image/webp" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">上传实拍图</button>
+          </form>
+          @if($order->hasFulfillmentPhoto())
+          <form action="{{ route('admin.orders.fulfillment_photo.delete', $order) }}" method="post" style="display:inline;" onsubmit="return confirm('确认删除实拍图？用户端将不再显示。');">
+            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="_method" value="DELETE">
+            <button type="submit" class="btn btn-danger btn-sm">删除实拍图</button>
+          </form>
+          @endif
         </td>
       </tr>
       @endif
-      @else
-      <!-- 否则展示物流公司和物流单号 -->
+      @if($order->paid_at)
       <tr>
-        <td>{{ is_site_mode_b() ? '代购人：' : '物流公司：' }}</td>
-        <td>{{ $order->ship_data['express_company'] }}</td>
-        <td>{{ is_site_mode_b() ? '转寄单号：' : '物流单号：' }}</td>
-        <td>{{ $order->ship_data['express_no'] }}</td>
+        <td colspan="4">
+          <h4 style="margin-top: 8px;">购物凭据（EMS 明细书，用户端可下载）</h4>
+          @if($order->hasShoppingReceipt())
+            <div style="margin-bottom: 12px;">
+              <a href="{{ route('admin.orders.shopping_receipt', $order) }}" target="_blank" class="btn btn-xs btn-default">查看/下载凭据</a>
+            </div>
+          @else
+            <p class="text-muted">尚未上传购物凭据。</p>
+          @endif
+          <form action="{{ route('admin.orders.shopping_receipt.upload', $order) }}" method="post" enctype="multipart/form-data" class="form-inline" style="margin-bottom: 8px;">
+            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+              <label for="shopping_receipt" class="control-label">上传/更换（PDF/JPG/PNG）</label>
+              <input type="file" id="shopping_receipt" name="receipt" accept=".pdf,image/jpeg,image/png" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">上传凭据</button>
+          </form>
+          @if($order->hasShoppingReceipt())
+          <form action="{{ route('admin.orders.shopping_receipt.delete', $order) }}" method="post" style="display:inline;" onsubmit="return confirm('确认删除购物凭据？');">
+            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="_method" value="DELETE">
+            <button type="submit" class="btn btn-danger btn-sm">删除凭据</button>
+          </form>
+          @endif
+        </td>
       </tr>
       @endif
-      <!-- 订单发货结束 -->
       @if($order->refund_status !== \App\Models\Order::REFUND_STATUS_PENDING)
       <tr>
         <td>退款状态：</td>
         <td colspan="2">{{ \App\Models\Order::$refundStatusMap[$order->refund_status] }}，理由：{{ $order->extra['refund_reason'] }}</td>
         <td>
-        <!-- 如果订单退款状态是已申请，则展示处理按钮 -->
         @if($order->refund_status === \App\Models\Order::REFUND_STATUS_APPLIED)
           <button class="btn btn-sm btn-success" id="btn-refund-agree">同意</button>
           <button class="btn btn-sm btn-danger" id="btn-refund-disagree">不同意</button>
@@ -299,44 +256,7 @@
 
 <script>
 $(document).ready(function() {
-  function markAcceptance(status) {
-    $.ajax({
-      url: '{{ route('admin.orders.mark_acceptance', [$order->id]) }}',
-      type: 'POST',
-      data: JSON.stringify({
-        status: status,
-        _token: LA.token,
-      }),
-      contentType: 'application/json',
-      success: function () {
-        swal({
-          title: '操作成功',
-          type: 'success'
-        }, function() {
-          location.reload();
-        });
-      },
-      error: function (xhr) {
-        var msg = '受理状态更新失败';
-        if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
-          msg = xhr.responseJSON.message;
-        }
-        swal(msg, '', 'error');
-      }
-    });
-  }
-
-  $('#btn-mark-accepted').click(function() {
-    markAcceptance('accepted');
-  });
-
-  $('#btn-mark-pending').click(function() {
-    markAcceptance('pending');
-  });
-
-  // 不同意 按钮的点击事件
   $('#btn-refund-disagree').click(function() {
-  // 注意：Laravel-Admin 的 swal 是 v1 版本，参数和 v2 版本的不太一样
     swal({
       title: '输入拒绝退款理由',
       type: 'input',
@@ -345,8 +265,6 @@ $(document).ready(function() {
       confirmButtonText: "确认",
       cancelButtonText: "取消",
     }, function(inputValue){
-      // 用户点击了取消，inputValue 为 false
-      // === 是为了区分用户点击取消还是没有输入
       if (inputValue === false) {
         return;
       }
@@ -354,24 +272,20 @@ $(document).ready(function() {
         swal('理由不能为空', '', 'error')
         return;
       }
-      // Laravel-Admin 没有 axios，使用 jQuery 的 ajax 方法来请求
       $.ajax({
         url: '{{ route('admin.orders.handle_refund', [$order->id]) }}',
         type: 'POST',
-        data: JSON.stringify({   // 将请求变成 JSON 字符串
-          agree: false,  // 拒绝申请
+        data: JSON.stringify({
+          agree: false,
           reason: inputValue,
-          // 带上 CSRF Token
-          // Laravel-Admin 页面里可以通过 LA.token 获得 CSRF Token
           _token: LA.token,
         }),
-        contentType: 'application/json',  // 请求的数据格式为 JSON
-        success: function (data) {  // 返回成功时会调用这个函数
+        contentType: 'application/json',
+        success: function (data) {
           swal({
             title: '操作成功',
             type: 'success'
           }, function() {
-            // 用户点击 swal 上的 按钮时刷新页面
             location.reload();
           });
         }
@@ -379,7 +293,6 @@ $(document).ready(function() {
     });
   });
 
-  // 同意按钮的点击事件
   $('#btn-refund-agree').click(function() {
     swal({
       title: '确认要将款项退还给用户？',
@@ -389,7 +302,6 @@ $(document).ready(function() {
       confirmButtonText: "确认",
       cancelButtonText: "取消",
     }, function(ret){
-      // 用户点击取消，不做任何操作
       if (!ret) {
         return;
       }
@@ -397,7 +309,7 @@ $(document).ready(function() {
         url: '{{ route('admin.orders.handle_refund', [$order->id]) }}',
         type: 'POST',
         data: JSON.stringify({
-          agree: true, // 代表同意退款
+          agree: true,
           _token: LA.token,
         }),
         contentType: 'application/json',

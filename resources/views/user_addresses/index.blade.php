@@ -1,21 +1,20 @@
 @extends('layouts.app')
-@section('title', trans('frontend.address.list_title'))
+@section('title', is_site_mode_b() ? '国内转寄地址列表' : trans('frontend.address.list_title'))
 
 @section('content')
-<div>
 <div class="row">
 <div class="col-lg-10 col-lg-offset-1">
 <div class="panel panel-default">
   <div class="panel-heading">
-    <span>{{ trans('frontend.address.list_title') }}</span>
-    <a href="{{ route('user_addresses.create') }}" class="btn btn-primary">{{ trans('frontend.address.add_new') }}</a>
+    {{ is_site_mode_b() ? '国内转寄地址列表（Domestic Forwarding Address）' : trans('frontend.address.list_title') }}
+    <a href="{{ route('user_addresses.create') }}" class="pull-right">{{ trans('frontend.address.add_new') }}</a>
   </div>
   <div class="panel-body">
     <table class="table table-bordered table-striped">
       <thead>
       <tr>
         <th>{{ trans('frontend.address.consignee') }}</th>
-        <th>{{ trans('frontend.address.address') }}</th>
+        <th>{{ is_site_mode_b() ? '国内转寄地址' : trans('frontend.address.address') }}</th>
         <th>{{ trans('frontend.address.zip') }}</th>
         <th>{{ trans('frontend.address.phone') }}</th>
         <th>{{ trans('frontend.address.operation') }}</th>
@@ -42,7 +41,6 @@
       </tbody>
     </table>
   </div>
-</div>
 </div>
 </div>
 </div>

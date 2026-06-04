@@ -15,7 +15,7 @@ class CouponCode extends Model
 
     public static $typeMap = [
         self::TYPE_FIXED   => '固定金额',
-        self::TYPE_PERCENT => '比例',
+        self::TYPE_PERCENT => '百分比折扣',
     ];
 
     protected $fillable = [

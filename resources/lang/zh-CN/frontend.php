@@ -13,7 +13,7 @@ return [
         'login' => '登录',
         'register' => '会员注册',
         'cart' => '购物车',
-        'all_products' => '全部商品',
+        'all_products' => '所有商品',
         'main_categories_aria' => '主分类导航',
         'addresses' => '收货地址',
         'my_orders' => '我的订单',

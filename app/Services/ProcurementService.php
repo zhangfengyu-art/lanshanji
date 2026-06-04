@@ -3,19 +3,12 @@
 namespace App\Services;
 
 use App\Models\ProcurementOrder;
-use App\Services\ShadowReferenceLibraryService;
+use App\Models\ProcurementReferenceItem;
 use InvalidArgumentException;
+use Illuminate\Support\Facades\Schema;
 
 class ProcurementService
 {
-    /** @var ShadowReferenceLibraryService */
-    protected $shadowReferenceLibraryService;
-
-    public function __construct(ShadowReferenceLibraryService $shadowReferenceLibraryService)
-    {
-        $this->shadowReferenceLibraryService = $shadowReferenceLibraryService;
-    }
-
     /**
      * 从结算金额生成一条 C2C 代购需求单。
      *
@@ -29,43 +22,45 @@ class ProcurementService
             throw new InvalidArgumentException('Settlement amount must be greater than zero.');
         }
 
-        $item = $this->shadowReferenceLibraryService->pickByAmount($normalizedAmount);
+        $item = $this->pickRandomItem();
         $nickname = $this->pickRandomNickname();
-        $narrative = (string) data_get($item, 'narrative', '');
-        if ($narrative === '') {
-            $narrative = $this->buildNarrative((string) data_get($item, 'item_name', '日本代购素材示例'), $normalizedAmount);
-        }
-
-        $itemName = (string) data_get($item, 'item_name', '日本代购素材示例');
-        $itemImage = (string) data_get($item, 'image_url', '/images/procurement/default-item.jpg');
-        $categoryId = data_get($item, 'category_id');
-        $referencePrice = data_get($item, 'reference_price');
+        $narrative = $this->buildNarrative($item['name'], $normalizedAmount);
 
         return ProcurementOrder::query()->create([
-            'item_name' => $itemName,
-            'item_image' => $itemImage,
+            'item_name' => $item['name'],
+            'item_image' => $item['image'],
             'buyer_nickname' => $nickname,
             'proxy_status' => ProcurementOrder::STATUS_PENDING,
             'order_narrative' => $narrative,
             'budget_amount' => $normalizedAmount,
             'extra' => [
                 'source' => 'settlement',
-                'category' => (string) data_get($item, 'category.name', 'general'),
+                'category' => $item['category'],
                 'reference_item_id' => data_get($item, 'id'),
-                'reference_price' => $referencePrice,
-                'reference_strategy' => data_get($item, 'strategy'),
-                'reference_snapshot' => [
-                    'item_name' => $itemName,
-                    'image_url' => $itemImage,
-                    'reference_price' => $referencePrice,
-                    'category_id' => $categoryId,
-                    'weight_estimate' => data_get($item, 'weight_estimate'),
-                    'narrative' => $narrative,
-                ],
-                'pricing_snapshot' => data_get($item, 'pricing', []),
+                'reference_price' => data_get($item, 'reference_price'),
                 'seed_amount' => $normalizedAmount,
             ],
         ]);
+    }
+
+    protected function pickRandomItem()
+    {
+        if (!Schema::hasTable('procurement_reference_items')) {
+            return $this->defaultReferenceItem();
+        }
+
+        $item = ProcurementReferenceItem::query()->inRandomOrder()->first();
+        if (!$item) {
+            return $this->defaultReferenceItem();
+        }
+
+        return [
+            'id' => $item->id,
+            'name' => $item->name,
+            'image' => $item->image_url,
+            'category' => $item->category,
+            'reference_price' => (float) $item->reference_price,
+        ];
     }
 
     protected function pickRandomNickname()
@@ -97,10 +92,21 @@ class ProcurementService
             '想求购%s，预算大约%s，要求正品可提供小票。',
             '求代购%s，预算%s左右，近期可发货优先。',
             '帮忙带一件%s，预算%s，包装完整优先。',
-            '寻找%s，预算%s，支持同城面交或直邮。',
+            '寻找%s，预算%s，支持同城面交或EMS直邮。',
         ];
 
         $template = $templates[array_rand($templates)];
         return sprintf($template, $itemName, number_format($amount, 2));
+    }
+
+    protected function defaultReferenceItem()
+    {
+        return [
+            'id' => null,
+            'name' => '跨境代购服务',
+            'image' => '/images/procurement/default-item.jpg',
+            'category' => 'general',
+            'reference_price' => null,
+        ];
     }
 }

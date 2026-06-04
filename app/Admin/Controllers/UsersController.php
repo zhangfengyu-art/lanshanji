@@ -22,7 +22,6 @@ class UsersController extends Controller
     public function index()
     {
         return Admin::content(function (Content $content) {
-            // 页面标题
             $content->header('用户列表');
             $content->body($this->grid());
         });
@@ -86,7 +85,6 @@ class UsersController extends Controller
     {
         $controller = $this;
 
-        // 根据回调函数，在页面上
         return Admin::grid(User::class, function (Grid $grid) use ($controller) {
             $keyword = trim((string) request()->query('keyword', ''));
             if ($keyword !== '') {
@@ -99,9 +97,7 @@ class UsersController extends Controller
                 });
             }
 
-            // 创建一个列名为 ID 的列，内容是用户的 id 字段，并且可以在前端页面点击排序
             $grid->id('ID')->sortable();
-            // 创建一个列名为 用户名 的列，内容是用户的 name 字段。下面的 email() 和 created_at() 同理
             $grid->name('用户名');
             $grid->email('邮箱');
             $grid->email_verified('已验证邮箱')->display(function ($value) {
@@ -121,24 +117,25 @@ class UsersController extends Controller
                     0 => '已封禁',
                 ]);
             });
-            // 不在页面显示 `新建` 按钮，因为我们不需要在后台新建用户
             $grid->disableCreateButton();
             $grid->actions(function ($actions) use ($controller) {
                 $user = $actions->row;
                 $actions->disableView();
                 $actions->disableDelete();
-                // 不在每一行后面展示编辑按钮
                 $actions->disableEdit();
                 $actions->append($controller->renderRowActions($user));
             });
             $grid->tools(function ($tools) use ($controller) {
                 $keyword = trim((string) request()->query('keyword', ''));
                 $tools->append($controller->renderUserSearchTool($keyword));
-                // 禁用批量删除按钮
+                $tools->append(view('admin.users._batch_tools'));
                 $tools->batch(function ($batch) {
                     $batch->disableDelete();
                 });
             });
+
+            Admin::script(view('admin.partials._batch_helper_script')->render());
+            Admin::script(view('admin.users._batch_tools_script')->render());
         });
     }
 

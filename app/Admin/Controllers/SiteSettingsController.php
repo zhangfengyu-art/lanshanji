@@ -3,10 +3,12 @@
 namespace App\Admin\Controllers;
 
 use App\Models\SiteSetting;
+use App\Services\ExchangeRateService;
 use Encore\Admin\Facades\Admin;
 use Encore\Admin\Layout\Content;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
 
@@ -39,18 +41,21 @@ class SiteSettingsController extends Controller
             ['key' => 'active_site_mode'],
             ['value' => strtoupper((string) config('site.mode', 'A')) === 'B' ? 'B' : 'A']
         );
-        $resolvedSiteMode = site_mode();
+        $jpyPerCny = SiteSetting::query()->firstOrCreate(
+            ['key' => ExchangeRateService::SETTING_KEY],
+            ['value' => (string) config('site.default_jpy_per_cny', 22)]
+        );
 
-        return Admin::content(function (Content $content) use ($setting, $brandTextZh, $brandTextEn, $disableEmailVerificationForTesting, $activeSiteMode, $resolvedSiteMode) {
+        return Admin::content(function (Content $content) use ($setting, $brandTextZh, $brandTextEn, $disableEmailVerificationForTesting, $activeSiteMode, $jpyPerCny) {
             $content->header('站点设置');
-            $content->description('上传前台 Header Logo');
+            $content->description('维护站点品牌信息与运行模式');
             $content->body(view('admin.site_settings.logo', [
                 'setting' => $setting,
                 'brandTextZh' => $brandTextZh,
                 'brandTextEn' => $brandTextEn,
                 'disableEmailVerificationForTesting' => $disableEmailVerificationForTesting,
                 'activeSiteMode' => $activeSiteMode,
-                'resolvedSiteMode' => $resolvedSiteMode,
+                'jpyPerCny' => $jpyPerCny,
             ]));
         });
     }
@@ -62,6 +67,8 @@ class SiteSettingsController extends Controller
             'brand_text_zh' => 'nullable|string|max:60',
             'brand_text_en' => 'nullable|string|max:120',
             'disable_email_verification_for_testing' => 'nullable|boolean',
+            'active_site_mode' => 'required|in:A,B',
+            'jpy_per_cny' => 'required|numeric|min:0.01',
         ]);
 
         $setting = SiteSetting::query()->firstOrCreate(
@@ -80,6 +87,15 @@ class SiteSettingsController extends Controller
             ['key' => 'disable_email_verification_for_testing'],
             ['value' => '0']
         );
+        $activeSiteMode = SiteSetting::query()->firstOrCreate(
+            ['key' => 'active_site_mode'],
+            ['value' => strtoupper((string) config('site.mode', 'A')) === 'B' ? 'B' : 'A']
+        );
+        $jpyPerCny = SiteSetting::query()->firstOrCreate(
+            ['key' => ExchangeRateService::SETTING_KEY],
+            ['value' => (string) config('site.default_jpy_per_cny', 22)]
+        );
+
         $logoFile = $request->file('logo');
         if ($logoFile) {
             $path = $this->storeOptimizedLogo($logoFile);
@@ -101,6 +117,14 @@ class SiteSettingsController extends Controller
         $disableEmailVerificationForTesting->update([
             'value' => in_array($disableToggleInput, ['1', 1, true, 'on', 'yes'], true) ? '1' : '0',
         ]);
+        $activeSiteMode->update([
+            'value' => strtoupper((string) $request->input('active_site_mode', 'A')) === 'B' ? 'B' : 'A',
+        ]);
+        $jpyPerCny->update([
+            'value' => (string) round((float) $request->input('jpy_per_cny'), 6),
+        ]);
+        Cache::forget('site.active_mode');
+        ExchangeRateService::forgetCache();
 
         return redirect()
             ->route('admin.site_settings.logo.edit')

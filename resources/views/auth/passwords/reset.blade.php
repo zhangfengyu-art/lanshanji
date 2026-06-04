@@ -1,4 +1,4 @@
-@extends(is_site_mode_b() ? 'b_mode.layouts.app' : 'layouts.app')
+@extends('layouts.app')
 
 @section('content')
 <div class="container">

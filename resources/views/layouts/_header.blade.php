@@ -1,19 +1,17 @@
+@if(is_site_mode_b())
+  @include('layouts._header_site_b')
+@else
 <header class="site-header">
     <div class="site-header__container">
         <div class="site-header__main">
-            @if(!is_site_mode_b())
-                <div class="site-header__logo-wrap">
-                    <a class="site-header__logo" href="{{ url('/') }}" aria-label="{{ $siteBrandZh }}">
-                        @if(!empty($siteLogoUrl))
-                            <img src="{{ $siteLogoUrl }}" alt="{{ $siteBrandZh }}" style="height: 152px; width: auto; max-height: none;">
-                        @elseif(file_exists(public_path('images/brand-logo.svg')))
-                            <img src="{{ asset('images/brand-logo.svg') }}" alt="{{ $siteBrandZh }}" style="height: 152px; width: auto; max-height: none;">
-                        @else
-                            <span class="site-header__logo-fallback">岚山烟务所</span>
-                        @endif
-                    </a>
-                </div>
-            @endif
+            <div class="site-header__logo-wrap">
+                <a class="site-header__logo" href="{{ site_home_url() }}" aria-label="{{ site_brand_zh() }}">
+                    @php $headerLogoUrl = site_logo_url() ?: ($siteLogoUrl ?? null); @endphp
+                    @if(!empty($headerLogoUrl))
+                        <img src="{{ $headerLogoUrl }}" alt="{{ site_brand_zh() }}" style="height: 152px; width: auto; max-height: none;">
+                    @endif
+                </a>
+            </div>
 
             <div class="site-header__actions">
                 <div class="site-header__user-nav">
@@ -29,12 +27,13 @@
                                 <li><a href="{{ route('user_addresses.index') }}">{{ trans('frontend.nav.addresses') }}</a></li>
                                 <li><a href="{{ route('orders.index') }}">{{ trans('frontend.nav.my_orders') }}</a></li>
                                 <li><a href="{{ route('products.favorites') }}">{{ trans('frontend.nav.my_favorites') }}</a></li>
-                                <li><a href="{{ route('support.feedbacks.replies') }}">问题回复</a></li>
+                                <li><a href="{{ route('support.feedbacks.index') }}">客服反馈</a></li>
+                                <li><a href="{{ route('support.feedbacks.create') }}">提交反馈</a></li>
                                 <li>
                                     <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                                         {{ trans('frontend.nav.logout') }}
                                     </a>
-                                    <form id="logout-form" class="logout-form" action="{{ route('logout') }}" method="POST">
+                                    <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
                                         {{ csrf_field() }}
                                     </form>
                                 </li>
@@ -76,9 +75,21 @@
 
     <div class="site-header__nav-wrap">
         <div class="site-header__container">
-            @php $currentCategoryId = (int) request('category', 0); @endphp
+            @php
+                $currentCategoryId = (int) request('category', 0);
+                $isAllProductsActive = $currentCategoryId === 0;
+                $reservedCategoryNames = ['所有商品', '全部商品'];
+            @endphp
             <nav class="site-header__nav" aria-label="{{ trans('frontend.nav.main_categories_aria') }}">
-                @forelse($categories as $category)
+                <div class="top-category-item{{ $isAllProductsActive ? ' is-active' : '' }}">
+                    <a class="top-category-link{{ $isAllProductsActive ? ' is-active' : '' }}" href="{{ route('products.index') }}">
+                        {{ trans('frontend.nav.all_products') }}
+                    </a>
+                </div>
+                @foreach($categories as $category)
+                    @if(in_array($category->name, $reservedCategoryNames, true))
+                        @continue
+                    @endif
                     @php
                         $childIds = $category->children->pluck('id')->map(function ($id) {
                             return (int) $id;
@@ -96,16 +107,15 @@
                                     @php $isChildCurrent = $currentCategoryId === (int) $child->id; @endphp
                                     <a class="top-category-sublink{{ $isChildCurrent ? ' is-active' : '' }}" href="{{ route('products.index', ['category' => $child->id]) }}">
                                         <span>{{ $child->name }}</span>
-                                        <span class="top-category-badge">直邮</span>
+                                        <span class="top-category-badge">EMS直邮</span>
                                     </a>
                                 @endforeach
                             </div>
                         @endif
                     </div>
-                @empty
-                    <a class="top-category-link is-empty" href="{{ route('products.index') }}">{{ trans('frontend.nav.all_products') }}</a>
-                @endforelse
+                @endforeach
             </nav>
         </div>
     </div>
 </header>
+@endif

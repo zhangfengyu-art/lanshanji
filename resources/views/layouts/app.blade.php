@@ -6,25 +6,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- CSRF Token -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', trans('frontend.site.title')) - {{ trans('frontend.site.subtitle') }}</title>
+    <title>@yield('title', site_brand_zh()) - {{ site_page_subtitle() }}</title>
     <!-- 样式 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="{{ asset('css/app.css') }}?v={{ @filemtime(public_path('css/app.css')) }}" rel="stylesheet">
+    <link href="{{ asset('css/app.css') }}" rel="stylesheet">
     @if(is_site_mode_b())
-        <link href="{{ asset('css/site-mode-b.css') }}?v={{ @filemtime(public_path('css/site-mode-b.css')) }}" rel="stylesheet">
+    <link href="{{ asset('css/site-b.css') }}" rel="stylesheet">
     @endif
-        @yield('styles')
+        <style>
+            .mini-cart-drawer {
+                width: 320px !important;
+                max-width: calc(100vw - 90px) !important;
+                overflow: hidden !important;
+            }
+
+            .mini-cart-drawer .mini-cart-item__img,
+            .mini-cart-drawer [class*="item__img"] {
+                width: 52px !important;
+                height: 52px !important;
+                overflow: hidden !important;
+                flex: 0 0 52px !important;
+            }
+
+            .mini-cart-drawer .mini-cart-item__img img,
+            .mini-cart-drawer [class*="item__img"] img,
+            .mini-cart-drawer img {
+                display: block !important;
+                width: 52px !important;
+                height: 52px !important;
+                max-width: 52px !important;
+                max-height: 52px !important;
+                object-fit: contain !important;
+                position: static !important;
+            }
+        </style>
 </head>
-<body class="site-mode-{{ strtolower(site_mode()) }}">
+<body>
     @php
         $isCartAvailable = auth()->check();
     @endphp
-    <div id="app" class="{{ route_class() }}-page">
-        @if(is_site_mode_b())
-            @include('b_mode.layouts._header')
-        @else
-            @include('layouts._header')
-        @endif
+    @php
+        $routeClass = route_class();
+        $pageClasses = $routeClass.'-page';
+        if (in_array($routeClass, ['payment-wechat', 'payment-alipay'], true)) {
+            $pageClasses .= ' orders-show-page payment-checkout-page';
+        }
+        if (is_site_mode_b()) {
+            $pageClasses .= ' site-mode-b';
+        }
+    @endphp
+    <div id="app" class="{{ $pageClasses }}">
+        @include('layouts._header')
         <div class="container">
             @yield('content')
         </div>
@@ -53,7 +85,7 @@
         window.AppI18n = @json(trans('frontend.js'));
         window.AppI18nCart = @json(trans('frontend.cart'));
     </script>
-    <script src="{{ asset('js/app.js') }}?v={{ @filemtime(public_path('js/app.js')) }}"></script>
+    <script src="{{ asset('js/app.js') }}"></script>
     @yield('scriptsAfterJs')
 </body>
 </html>

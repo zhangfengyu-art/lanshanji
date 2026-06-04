@@ -1,4 +1,4 @@
-@extends(is_site_mode_b() ? 'b_mode.layouts.app' : 'layouts.app')
+@extends('layouts.app')
 @section('title', '代购任务确认')
 
 @section('content')
@@ -7,84 +7,24 @@
 @endphp
 
 <style>
-  .pa-wrap {
-    max-width: 1060px;
-    margin: 20px auto 30px;
-    padding: 0 6px;
-  }
+  .pa-wrap { max-width: 1020px; margin: 20px auto 30px; }
   .pa-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 14px; }
-  .pa-card {
-    background: #fff;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    border-radius: 16px;
-    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
-    overflow: hidden;
-  }
-  .pa-head {
-    padding: 13px 16px;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-    font-size: 16px;
-    font-weight: 700;
-    color: #1f2937;
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  }
-  .pa-body { padding: 16px; }
-  .pa-row { margin-bottom: 14px; }
-  .pa-label { display: block; margin-bottom: 6px; font-size: 12px; color: #64748b; }
-  .pa-value { color: #111827; font-size: 14px; line-height: 1.8; }
-  .pa-title { margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; }
-  .pa-budget { margin: 6px 0 0; font-size: 30px; color: #0f172a; font-weight: 800; line-height: 1.15; }
-  .pa-agreement {
-    font-size: 13px;
-    color: #334155;
-    line-height: 1.8;
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 12px;
-    max-height: 320px;
-    overflow: auto;
-  }
-  .pa-select, .pa-textarea {
-    width: 100%;
-    border: 1px solid #d7dbe2;
-    border-radius: 10px;
-    padding: 9px 10px;
-    background: #fff;
-  }
-  .pa-textarea { min-height: 78px; resize: vertical; }
-  .pa-summary-line {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
-    color: #475569;
-    font-size: 14px;
-  }
-  .pa-summary-total {
-    margin-top: 2px;
-    font-size: 21px;
-    font-weight: 800;
-    color: #0f172a;
-    border-top: 1px dashed #d4d7de;
-    padding-top: 11px;
-  }
-  .pa-btn {
-    width: 100%;
-    border: 0;
-    border-radius: 12px;
-    padding: 11px 12px;
-    font-size: 15px;
-    font-weight: 700;
-    color: #fff;
-    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-    transition: transform .16s ease, box-shadow .16s ease;
-  }
-  .pa-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 16px rgba(15, 23, 42, 0.2); }
-  .pa-note { margin-top: 8px; color: #64748b; font-size: 12px; }
-  @media (max-width: 900px) {
-    .pa-grid { grid-template-columns: 1fr; }
-    .pa-wrap { margin: 10px auto 16px; }
-  }
+  .pa-card { background: #fff; border: 1px solid #e6e7eb; border-radius: 12px; box-shadow: 0 4px 14px rgba(20, 24, 31, 0.05); }
+  .pa-head { padding: 12px 14px; border-bottom: 1px solid #eef0f3; font-size: 16px; font-weight: 700; color: #20242c; }
+  .pa-body { padding: 14px; }
+  .pa-row { margin-bottom: 12px; }
+  .pa-label { display: block; margin-bottom: 6px; font-size: 12px; color: #6b7280; }
+  .pa-value { color: #111827; font-size: 14px; }
+  .pa-title { margin: 0; font-size: 22px; color: #111827; }
+  .pa-budget { margin: 6px 0 0; font-size: 26px; color: #111827; font-weight: 700; }
+  .pa-agreement { font-size: 13px; color: #374151; line-height: 1.8; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; max-height: 300px; overflow: auto; }
+  .pa-select, .pa-textarea { width: 100%; border: 1px solid #d7dbe2; border-radius: 8px; padding: 8px 10px; }
+  .pa-textarea { min-height: 74px; resize: vertical; }
+  .pa-summary-line { display: flex; justify-content: space-between; margin-bottom: 10px; color: #4b5563; }
+  .pa-summary-total { font-size: 20px; font-weight: 700; color: #111827; border-top: 1px dashed #d4d7de; padding-top: 10px; }
+  .pa-btn { width: 100%; border: 0; border-radius: 10px; padding: 11px 12px; font-size: 15px; font-weight: 700; color: #fff; background: linear-gradient(180deg, #1f242e 0%, #11151d 100%); }
+  .pa-note { margin-top: 8px; color: #6b7280; font-size: 12px; }
+  @media (max-width: 900px) { .pa-grid { grid-template-columns: 1fr; } }
 </style>
 
 <div class="pa-wrap">
@@ -143,8 +83,8 @@
         <div class="pa-summary-line"><span>EMS运费</span><strong>1750.00</strong></div>
         <div class="pa-summary-line pa-summary-total"><span>应付总额</span><strong id="pa-total">{{ number_format($unitPrice + ($unitPrice * 0.13) + 300 + 1750, 2, '.', '') }}</strong></div>
 
-        <button type="button" id="pa-confirm" class="pa-btn">提交订单并支付</button>
-        <div class="pa-note">点击后将创建订单，并进入支付页面。</div>
+        <button type="button" id="pa-confirm" class="pa-btn">确认并预付资金</button>
+        <div class="pa-note">点击后将创建订单并跳转至订单支付页。</div>
       </div>
     </aside>
   </div>
@@ -163,7 +103,7 @@ $(function () {
 
     var $btn = $(this);
     if ($btn.prop('disabled')) return;
-    $btn.prop('disabled', true).text('正在跳转支付...');
+    $btn.prop('disabled', true).text('创建任务订单中...');
 
     axios.post('{{ route('orders.store') }}', {
       address_id: addressId,
@@ -172,13 +112,13 @@ $(function () {
     }).then(function (resp) {
       var orderId = resp.data.id;
       if (!orderId) {
-        swal('创建订单失败，请稍后重试', '', 'error');
-        $btn.prop('disabled', false).text('提交订单并支付');
+        swal('创建订单失败，请重试', '', 'error');
+        $btn.prop('disabled', false).text('确认并预付资金');
         return;
       }
       window.location.href = '{{ url('orders') }}/' + orderId;
     }).catch(function (error) {
-      $btn.prop('disabled', false).text('提交订单并支付');
+      $btn.prop('disabled', false).text('确认并预付资金');
       if (error.response && error.response.status === 422 && error.response.data && error.response.data.errors) {
         var msg = '';
         _.forEach(error.response.data.errors, function (arr) { _.forEach(arr, function (m) { msg += m + '\n'; }); });

@@ -1,4 +1,4 @@
-@extends(is_site_mode_b() ? 'b_mode.layouts.app' : 'layouts.app')
+@extends('layouts.app')
 @section('title', '订单核算与支付')
 
 @section('content')
@@ -45,12 +45,12 @@
           <div>
             <h1 class="pc-title">{{ $product->title }}</h1>
             <p class="pc-price" id="pc-unit-price">JPY ¥{{ number_format((float) $defaultSku->price, 2, '.', '') }}</p>
-            <p class="pc-muted">提交订单后将进入支付页面，支持支付宝与微信支付。</p>
+            <p class="pc-muted">下单后将自动跳转到支付页，支持支付宝与微信支付。</p>
           </div>
         </div>
 
         <div class="pc-row" style="margin-top:14px;">
-           <label class="pc-label">加入购物车</label>
+          <label class="pc-label">选择规格</label>
           <div class="pc-skus" id="pc-sku-list">
             @foreach($product->skus as $sku)
               <button type="button" class="pc-sku{{ (int)$sku->id === $defaultSkuId ? ' is-active' : '' }}" data-sku-id="{{ $sku->id }}" data-price="{{ $sku->price }}" data-stock="{{ (int)$sku->stock }}" data-title="{{ $sku->title }}">{{ $sku->title }}</button>
@@ -94,8 +94,8 @@
         <div class="pc-summary-line"><span>EMS运费</span><strong id="pc-ship">1750.00</strong></div>
         <div class="pc-summary-line pc-summary-total"><span>应付总额</span><strong id="pc-total">0.00</strong></div>
 
-        <button type="button" id="pc-pay-now" class="pc-pay-btn">提交订单并支付</button>
-        <div class="pc-note">点击后将创建订单，并进入支付页面。</div>
+        <button type="button" id="pc-pay-now" class="pc-pay-btn">立刻支付</button>
+        <div class="pc-note">点击后创建订单并自动跳转到支付页面。</div>
       </div>
     </aside>
   </div>
@@ -176,7 +176,7 @@ $(function () {
 
     var $btn = $(this);
     if ($btn.prop('disabled')) return;
-    $btn.prop('disabled', true).text('正在跳转支付...');
+    $btn.prop('disabled', true).text('创建订单中...');
 
     axios.post('{{ route('orders.store') }}', {
       address_id: addressId,
@@ -185,13 +185,13 @@ $(function () {
     }).then(function (resp) {
       var orderId = resp.data.id;
       if (!orderId) {
-        swal('创建订单失败，请稍后重试', '', 'error');
-        $btn.prop('disabled', false).text('提交订单并支付');
+        swal('创建订单失败，请重试', '', 'error');
+        $btn.prop('disabled', false).text('立刻支付');
         return;
       }
       window.location.href = '{{ url('orders') }}/' + orderId;
     }).catch(function (error) {
-      $btn.prop('disabled', false).text('提交订单并支付');
+      $btn.prop('disabled', false).text('立刻支付');
       if (error.response && error.response.status === 422 && error.response.data && error.response.data.errors) {
         var msg = '';
         _.forEach(error.response.data.errors, function (arr) { _.forEach(arr, function (m) { msg += m + '\n'; }); });

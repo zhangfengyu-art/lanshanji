@@ -5,11 +5,11 @@ namespace App\Admin\Controllers;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductSku;
+use App\Services\HeatedTobaccoClassificationService;
+use App\Services\OrderTobaccoLimitService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 use Encore\Admin\Form;
 use Encore\Admin\Grid;
@@ -17,7 +17,6 @@ use Encore\Admin\Facades\Admin;
 use Encore\Admin\Layout\Content;
 use App\Http\Controllers\Controller;
 use Encore\Admin\Controllers\ModelForm;
-use Illuminate\Support\Facades\Schema;
 
 class ProductsController extends Controller
 {
@@ -99,91 +98,41 @@ class ProductsController extends Controller
             $grid->column('category.name', '所属分类')->display(function ($value) {
                 return $value ?: '-';
             });
+            $grid->column('shipping_mode', '寄送模式')->display(function ($value) {
+                $resolved = $value ?: optional($this->category)->default_shipping_mode;
+
+                return Product::shippingModeOptions()[$resolved] ?? 'EMS 自缴税';
+            });
+            $grid->column('tobacco_type', '烟草分类')->display(function ($value) {
+                return Product::tobaccoTypeOptions()[$value] ?? '—';
+            });
+            $grid->column('unit_weight_grams', '单位重量(g)');
+            $grid->column('unit_sticks', '支数/包')->display(function ($sticks) {
+                return \App\Services\OrderTobaccoLimitService::countsTowardStickLimit($this->tobacco_type)
+                    ? (int) $sticks
+                    : '—';
+            });
             $grid->on_sale('已上架')->display(function ($value) {
                 return $value ? '是' : '否';
             });
             $grid->price('价格');
-            $grid->column('sku_logistics', 'SKU物流数据')->display(function () {
-                $skus = collect($this->skus ?: []);
-                if ($skus->isEmpty()) {
-                    return '<span class="label label-default">无 SKU</span>';
-                }
+            $grid->column('sale_status', '销售状态')->display(function ($status) {
+                $labels = [
+                    ProductSku::STATUS_ACTIVE => '<span class="label label-success">正常购买</span>',
+                    ProductSku::STATUS_LIMITED => '<span class="label label-warning">限购</span>',
+                    ProductSku::STATUS_DEPLETED => '<span class="label label-default">售罄</span>',
+                ];
 
-                return $skus->map(function ($sku) {
-                    $title = e((string) data_get($sku, 'title', 'SKU'));
-                    $itemType = (string) data_get($sku, 'item_type', '');
-                    if ($itemType === 'cigarette') {
-                        return '<div><strong>'.$title.'</strong>：香烟 / '.(int) data_get($sku, 'unit_sticks', 0).' 支</div>';
-                    }
-                    if ($itemType === 'tobacco_silk') {
-                        return '<div><strong>'.$title.'</strong>：烟丝 / '.(int) data_get($sku, 'unit_weight', 0).' g</div>';
-                    }
-                    return '<div><strong>'.$title.'</strong>：<span style="color:#d9534f;">未录入</span></div>';
-                })->implode('');
+                return $labels[$status] ?? e((string) $status);
             });
-            $grid->column('sku_logistics_missing', '缺失数')->display(function () {
-                $skus = collect($this->skus ?: []);
-                if ($skus->isEmpty()) {
-                    return '<span class="label label-default">-</span>';
-                }
-                $missing = $skus->filter(function ($sku) {
-                    $itemType = (string) data_get($sku, 'item_type', '');
-                    if ($itemType === 'cigarette') {
-                        return (int) data_get($sku, 'unit_sticks', 0) <= 0;
-                    }
-                    if ($itemType === 'tobacco_silk') {
-                        return (int) data_get($sku, 'unit_weight', 0) <= 0;
-                    }
-                    return true;
-                })->count();
-
-                if ($missing > 0) {
-                    return '<span class="label label-danger">'.$missing.' 个待补</span>';
-                }
-                return '<span class="label label-success">已完整</span>';
-            });
-            $grid->column('sku_logistics_quick', '快速录入')->display(function () {
-                $skus = collect($this->skus ?: []);
-                if ($skus->isEmpty()) {
-                    return '-';
+            $grid->column('purchase_limit', '限购数量')->display(function ($limit) {
+                if ($this->sale_status !== ProductSku::STATUS_LIMITED) {
+                    return '—';
                 }
 
-                $quickUrl = admin_url('products/'.$this->id.'/quick-logistics');
-                return $skus->map(function ($sku) use ($quickUrl) {
-                    $skuId = (int) data_get($sku, 'id');
-                    $type = (string) data_get($sku, 'item_type', '');
-                    $sticks = (int) data_get($sku, 'unit_sticks', 0);
-                    $weight = (int) data_get($sku, 'unit_weight', 0);
-                    $title = e((string) data_get($sku, 'title', 'SKU'));
-                    $sticksDisabled = $type === 'cigarette' ? '' : 'disabled';
-                    $weightDisabled = $type === 'tobacco_silk' ? '' : 'disabled';
+                $limit = (int) $limit;
 
-                    $html = '<div class="quick-sku-logistics-row" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">';
-                    $html .= '<span style="min-width:90px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'.$title.'">'.$title.'</span>';
-                    $html .= '<select class="form-control input-sm quick-sku-item-type" style="width:95px;" data-sku-id="'.$skuId.'">';
-                    $html .= '<option value="">未选</option>';
-                    $html .= '<option value="cigarette"'.($type === 'cigarette' ? ' selected' : '').'>香烟</option>';
-                    $html .= '<option value="tobacco_silk"'.($type === 'tobacco_silk' ? ' selected' : '').'>烟丝</option>';
-                    $html .= '</select>';
-                    $html .= '<input type="number" min="0" class="form-control input-sm quick-sku-unit-sticks" style="width:78px;" placeholder="支数" value="'.$sticks.'" '.$sticksDisabled.'>';
-                    $html .= '<input type="number" min="0" class="form-control input-sm quick-sku-unit-weight" style="width:86px;" placeholder="克重g" value="'.$weight.'" '.$weightDisabled.'>';
-                    $html .= '<button type="button" class="btn btn-xs btn-primary btn-quick-sku-logistics-save" data-url="'.$quickUrl.'" data-sku-id="'.$skuId.'">保存</button>';
-                    $html .= '</div>';
-
-                    return $html;
-                })->implode('');
-            });
-            $grid->column('dispatch_quick', '库存调整')->display(function () {
-                $skus = collect($this->skus ?: []);
-                $totalStock = (int) $skus->sum('stock');
-                $quickUrl = admin_url('products/'.$this->id.'/quick-dispatch');
-
-                return '<div class="dispatch-quick-editor" style="min-width:280px;display:flex;gap:6px;align-items:center;">'
-                    .'<span style="font-size:11px;color:#888;">当前: <strong>'.$totalStock.'</strong></span>'
-                    .'<input type="number" class="form-control input-sm quick-stock-delta" style="width:80px;" value="" placeholder="增量(正增负减)">'
-                    .'<button type="button" class="btn btn-xs btn-primary btn-quick-stock-add" data-url="'.$quickUrl.'">添加库存</button>'
-                    .'<span style="font-size:10px;color:#999;margin-left:6px;">(正数增加,负数扣减)</span>'
-                    .'</div>';
+                return $limit > 0 ? $limit.' 件/单' : '—';
             });
             $grid->rating('评分');
             $grid->sold_count('销量');
@@ -198,103 +147,25 @@ class ProductsController extends Controller
 
             $grid->actions(function ($actions) {
                 $actions->disableView();
+                $actions->disableDelete();
             });
             $grid->tools(function ($tools) {
-                $tools->append(view('admin.products._batch_set_category', [
+                // 禁用批量删除按钮
+                $tools->batch(function ($batch) {
+                    $batch->disableDelete();
+                });
+
+                $tools->append(view('admin.products._batch_tools', [
                     'categories' => $this->categoryOptions(),
                 ]));
+                $tools->append(
+                    '<a class="btn btn-sm btn-default" href="'.route('admin.products.import_template').'" style="margin-left:6px;">'
+                    .'<i class="fa fa-download"></i> 导入模板</a>'
+                );
+                $tools->append(view('admin.products._import_csv'));
             });
 
-            Admin::script(<<<'JS'
-$(document).off('click', '.btn-quick-stock-add').on('click', '.btn-quick-stock-add', function () {
-    var $btn = $(this);
-    var $editor = $btn.closest('.dispatch-quick-editor');
-    var delta = parseInt($editor.find('.quick-stock-delta').val(), 10);
-
-    if (isNaN(delta)) {
-        alert('Please enter a valid number. Positive and negative values are supported.');
-        return;
-    }
-
-    var url = $btn.data('url');
-    $.post(url, {
-        _token: LA.token,
-        stock_delta: delta
-    }, function (ret) {
-        if (ret.status) {
-            $.pjax.reload('#pjax-container');
-            return;
-        }
-        alert(ret.message || '更新失败');
-    }).fail(function () {
-        alert('请求失败，请稍后重试');
-    });
-});
-
-$(document).off('change', '.quick-sku-item-type').on('change', '.quick-sku-item-type', function () {
-    var $row = $(this).closest('.quick-sku-logistics-row');
-    var type = $(this).val();
-    var $sticks = $row.find('.quick-sku-unit-sticks');
-    var $weight = $row.find('.quick-sku-unit-weight');
-
-    $sticks.prop('disabled', type !== 'cigarette');
-    $weight.prop('disabled', type !== 'tobacco_silk');
-});
-
-$(document).off('click', '.btn-quick-sku-logistics-save').on('click', '.btn-quick-sku-logistics-save', function () {
-    var $btn = $(this);
-    var $row = $btn.closest('.quick-sku-logistics-row');
-    var url = $btn.data('url');
-    var payload = {
-        _token: LA.token,
-        sku_id: $btn.data('sku-id'),
-        item_type: $row.find('.quick-sku-item-type').val(),
-        unit_sticks: parseInt($row.find('.quick-sku-unit-sticks').val(), 10) || 0,
-        unit_weight: parseInt($row.find('.quick-sku-unit-weight').val(), 10) || 0
-    };
-
-    $.post(url, payload, function (ret) {
-        if (ret.status) {
-            $.pjax.reload('#pjax-container');
-            return;
-        }
-        alert(ret.message || '保存失败');
-    }).fail(function () {
-        alert('请求失败，请稍后重试');
-    });
-});
-
-$(document).off('click', '.btn-batch-set-category').on('click', '.btn-batch-set-category', function () {
-    var categoryId = $('.batch-category-select').val();
-    var ids = [];
-    $('.grid-row-checkbox:checked').each(function () {
-        ids.push($(this).val());
-    });
-
-    if (!ids.length) {
-        alert('Please select at least one product to update.');
-        return;
-    }
-
-    if (!categoryId) {
-        alert('Please choose a target category.');
-        return;
-    }
-
-    $.post('/admin/products/batch-set-category', {
-        _token: LA.token,
-        ids: ids,
-        category_id: categoryId
-    }, function (ret) {
-        if (ret.status) {
-            $.pjax.reload('#pjax-container');
-            return;
-        }
-        alert(ret.message || 'Batch update failed');
-    });
-});
-JS
-            );
+            Admin::script(view('admin.products._batch_tools_script')->render());
         });
     }
 
@@ -306,104 +177,99 @@ JS
     protected function form()
     {
         // 创建一个表单
-        $controller = $this;
-
-        return Admin::form(Product::class, function (Form $form) use ($controller) {
-            $form->tools(function (Form\Tools $tools) {
-                $tools->disableView();
-                $tools->disableDelete();
-            });
-
-            $siteModeForProduct = $controller->resolveProductSiteMode($form->model());
-
-            $form->hidden('image_original');
-            $form->hidden('image_crop_meta');
-            $form->hidden('image_crop_payload');
-            $form->ignore(['image_crop_payload', 'skus']);
+        return Admin::form(Product::class, function (Form $form) {
+            // 裁切辅助字段（非数据库列，勿用 $form->hidden 注册为模型属性）
+            $form->html(
+                '<input type="hidden" name="_image_crop_meta" value="">'
+                .'<input type="hidden" name="_image_crop_payload" value="">',
+                ''
+            );
 
             // 创建一个输入框，第一个参数 title 是模型的字段名，第二个参数是该字段描述
             $form->text('title', '商品名称')->rules('required');
             $form->select('category_id', '所属分类')
-                ->options($this->categoryOptions($siteModeForProduct))
-                ->help('请为商品指定一个分类，前台导航筛选依赖此字段');
+                ->options($this->categoryOptions())
+                ->help('请为商品选择归属分类，前台导航与筛选依赖此字段');
+            $form->select('shipping_mode', '寄送模式')
+                ->options(['' => '继承分类默认'] + Product::shippingModeOptions())
+                ->help('留空则使用所属分类的默认寄送模式；含税包邮商品报价已含运费与税费，结算不再加收 EMS');
+            $form->select('tobacco_type', '烟草分类（物流）')
+                ->options(Product::tobaccoTypeOptions())
+                ->rules('required')
+                ->default(OrderTobaccoLimitService::TYPE_CIGARETTE)
+                ->help('新品加热烟请选「加热烟」并填每包支数；旧品若一直标「香烟」可不改，仍计入 400 支。选加热烟分类后保存时会按分类名自动建议本项。');
+            $form->number('unit_weight_grams', '单位重量（克）')
+                ->min(1)
+                ->default(0)
+                ->rules('required|integer|min:1')
+                ->help('香烟：每盒/每包重量；手卷烟丝：每包重量');
+            $form->number('unit_sticks', '每包/盒支数（仅香烟）')
+                ->min(1)
+                ->default(0)
+                ->help('烟草分类为「香烟」或「加热烟」时必填，计入单笔 400 支限额（二者合计）');
             // 创建一个选择图片的框
-            $form->image('image', '封面图片')->rules('required|image')->help('上传后会弹出裁切器，支持缩放与拖拽，保存后前台使用裁切结果图。');
+            $form->image('image', '商品主图')->rules('required|image')->help('上传后会弹出裁切器，支持缩放和拖拽；保存后前台使用裁切后的图片。');
             // 创建一个富文本编辑器
             $form->editor('description', '商品描述')->rules('required');
             // 创建一组单选框
-            $form->radio('on_sale', '上架')->options(['1' => '是', '0' => '否'])->default('0');
+            $form->radio('on_sale', '上架状态')->options(['1' => '已上架', '0' => '未上架'])->default('0');
+            $form->select('sale_status', '销售状态')
+                ->options(Product::saleStatusOptions())
+                ->default(ProductSku::STATUS_ACTIVE)
+                ->rules('required')
+                ->help('正常购买：用户可下单；限购：需填写下方限购数量；售罄：前台不可购买');
+            $form->number('purchase_limit', '限购数量（件/单）')
+                ->min(1)
+                ->help('仅当销售状态为「限购」时生效');
             // 直接添加一对多的关联模型
-            $form->hasMany('skus', function (Form\NestedForm $form) {
-                $form->text('title', 'SKU 名称')->rules('required');
-                $form->text('description', 'SKU 描述')->rules('required');
-                $form->text('price', '单价')->rules('required|numeric|min:0.01');
-                $form->text('stock', '剩余库存')->rules('required|integer|min:0');
-                $form->select('item_type', '物流品类')->options([
-                    'cigarette' => '香烟',
-                    'tobacco_silk' => '烟丝',
-                ])->default(null)->help('选择后将联动显示对应录入字段');
-                $form->number('unit_sticks', '每包支数')->min(0)->default(0)->help('仅香烟有效，例如 20');
-                $form->number('unit_weight', '每包克重(g)')->min(0)->default(0)->help('仅烟丝有效，例如 50');
-            });
-            Admin::script(<<<'JS'
+            $form->hasMany('skus', 'SKU 规格', function (Form\NestedForm $form) {
+                $form->text('title', '规格名称')->rules('required');
+                $form->text('description', '规格说明')->rules('required');
+                $form->text('price', '销售单价')->rules('required|numeric|min:0.01');
+            })->help('前台展示价 = 各规格「销售单价」中的最低价，保存后自动同步');
+            $heatedCategoryPatternsJson = json_encode(
+                config('heated_tobacco_classification.category_name_patterns', []),
+                JSON_UNESCAPED_UNICODE
+            );
+            Admin::script(<<<JS
 (function () {
-    function markHasManyButtonsNoPjax() {
-        $('.has-many-skus .add, .has-many-skus .remove').attr('data-no-pjax', '1');
-    }
-
-    function updateSkuLogisticsFields($scope) {
-        var $type = $scope.find('select[name$="[item_type]"]');
-        if (!$type.length) {
-            return;
-        }
-
-        var value = $type.val() || '';
-        var $sticks = $scope.find('.field_unit_sticks');
-        var $weight = $scope.find('.field_unit_weight');
-
-        $sticks.hide();
-        $weight.hide();
-
-        if (value === 'cigarette') {
-            $sticks.show();
-            return;
-        }
-        if (value === 'tobacco_silk') {
-            $weight.show();
+    function syncPurchaseLimitField() {
+        var status = $('select[name="sale_status"]').val();
+        var $group = $('input[name="purchase_limit"]').closest('.form-group');
+        if (status === 'LIMITED') {
+            $group.show();
+        } else {
+            $group.hide();
         }
     }
-
-    function syncAllSkuRows() {
-        $('.has-many-skus-form').each(function () {
-            updateSkuLogisticsFields($(this));
-        });
+    function syncTobaccoFields() {
+        var type = $('select[name="tobacco_type"]').val();
+        var $sticksGroup = $('input[name="unit_sticks"]').closest('.form-group');
+        if (type === 'cigarette' || type === 'heated_tobacco') {
+            $sticksGroup.show();
+        } else {
+            $sticksGroup.hide();
+        }
+        if (type === 'non_tobacco' || type === 'rolling_tobacco') {
+            $('input[name="unit_sticks"]').val(0);
+        }
     }
-
-    $(document).off('change.sku-logistics-link', 'select[name$="[item_type]"]')
-        .on('change.sku-logistics-link', 'select[name$="[item_type]"]', function () {
-            updateSkuLogisticsFields($(this).closest('.has-many-skus-form'));
+    var heatedCategoryPatterns = {$heatedCategoryPatternsJson};
+    function syncTobaccoTypeFromCategory() {
+        var catText = $('select[name="category_id"] option:selected').text() || '';
+        var isHeated = heatedCategoryPatterns.some(function (p) {
+            return p && catText.indexOf(p) !== -1;
         });
-
-    $(document).off('click.sku-logistics-add', '.has-many-skus .add')
-        .on('click.sku-logistics-add', '.has-many-skus .add', function () {
-            setTimeout(function () {
-                syncAllSkuRows();
-                markHasManyButtonsNoPjax();
-            }, 50);
-        });
-
-    $(document).off('click.sku-logistics-remove', '.has-many-skus .remove')
-        .on('click.sku-logistics-remove', '.has-many-skus .remove', function () {
-            setTimeout(function () {
-                syncAllSkuRows();
-                markHasManyButtonsNoPjax();
-            }, 50);
-        });
-
-    $(function () {
-        syncAllSkuRows();
-        markHasManyButtonsNoPjax();
-    });
+        if (isHeated) {
+            $('select[name="tobacco_type"]').val('heated_tobacco').trigger('change');
+        }
+    }
+    $(document).on('change', 'select[name="sale_status"]', syncPurchaseLimitField);
+    $(document).on('change', 'select[name="tobacco_type"]', syncTobaccoFields);
+    $(document).on('change', 'select[name="category_id"]', syncTobaccoTypeFromCategory);
+    syncPurchaseLimitField();
+    syncTobaccoFields();
+    syncTobaccoTypeFromCategory();
 })();
 JS
             );
@@ -437,7 +303,7 @@ JS
             return;
         }
 
-        // Keep the crop box close to the visible image area for freeform crops.
+        // 自由比例时尽量贴合图片可视区域，避免细长图出现“中间小方框”。
         var targetWidth = Math.max(120, imageData.width * 0.92);
         var targetHeight = Math.max(160, imageData.height * 0.92);
         targetWidth = Math.min(targetWidth, containerData.width * 0.95);
@@ -452,11 +318,11 @@ JS
     }
 
             function getPayloadInput() {
-        return $('input[name="image_crop_payload"]');
+        return $('input[name="_image_crop_payload"]');
     }
 
             function getMetaInput() {
-                return $('input[name="image_crop_meta"]');
+                return $('input[name="_image_crop_meta"]');
             }
 
     function findExistingImageSource() {
@@ -725,7 +591,7 @@ JS
                 exportHeight: 1200
             };
 
-            // Avoid submitting a huge base64 string into admin_operation_log.
+            // 不再提交超长 base64，避免 admin_operation_log 的 input 字段溢出。
             var $payloadInput = getPayloadInput();
             if ($payloadInput.length) {
                 $payloadInput.val('');
@@ -772,19 +638,19 @@ JS
                     return;
                 }
 
-                // Refresh the preview immediately after file selection.
+                // 选择文件后立即更新预览，避免用户误以为预览不可用。
                 updatePreview(source);
 
-                // Open the crop modal right away so the action feels responsive.
+                // 先展示弹窗，避免用户感知为“没有触发”
                 openCropper(source);
 
                 loadCropperAssets(function () {
                     openCropper(source);
                 }, function () {
                     if (window.toastr && toastr.warning) {
-                        toastr.warning('Cropper failed to load. The original preview is still available.');
+                        toastr.warning('裁切组件加载失败，已展示原图预览，可继续保存。');
                     } else {
-                        alert('Cropper failed to load. The original preview is still available.');
+                        alert('裁切组件加载失败，已展示原图预览，可继续保存。');
                     }
                 });
             };
@@ -818,329 +684,67 @@ JS
 JS
             );
 
-            // 定义事件回调，当模型即将保存时会触发这个回调
-            $form->saving(function (Form $form) use ($controller) {
-                $uploadedImage = request()->file('image');
-                if (is_array($uploadedImage)) {
-                    $uploadedImage = reset($uploadedImage);
+            $form->saving(function (Form $form) {
+                request()->request->remove('_image_crop_payload');
+                request()->request->remove('_image_crop_meta');
+
+                if (\App\Services\OrderTobaccoLimitService::countsTowardStickLimit($form->tobacco_type)) {
+                    if ((int) $form->unit_sticks < 1) {
+                        throw new \Exception('烟草分类为「香烟」或「加热烟」时，请填写每包/盒支数（至少 1 支）');
+                    }
+                } else {
+                    $form->unit_sticks = null;
                 }
 
-                if ($uploadedImage instanceof UploadedFile && $uploadedImage->isValid()) {
-                    // Persist file explicitly so frontend image path is never lost when form inputs miss file keys.
-                    $storedImagePath = $uploadedImage->store('images', 'public');
-                    $form->input('image', $storedImagePath);
-                    request()->request->set('image', $storedImagePath);
-
-                    $form->image_original = $storedImagePath;
-                    request()->request->set('image_original', $storedImagePath);
+                if ($form->shipping_mode === '') {
+                    $form->shipping_mode = null;
                 }
 
-                $rawSkus = (array) request()->input('skus', []);
-                Log::info('admin.products.saving', [
-                    'product_id' => $form->model()->id,
-                    'sku_rows' => count($rawSkus),
-                    'sku_keys' => array_keys($rawSkus),
-                ]);
+                if ((int) $form->unit_weight_grams < 1) {
+                    throw new \Exception('请填写单位重量（克）');
+                }
 
-                request()->request->set('image_crop_payload', '[omitted]');
-
-                $metaRaw = trim($controller->normalizeStringValue($form->input('image_crop_meta', '')));
-                if ($metaRaw !== '') {
-                    $meta = json_decode($metaRaw, true);
-                    if (is_array($meta)) {
-                        $form->image_crop_meta = json_encode($meta, JSON_UNESCAPED_UNICODE);
+                $productModel = $form->model();
+                if (!$form->tobacco_type && $productModel instanceof Product) {
+                    $suggested = app(HeatedTobaccoClassificationService::class)
+                        ->suggestedTobaccoType($productModel);
+                    if ($suggested) {
+                        $form->tobacco_type = $suggested;
                     }
                 }
 
-                $imageOriginal = $controller->normalizeStringValue($form->input('image_original', ''));
-                if ($imageOriginal === '') {
-                    $imageOriginal = $controller->normalizeStringValue($form->input('image', ''));
+                if ($form->sale_status === ProductSku::STATUS_LIMITED) {
+                    if ((int) $form->purchase_limit < 1) {
+                        throw new \Exception('销售状态为「限购」时，请填写限购数量（至少 1 件）');
+                    }
+                } else {
+                    $form->purchase_limit = null;
                 }
-                if ($imageOriginal === '') {
-                    $imageOriginal = $controller->normalizeStringValue($form->model()->image);
-                }
-
-                if ($imageOriginal !== '') {
-                    $form->image_original = $imageOriginal;
-                }
-
-                $form->model()->price = collect($rawSkus)->where(Form::REMOVE_FLAG_NAME, 0)->min('price') ?: 0;
             });
 
-            $form->saved(function (Form $form) use ($controller) {
-                $rawSkus = (array) request()->input('skus', []);
-                Log::info('admin.products.saved', [
-                    'product_id' => $form->model()->id,
-                    'sku_rows' => count($rawSkus),
-                    'sku_keys' => array_keys($rawSkus),
-                ]);
-                $controller->syncProductSkus($form->model(), $rawSkus);
+            // SKU 在 saving 之后才写入，展示价必须在保存完成后按 SKU 最低价同步
+            $form->saved(function (Form $form) {
+                $product = $form->model()->fresh(['skus']);
+                $minPrice = $product->skus->min('price');
+
+                if ($minPrice === null || (float) $minPrice <= 0) {
+                    return;
+                }
+
+                if ((float) $product->price !== (float) $minPrice) {
+                    $product->forceFill(['price' => $minPrice])->save();
+                }
             });
         });
     }
 
-    public function batchSetCategory(Request $request)
+    protected function categoryOptions()
     {
-        $ids = array_filter((array) $request->input('ids', []));
-        $categoryId = (int) $request->input('category_id');
-
-        if (!$ids) {
-            return ['status' => false, 'message' => '请选择商品'];
-        }
-
-        $categoryExists = Category::query()->where('id', $categoryId)->exists();
-        if (!$categoryExists) {
-            return ['status' => false, 'message' => '目标分类不存在'];
-        }
-
-        Product::query()->whereIn('id', $ids)->update(['category_id' => $categoryId]);
-
-        return ['status' => true, 'message' => '批量更新成功'];
-    }
-
-    public function quickUpdateDispatch(Request $request, $id)
-    {
-        $stockDelta = (int) $request->input('stock_delta', null);
-        $limitQty = (int) $request->input('limit_qty', null);
-
-        $product = Product::query()->with('skus:id,product_id')->find($id);
-        if (!$product) {
-            return ['status' => false, 'message' => '商品不存在'];
-        }
-
-        if ($product->skus->isEmpty()) {
-            return ['status' => false, 'message' => '该商品暂无 SKU，无法调整库存'];
-        }
-
-        // 处理库存增量
-        if ($stockDelta !== null) {
-            // 使用 increment 进行原子操作，避免并发竞态条件
-            ProductSku::query()->where('product_id', $product->id)->increment('stock', $stockDelta);
-        }
-
-        // 处理限量配置（直接设置值，而不是增量）
-        if ($limitQty !== null) {
-            if ($limitQty < 0) {
-                return ['status' => false, 'message' => '限量必须是大于等于 0 的整数'];
-            }
-            ProductSku::query()->where('product_id', $product->id)->update(['limit_qty' => $limitQty]);
-        }
-
-        return ['status' => true, 'message' => '调整成功'];
-    }
-
-    public function quickUpdateLogistics(Request $request, $id)
-    {
-        $product = Product::query()->with('skus:id,product_id')->find($id);
-        if (!$product) {
-            return ['status' => false, 'message' => '商品不存在'];
-        }
-
-        $skuId = (int) $request->input('sku_id', 0);
-        if ($skuId <= 0) {
-            return ['status' => false, 'message' => 'SKU 参数错误'];
-        }
-
-        $sku = ProductSku::query()->where('product_id', $product->id)->find($skuId);
-        if (!$sku) {
-            return ['status' => false, 'message' => 'SKU 不存在或不属于当前商品'];
-        }
-
-        $itemType = (string) $request->input('item_type', '');
-        $unitSticks = max(0, (int) $request->input('unit_sticks', 0));
-        $unitWeight = max(0, (int) $request->input('unit_weight', 0));
-
-        if ($itemType !== '' && !in_array($itemType, ['cigarette', 'tobacco_silk'], true)) {
-            return ['status' => false, 'message' => '物流品类不合法'];
-        }
-
-        if ($itemType === 'cigarette') {
-            $sku->update([
-                'item_type' => 'cigarette',
-                'unit_sticks' => $unitSticks,
-                'unit_weight' => 0,
-            ]);
-            return ['status' => true, 'message' => '香烟物流数据已保存'];
-        }
-
-        if ($itemType === 'tobacco_silk') {
-            $sku->update([
-                'item_type' => 'tobacco_silk',
-                'unit_sticks' => 0,
-                'unit_weight' => $unitWeight,
-            ]);
-            return ['status' => true, 'message' => '烟丝物流数据已保存'];
-        }
-
-        $sku->update([
-            'item_type' => null,
-            'unit_sticks' => 0,
-            'unit_weight' => 0,
-        ]);
-
-        return ['status' => true, 'message' => '已清空物流数据'];
-    }
-
-    protected function resolveProductSiteMode($product)
-    {
-        if ($product && Schema::hasColumn('products', 'is_from_native_procurement')) {
-            return (bool) $product->is_from_native_procurement ? Category::SITE_MODE_B : Category::SITE_MODE_A;
-        }
-
-        $requestSiteMode = strtoupper((string) request('site_mode', site_mode()));
-
-        return $requestSiteMode === Category::SITE_MODE_B ? Category::SITE_MODE_B : Category::SITE_MODE_A;
-    }
-
-    protected function normalizeStringValue($value)
-    {
-        while (is_array($value) || is_object($value)) {
-            if (is_array($value)) {
-                if (empty($value)) {
-                    return '';
-                }
-
-                $value = reset($value);
-                continue;
-            }
-
-            $value = (array) $value;
-            if (empty($value)) {
-                return '';
-            }
-
-            $value = reset($value);
-        }
-
-        if ($value === null) {
-            return '';
-        }
-
-        if (is_bool($value)) {
-            return $value ? '1' : '0';
-        }
-
-        if (!is_scalar($value)) {
-            return '';
-        }
-
-        return trim((string) $value);
-    }
-
-    protected function syncProductSkus(Product $product, array $skusData)
-    {
-        $hasItemTypeColumn = Schema::hasColumn('product_skus', 'item_type');
-        $hasUnitSticksColumn = Schema::hasColumn('product_skus', 'unit_sticks');
-        $hasUnitWeightColumn = Schema::hasColumn('product_skus', 'unit_weight');
-
-        Log::info('admin.products.sync_skus.start', [
-            'product_id' => $product->id,
-            'sku_rows' => count($skusData),
-            'sku_keys' => array_keys($skusData),
-        ]);
-
-        $submittedIds = [];
-
-        foreach ($skusData as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
-            if ((int) data_get($row, Form::REMOVE_FLAG_NAME, 0) === 1) {
-                continue;
-            }
-
-            $payload = [
-                'title' => $this->normalizeStringValue(data_get($row, 'title', '')),
-                'description' => $this->normalizeStringValue(data_get($row, 'description', '')),
-                'price' => $this->normalizeStringValue(data_get($row, 'price', '')),
-                'stock' => max(0, (int) data_get($row, 'stock', 0)),
-                'limit_qty' => max(0, (int) data_get($row, 'limit_qty', 0)),
-            ];
-
-            if ($hasItemTypeColumn) {
-                $itemType = $this->normalizeStringValue(data_get($row, 'item_type', ''));
-                $payload['item_type'] = $itemType === '' ? null : $itemType;
-            }
-
-            if ($hasUnitSticksColumn) {
-                $payload['unit_sticks'] = max(0, (int) data_get($row, 'unit_sticks', 0));
-            }
-
-            if ($hasUnitWeightColumn) {
-                $payload['unit_weight'] = max(0, (int) data_get($row, 'unit_weight', 0));
-            }
-
-            $hasMeaningfulValue = $payload['title'] !== ''
-                || $payload['description'] !== ''
-                || $payload['price'] !== ''
-                || $payload['stock'] > 0
-                || $payload['limit_qty'] > 0;
-
-            if ($hasItemTypeColumn && array_key_exists('item_type', $payload)) {
-                $hasMeaningfulValue = $hasMeaningfulValue || $payload['item_type'] !== null;
-            }
-
-            if ($hasUnitSticksColumn && array_key_exists('unit_sticks', $payload)) {
-                $hasMeaningfulValue = $hasMeaningfulValue || $payload['unit_sticks'] > 0;
-            }
-
-            if ($hasUnitWeightColumn && array_key_exists('unit_weight', $payload)) {
-                $hasMeaningfulValue = $hasMeaningfulValue || $payload['unit_weight'] > 0;
-            }
-
-            if (!$hasMeaningfulValue) {
-                continue;
-            }
-
-            $skuId = (int) data_get($row, 'id', 0);
-
-            if ($skuId > 0) {
-                $sku = $product->skus()->whereKey($skuId)->first();
-                if ($sku) {
-                    $sku->fill($payload);
-                    $sku->save();
-                    $submittedIds[] = $sku->id;
-                    continue;
-                }
-            }
-
-            $created = $product->skus()->create($payload);
-            $submittedIds[] = $created->id;
-        }
-
-        if (!empty($submittedIds)) {
-            $product->skus()->whereNotIn('id', $submittedIds)->delete();
-            Log::info('admin.products.sync_skus.finish', [
-                'product_id' => $product->id,
-                'kept_ids' => $submittedIds,
-                'mode' => 'keep_submitted',
-            ]);
-            return;
-        }
-
-        $product->skus()->delete();
-        Log::info('admin.products.sync_skus.finish', [
-            'product_id' => $product->id,
-            'kept_ids' => [],
-            'mode' => 'delete_all',
-        ]);
-    }
-
-    protected function categoryOptions($siteMode = null)
-    {
-        $query = Category::query()
+        $categories = Category::query()
             ->with('parent:id,name')
             ->orderByRaw('COALESCE(parent_id, 0) asc')
-            ->orderBy('id');
-
-        if (Schema::hasColumn('categories', 'site_mode')) {
-            $siteMode = strtoupper((string) $siteMode);
-            $siteMode = $siteMode === Category::SITE_MODE_B ? Category::SITE_MODE_B : Category::SITE_MODE_A;
-            $query->where('site_mode', $siteMode);
-        }
-
-        $categories = $query->get(['id', 'name', 'parent_id']);
+            ->orderBy('id')
+            ->get(['id', 'name', 'parent_id']);
 
         $options = [];
         foreach ($categories as $category) {
@@ -1152,6 +756,120 @@ JS
         }
 
         return $options;
+    }
+
+    public function downloadImportTemplate()
+    {
+        $headers = [
+            'id',
+            'title',
+            'category_id',
+            'shipping_mode',
+            'tobacco_type',
+            'unit_weight_grams',
+            'unit_sticks',
+            'on_sale',
+            'sale_status',
+            'purchase_limit',
+        ];
+        $sample = [
+            '',
+            '示例商品',
+            '1',
+            'ems_self_tax',
+            'cigarette',
+            '200',
+            '20',
+            '1',
+            'ACTIVE',
+            '',
+        ];
+
+        $lines = [implode(',', $headers), implode(',', $sample)];
+        $csv = "\xEF\xBB\xBF".implode("\n", $lines);
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="products_import_template.csv"',
+        ]);
+    }
+
+    public function importCsv(Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:2048'],
+        ]);
+
+        $path = $request->file('file')->getRealPath();
+        $handle = fopen($path, 'r');
+        if (!$handle) {
+            return redirect()->back()->withErrors(['file' => '无法读取 CSV 文件']);
+        }
+
+        $header = null;
+        $updated = 0;
+        $skipped = 0;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            if ($header === null) {
+                $header = array_map(function ($col) {
+                    return trim((string) $col);
+                }, $row);
+                continue;
+            }
+
+            if (count(array_filter($row)) === 0) {
+                continue;
+            }
+
+            $data = [];
+            foreach ($header as $i => $col) {
+                $data[$col] = isset($row[$i]) ? trim((string) $row[$i]) : '';
+            }
+
+            $id = (int) data_get($data, 'id', 0);
+            if ($id < 1) {
+                $skipped++;
+                continue;
+            }
+
+            $product = Product::query()->find($id);
+            if (!$product) {
+                $skipped++;
+                continue;
+            }
+
+            $payload = [];
+            foreach (['shipping_mode', 'tobacco_type', 'unit_weight_grams', 'unit_sticks', 'sale_status'] as $field) {
+                if (array_key_exists($field, $data) && $data[$field] !== '') {
+                    $payload[$field] = $data[$field];
+                }
+            }
+
+            if (isset($payload['unit_weight_grams'])) {
+                $payload['unit_weight_grams'] = (int) $payload['unit_weight_grams'];
+            }
+            if (isset($payload['unit_sticks'])) {
+                $payload['unit_sticks'] = (int) $payload['unit_sticks'] ?: null;
+            }
+            if (isset($payload['shipping_mode']) && !array_key_exists($payload['shipping_mode'], Product::shippingModeOptions())) {
+                unset($payload['shipping_mode']);
+            }
+            if (isset($payload['tobacco_type']) && !array_key_exists($payload['tobacco_type'], Product::tobaccoTypeOptions())) {
+                unset($payload['tobacco_type']);
+            }
+
+            if (!empty($payload)) {
+                $product->update($payload);
+                $updated++;
+            }
+        }
+
+        fclose($handle);
+
+        return redirect()
+            ->to('/admin/products')
+            ->with('success', 'CSV 导入完成：更新 '.$updated.' 条，跳过 '.$skipped.' 条。');
     }
 
 }

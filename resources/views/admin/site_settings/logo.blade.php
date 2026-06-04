@@ -1,6 +1,6 @@
 <div class="box box-primary">
     <div class="box-header with-border">
-        <h3 class="box-title">Header Logo</h3>
+        <h3 class="box-title">站点品牌信息</h3>
     </div>
     @if(session('logo_upload_success'))
         <div class="alert alert-success" style="margin: 10px 15px 0;">
@@ -26,11 +26,25 @@
                 @endif
             </div>
 
-            <div class="form-group">
-                <label>当前运行模式（只读）</label>
-                <input type="text" class="form-control" value="{{ ($resolvedSiteMode ?? 'A') === 'B' ? 'B模式 (C2C大厅)' : 'A模式 (选物主站)' }}" readonly>
-                <p class="help-block">运行模式已改为由启动脚本与环境文件统一控制，此处仅展示当前生效状态。</p>
-                <p class="help-block" style="margin-top: 4px;">历史配置值：{{ strtoupper((string) $activeSiteMode->value) === 'B' ? 'B' : 'A' }}（仅用于排障参考，不再作为控制开关）</p>
+            <div class="form-group {{ $errors->has('jpy_per_cny') ? 'has-error' : '' }}">
+                <label for="jpy_per_cny">日元汇率（1 人民币 = ? 日元）</label>
+                <input id="jpy_per_cny" type="number" step="0.000001" min="0.01" name="jpy_per_cny" class="form-control" value="{{ old('jpy_per_cny', $jpyPerCny->value) }}">
+                <p class="help-block">A 站订单按日元核算，用户跳转 B 站支付时按此汇率换算为人民币收款。例如填 22 表示 2200 日元 ≈ 100 元人民币。</p>
+                @if($errors->has('jpy_per_cny'))
+                    <span class="help-block">{{ $errors->first('jpy_per_cny') }}</span>
+                @endif
+            </div>
+
+            <div class="form-group {{ $errors->has('active_site_mode') ? 'has-error' : '' }}">
+                <label for="active_site_mode">当前运行模式</label>
+                <select id="active_site_mode" name="active_site_mode" class="form-control">
+                    <option value="A" {{ old('active_site_mode', $activeSiteMode->value) === 'A' ? 'selected' : '' }}>A 模式（选品主站）</option>
+                    <option value="B" {{ old('active_site_mode', $activeSiteMode->value) === 'B' ? 'selected' : '' }}>B 模式（互助代购大厅）</option>
+                </select>
+                <p class="help-block">保存后将优先作为全站 site_mode 判定来源（高于 .env 的 SITE_MODE）。</p>
+                @if($errors->has('active_site_mode'))
+                    <span class="help-block">{{ $errors->first('active_site_mode') }}</span>
+                @endif
             </div>
 
             <div class="form-group {{ $errors->has('disable_email_verification_for_testing') ? 'has-error' : '' }}">
@@ -52,17 +66,17 @@
 
             @if($setting->value)
                 <div class="form-group">
-                    <label>当前 Logo</label>
+                    <label>当前站点 Logo</label>
                     <div>
-                        <img src="{{ Storage::disk('public')->url($setting->value) }}" alt="Current Logo" style="max-height: 64px; border: 1px solid #eeeeee; padding: 4px; background: #ffffff;">
+                        <img src="{{ asset('storage/'.ltrim(str_replace('\\', '/', $setting->value), '/')) }}" alt="当前站点 Logo" style="max-height: 64px; border: 1px solid #eeeeee; padding: 4px; background: #ffffff;">
                     </div>
                 </div>
             @endif
 
             <div class="form-group {{ $errors->has('logo') ? 'has-error' : '' }}">
-                <label for="logo">上传新 Logo（建议透明 PNG 或 SVG）</label>
-                <input id="logo" type="file" name="logo" class="form-control" accept="image/*">
-                <p class="help-block">上传后会自动压缩并缩放到适合头部展示的尺寸（最长边不超过 320px）。</p>
+                <label for="logo">上传站点 Logo（建议透明 PNG）<span class="text-danger">*</span></label>
+                <input id="logo" type="file" name="logo" class="form-control" accept="image/*"{{ $setting->value ? '' : ' required' }}>
+                <p class="help-block">保存后首页左上角将显示此图片，不再显示中文品牌文字。上传后会自动压缩并缩放（最长边不超过 640px）。若当前未显示 Logo，请在此选择图片后点击保存。</p>
                 @if($errors->has('logo'))
                     <span class="help-block">{{ $errors->first('logo') }}</span>
                 @endif

@@ -81,24 +81,32 @@ $(function () {
         $items.html(html);
     }
 
+    function setCartCount(count) {
+        count = parseInt(count, 10) || 0;
+        $count.text(count);
+        $count.toggleClass('is-zero', count <= 0);
+    }
+
     function refresh() {
         if (!isAuth || !summaryUrl) {
-            $count.text('0');
+            setCartCount(0);
             renderItems([]);
             return;
         }
 
         axios.get(summaryUrl).then(function (res) {
             var data = res.data || {};
-            $count.text(data.count || 0);
+            setCartCount(data.count || 0);
             renderItems(data.items || []);
         }).catch(function () {
-            $count.text('0');
+            setCartCount(0);
             renderItems([]);
         });
     }
 
-    $('[data-mini-cart-toggle]').on('click', function () {
+    $('[data-mini-cart-toggle]').on('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
         if (!isAuth) {
             toast(t(i18n, 'login_required', '请先登录后使用购物车'));
             setTimeout(function () {
@@ -110,7 +118,8 @@ $(function () {
     });
 
     $(document).on('click', function (e) {
-        if (!$(e.target).closest('[data-mini-cart]').length) {
+        if (!$(e.target).closest('[data-mini-cart]').length
+            && !$(e.target).closest('[data-mini-cart-toggle]').length) {
             $drawer.removeClass('is-open');
         }
     });

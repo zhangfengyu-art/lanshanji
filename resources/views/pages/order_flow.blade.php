@@ -1,145 +1,144 @@
 @extends('layouts.app')
 
-@section('title', '下单流程')
+@section('title', '下单流程说明')
 
-@section('styles')
-<style>
-    .order-flow-wrap {
-        max-width: 980px;
-        margin: 16px auto 24px;
-        color: #000;
-    }
 
-    .order-flow-wrap,
-    .order-flow-wrap * {
-        color: #000 !important;
-    }
-
-    .order-flow-wrap h1 {
-        font-size: 44px;
-        color: #1f6feb !important;
-        font-weight: 700;
-        margin-bottom: 18px;
-    }
-
-    .order-flow-wrap h2 {
-        font-size: 28px;
-        color: #000 !important;
-        margin: 14px 0 10px;
-        border-bottom: 1px solid #d6dde6;
-        padding-bottom: 8px;
-        font-weight: 700;
-    }
-
-    .order-flow-body {
-        background: #f4f6f9;
-        border-radius: 8px;
-        padding: 16px 18px;
-        line-height: 1.9;
-        margin-bottom: 16px;
-        font-size: 16px;
-    }
-
-    .order-flow-note {
-        background: #eef6ff;
-        border: 1px solid #d8e9ff;
-        border-radius: 8px;
-        padding: 12px 14px;
-        margin-bottom: 16px;
-        font-size: 16px;
-        line-height: 1.8;
-    }
-
-    .order-flow-wrap p,
-    .order-flow-wrap li {
-        margin-bottom: 12px;
-    }
-
-    .order-flow-wrap p:last-child,
-    .order-flow-wrap li:last-child {
-        margin-bottom: 0;
-    }
-
-    .order-flow-wrap ul,
-    .order-flow-wrap ol {
-        margin-bottom: 0;
-        padding-left: 26px;
-    }
-
-    .order-flow-wrap a {
-        color: #0f4ca8 !important;
-        text-decoration: underline;
-    }
-
-    .order-flow-wrap .text-danger {
-        color: #dc3545 !important;
-    }
-
-    .order-flow-wrap .text-success {
-        color: #198754 !important;
-    }
-
-    @media (max-width: 768px) {
-        .order-flow-wrap {
-            margin-top: 10px;
-            margin-bottom: 16px;
-            padding: 0 12px;
-        }
-
-        .order-flow-wrap h1 {
-            font-size: 32px;
-            line-height: 1.35;
-            margin-bottom: 14px;
-        }
-
-        .order-flow-wrap h2 {
-            font-size: 22px;
-        }
-
-        .order-flow-body,
-        .order-flow-note {
-            font-size: 15px;
-            line-height: 1.8;
-            padding: 12px 14px;
-        }
-    }
-</style>
-@endsection
 
 @section('content')
-<div class="container order-flow-wrap">
-    <h1 class="text-center">下单流程说明</h1>
 
-    <div class="order-flow-note">
-        本店目前提供“EMS自缴税”、“顺丰含税”两种寄送模式。
-        <br>
-        <span>这里的“税”指收件人所在地海关收取的税费，商品本身都是日本国内完税版本，非机场免税店商品。</span>
+<div class="panel panel-default policy-page">
+
+    <div class="panel-heading">下单流程说明</div>
+
+    <div class="panel-body policy-page-body">
+
+        <p class="lead">本店目前提供「EMS 自缴税」、「含税物流」两种寄送模式（这里的「税」指收件人所在地海关收取的税费，商品本身都是日本国内完税版本，非机场免税店商品）。<strong>同一笔订单不可混合两种模式的商品</strong>，请分开下单。</p>
+
+
+
+        <h4>EMS 自缴税寄送</h4>
+
+        <p>大分类或商品标注为 <strong>EMS 自缴税</strong> 的，采用该方式发货。商品报价<strong>不含 EMS 国际运费</strong>；结算时按包裹<strong>计费总重量</strong>自动匹配下方 EMS 第一区域（中国·中国台湾·韩国）资费，另加 13% 服务费与 300 日元包装费。</p>
+
+        <p>烟草类单笔订单限制：<strong>香烟、加热烟合计不超过 400 支</strong>（按每包/条支数累加），<strong>手卷烟丝合计不超过 5kg</strong>；计费重量上限 <strong>16kg</strong>（超出将无法提交）。其它商品（如加热器设备）仅计入重量，不计入支数/烟丝额度。</p>
+
+        <div class="policy-notice" style="font-size:13px;">
+
+            <p><strong>EMS 重量资费（日元，第一区域）：</strong></p>
+
+            <p>500g→1450 · 600g→1600 · 700g→1750 · 800g→1900 · 900g→2050 · 1kg→2200 · 1.25kg→2500 · 1.5kg→2800 · 1.75kg→3100 · 2kg→3400 · 2.5kg→3900 · 3kg→4400 · 3.5kg→4900 · 4kg→5400 · 4.5kg→5900 · 5kg→6400 · 5.5kg→6900 · 6kg→7400 · 7kg→8200 · 8kg→9000 · 9kg→9800 · 10kg→10600 · 11kg→11400 · 12kg→12200 · 13kg→13000 · 14kg→13800 · 15kg→14600 · 16kg→15400</p>
+
+        </div>
+
+        <p>订单支付成功后，本店会尽快处理并按下单先后顺序安排发货，不设排队等候队列，也不按订单类型拆分发货通道。</p>
+
+        <p>处理时会确认订单内所有商品是否可供发出：有现货会直接发货；若需向供货商订货，则待货到后再一并发出（热门规格可能暂时缺货，供货商配送周期因地而异，遇日本节假日顺延）。一般订货后约 7 个工作日内可发出，具体以订单页状态为准。</p>
+
+        <div class="policy-notice">
+
+            <p><strong>请注意：</strong></p>
+
+            <p>商品显示可购买仅代表本店接受该订单，不代表一定现货。若供货方能在合理期限内完成配货，一般不视为缺货。</p>
+
+            <p>无法供货的订单可按规则申请全额退款，故不会为缺货商品长期预留同单其它商品；一单含多个热门规格时，可能出现部分品种先后缺货的情况。</p>
+
+            <p>同一订单的所有商品需一并发货，不提供拆分订单、不接受增减商品。</p>
+
+            <p>若等待时间过长可申请退款（<a href="{{ url('/pages/change-exchange-return.html') }}">查看退款相关规则</a>）。催促无法加快供货或跨境物流进度，本店也不会因催促而跳过正常处理顺序优先发货。</p>
+
+        </div>
+
+        <p>寄往中国大陆的 EMS，大约发货后 3 个工作日入境中国（请注意是工作日），之后需要多久与收件地址所在城市远近、入境口岸/属地海关工作效率有关，本店并不知晓具体需要多久。北京、上海这样的一线大城市最快记录是发货后 5 天签收；而远一些小地方物流需要中转的次数多，休息日到达入境口岸/属地海关需等到上班后才会被受理；如果入境口岸/属地海关积压包裹太多也会被延后处理，存在这些情况需要的时间就会比别人多，十几天也是有可能的。</p>
+
+        <p>税费由您属地海关向您收取。属地海关非入境口岸城市的地址需等待包裹到达属地海关。海关向您发送通知短信后，海关 APP 里才能查询到并缴税，海关短信可能会比物流记录晚 2、3 个工作日。</p>
+
+        <p>EMS 自缴税订单发货后，购物凭据（购物明细书）可在<strong>订单详情页</strong>下载（由客服上传后可见）。</p>
+
+
+
+        <h4>含税物流包邮寄送</h4>
+
+        <p>本店提到的含税物流一般指顺丰、京东，会根据实际情况安排，不接受自行指定。</p>
+
+        <p>商品或分类标注为 <strong>含税包邮</strong> 的，报价已包含中国海关税费（实报实缴）及运费；结算时<strong>不再加收 EMS 运费</strong>，仍可能收取 13% 服务费与 300 日元包装费（以购物车结算为准）。</p>
+
+        <p>加热设备含税物流方式发货（设备含电池，EMS 拒收）。</p>
+
+        <p>烟草商品的含税发货名额比较稀缺，不定期会在站内推出特定品种烟草商品「含税包邮」活动，没有预告，没有通知，需要正好赶上才能参与购买。</p>
+
+        <div class="policy-notice">
+
+            <p><strong>请注意：</strong>含税物流方式发货，手续繁琐，且通关后为陆运，全程需要至少十几天，二三十天也有可能（海关包裹积压太多时甚至出现过超过三十天的特例），肯定比「EMS 自缴税」慢。且通过海关前由日本物流承运，完成清关通过海关后才会交付中国承运物流（顺丰、京东）。请勿向中国物流催促（中国承运物流未接手前他们查不到情况会瞎乱答复），频繁催促中国承运物流还会向日本物流投诉，可能导致证件号码今后被本店这边物流拉黑（会导致 EMS 也发不了，是同一家本地物流在承接本店所有包裹的发货）。接受不了速度慢请一定不要下单「含税包邮」商品；性子急的建议购买「EMS 自缴税」方式寄送的商品，可以随便催邮政，邮政不会找日本这边物流告状……</p>
+
+            <p>中国西藏地址，顺丰、京东大概率含税寄送不可用，会换用申通含税发货，需注意事项同前述。其它地区，如遇特殊情况无法顺丰、京东含税发货，可能临时换用其它可含税发货的物流发货。</p>
+
+            <p>含税包邮购买仅限中国大陆 18 位身份证。港/澳/台居民来往大陆通行证、港/澳/台居民居住证不可用，物流会拒收（非歧视，是物流公司无权限为这些证件办理代缴税）。</p>
+
+        </div>
+
+
+
+        <hr>
+
+
+
+        <p class="text-muted" style="font-size: 13px;">能加入购物车并下单的商品，不代表现货，也不保证当日或次日发出；实际发货时间取决于确认供货、打包及所选物流方式。急单建议另寻其它购买途径。改址与退款规则请参见 <a href="{{ url('/pages/change-exchange-return.html') }}">订单改、退相关规则</a>。</p>
+
+
+
+        <div class="text-center" style="margin-top: 24px;">
+
+            <a class="btn btn-primary" href="{{ route('products.index') }}">返回商品列表</a>
+
+            <a class="btn btn-default" href="{{ url('/pages/change-exchange-return.html') }}" style="margin-left: 8px;">改/退规则</a>
+
+            <a class="btn btn-default" href="{{ route('pages.faq') }}" style="margin-left: 8px;">常见问题</a>
+
+        </div>
+
     </div>
 
-    <h2>EMS自缴税寄送</h2>
-    <div class="order-flow-body">
-        <p>大分类明确标注EMS的商品，采用“EMS自缴税”方式发货，此模式下商品报价不含运费，运费在结算的时候单独自动计算，有助于减少您所在地海关收取的税费（绝大部分地区海关认可征税排除运费，大部分地区海关认可征税排除服务费）。</p>
-        <p>因需要下单购买的人数太多，超出本地与周边邮局每日揽收量，故需要提前报名参与下单名额的随机抽取（前往下单名额报名）（可直接下单的烟草套餐大分类除外）。</p>
-        <p>获得下单名额并完成订单支付后，并不能立刻发货，因为还有大量更早时间已下单但未被查阅受理的订单，所以需要先排队等候。</p>
-        <p>2026年起，EMS发货订单拆分为A、B两个排队等候队列，每日包裹揽收额度平均分配给这2个队列，B队列为烟草套餐与服务费为0的订单，A队列为其它订单，若B队列已无等待发货的订单则当日剩余包裹揽收额度会给予A队列。</p>
-        <p>排到受理您的订单后，会确认订单中所有商品是否有库存，有货会直接发货，反之需要向烟草公司订货并等待配送到店（尤其热门烟丝，极易被更靠前订单用完，经常数百个订单等待新到货，烟草公司一周配送2-3次，但烟草公司存量也并不充足，经常实际配送少于订货数量），订货后一般在7天内能发货（遇日本节假日顺延）。</p>
-        <p><strong>请注意：</strong></p>
-        <p><span class="text-danger">商品可下单仅代表本店愿意接单，不代表店内有现货。</span></p>
-        <p>排队轮到受理您的订单后，若日本烟草公司能在接下来7天内供货不被视为缺货。</p>
-        <p>缺货订单提供可全额退款故不会为缺货订单预留订单内其它商品，热门品种多的订单有可能会反复缺货。</p>
-        <p>同一订单的所有商品需要等待一起发货，不提供拆分订单、不接受增减商品。</p>
-        <p>实在觉得太久等不了可以申请退款（查看退款相关规则），催促没有用，不会因为您催促就立刻有货，也不会因为您催促就搁着前面的订单不管先给您发货，如果您实在太着急，本店能主动实现的只有主动退款给您，并今后不再承接您的订单。</p>
-    </div>
-
-    <h2>顺丰含税包邮寄送</h2>
-    <div class="order-flow-body">
-        <p>大分类明确标注顺丰的商品，采用“顺丰含税”方式发货，此模式下商品报价已包含中国海关收取的税费，也包含运费，发货后除遇海关通知您在线核验身份需要自行配合以外，等着收货即可，无其它费用产生。</p>
-        <p><strong>加热设备</strong>为“顺丰含税”方式发货。</p>
-        <p>烟草商品的含税发货名额比较稀缺，不定期会在站内推出特定品种烟草商品“含税包邮”活动，没有预告，没有通知，需要正好赶上才能参与购买。</p>
-        <p><strong>请注意：</strong></p>
-        <p>“顺丰含税”方式发货，手续繁琐，且通关后为陆运，全程需要至少十几天，极端情况甚至需要二十天以上，肯定比“EMS自缴税”慢，且通过海关前由日本顺丰承运，完成清关通过海关后才会交付中国顺丰，请勿向中国顺丰催促，如果中国顺丰向日本顺丰投诉可能导致证件号码今后被本店这边物流拉黑（会导致EMS也发不了，是同一家本地物流在承接本店所有包裹的发货），接受不了速度慢请一定不要下单“含税包邮”商品，性子急的建议购买“EMS自缴税”方式寄送的商品，可以随便催邮政，邮政不会找日本这边告状……</p>
-        <p>中国西藏地址，顺丰含税不可用，会换用申通含税发货，需注意事项同顺丰。其它地区，如遇特殊情况无法顺丰含税发货，可能临时换用其它可含税发货的物流发货。</p>
-        <p>含税包邮购买仅限中国大陆18位身份证。港/澳/台居民来往大陆通行证、港/澳/台居民居住证不可用，物流会拒收（非歧视，是物流公司无权限为这些证件办理代缴税）。</p>
-    </div>
 </div>
+
+
+
+<style>
+
+.policy-page-body .lead { margin-bottom: 16px; line-height: 1.75; }
+
+.policy-page-body h4 {
+
+    margin-top: 24px;
+
+    margin-bottom: 10px;
+
+    font-size: 18px;
+
+    font-weight: 700;
+
+    color: #2f3b4a;
+
+}
+
+.policy-page-body h4:first-of-type { margin-top: 0; }
+
+.policy-page-body p { line-height: 1.75; color: #444; margin-bottom: 10px; }
+
+.policy-notice {
+
+    padding: 10px 12px;
+
+    background: #f8fafc;
+
+    border-left: 3px solid #94a3b8;
+
+    margin: 12px 0 16px;
+
+}
+
+.policy-notice p { margin-bottom: 8px; }
+
+</style>
+
 @endsection
+

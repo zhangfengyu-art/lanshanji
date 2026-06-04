@@ -7,48 +7,79 @@ use App\Models\ProductSku;
 
 class OrderRequest extends Request
 {
+    public function authorize()
+    {
+        \Log::error('OrderRequest::authorize() called');
+        return true;
+    }
+    
     public function rules()
     {
-        return [
-            // 判断用户提交的地址 ID 是否存在于数据库并且属于当前用户
-            // 后面这个条件非常重要，否则恶意用户可以用不同的地址 ID 不断提交订单来遍历出平台所有用户的收货地址
+        $items = $this->input('items', []);
+        $rules = [
             'address_id'     => ['required', Rule::exists('user_addresses', 'id')->where('user_id', $this->user()->id)],
             'items'          => ['required', 'array'],
-            'items.*.sku_id' => [ // 检查 items 数组下每一个子数组的 sku_id 参数
-                'required',
-                function ($attribute, $value, $fail) {
-                    if (!$sku = ProductSku::find($value)) {
-                        $fail('该商品不存在');
-                        return;
-                    }
-                    if (!$sku->product->on_sale) {
-                        $fail('该商品未上架');
-                        return;
-                    }
-                    if ($sku->stock === 0) {
-                        $fail('该商品已售完');
-                        return;
-                    }
-                    // 获取当前索引
-                    preg_match('/items\.(\d+)\.sku_id/', $attribute, $m);
-                    $index  = $m[1];
-                    // 根据索引找到用户所提交的购买数量
-                    $amount = $this->input('items')[$index]['amount'];
-                    if ($amount > 0 && $amount > $sku->stock) {
-                        $fail('该商品库存不足');
-                        return;
-                    }
-                    
-                    // 检查限购限制
-                    $maxAllowed = $sku->getOrderMaxQty();
-                    if ($amount > 0 && $maxAllowed > 0 && $amount > $maxAllowed) {
-                        $fail('该商品限购，单笔最多购买 ' . $maxAllowed . ' 件');
-                        return;
-                    }
-                },
-            ],
-            'items.*.amount' => ['required', 'integer', 'min:1'],
         ];
+        
+        // 检查是否是原生求购单
+        $isNativeProcurement = false;
+        if (!empty($items[0])) {
+            $isNativeProcurement = isset($items[0]['is_native_procurement']) && $items[0]['is_native_procurement'];
+        }
+        
+        \Log::info('OrderRequest::rules() called', [
+            'is_native_procurement' => $isNativeProcurement,
+            'items_count' => count($items),
+            'first_item' => json_encode($items[0] ?? null),
+            'first_item_is_native' => json_encode($items[0]['is_native_procurement'] ?? 'NOT SET'),
+            'first_item_is_native_type' => gettype($items[0]['is_native_procurement'] ?? null),
+        ]);
+        
+        if ($isNativeProcurement) {
+            \Log::info('Using native procurement validation rules');
+            // 原生求购单：只需要基本的格式验证，跳过 SKU 存在性验证
+            foreach ($items as $index => $item) {
+                $rules["items.{$index}.sku_id"] = ['required', 'integer'];
+                $rules["items.{$index}.amount"] = ['required', 'integer', 'min:1'];
+            }
+        } else {
+            \Log::info('Using normal product validation rules');
+            // 普通商品订单：需要验证 SKU 存在性
+            foreach ($items as $index => $item) {
+                $rules["items.{$index}.sku_id"] = [
+                    'required',
+                    function ($attribute, $value, $fail) use ($index, $items) {
+                        \Log::info("Validating SKU for item {$index}", [
+                            'sku_id' => $value,
+                            'item' => json_encode($items[$index] ?? null),
+                        ]);
+                        
+                        if (!$sku = ProductSku::find($value)) {
+                            $fail('该商品不存在');
+                            return;
+                        }
+                        if (!$sku->product->on_sale) {
+                            $fail('该商品未上架');
+                            return;
+                        }
+                        if ($sku->isDepleted()) {
+                            $fail('该商品已售罄');
+                            return;
+                        }
+
+                        $amount = (int) data_get($items, "{$index}.amount", 0);
+                        $maxAllowed = $sku->getOrderMaxQty();
+                        if ($amount > 0 && $maxAllowed > 0 && $amount > $maxAllowed) {
+                            $fail('该商品限购，单笔最多购买 ' . $maxAllowed . ' 件');
+                            return;
+                        }
+                    },
+                ];
+                
+                $rules["items.{$index}.amount"] = ['required', 'integer', 'min:1'];
+            }
+        }
+        
+        return $rules;
     }
 }
-

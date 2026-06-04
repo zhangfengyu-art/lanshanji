@@ -3,6 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Models\ProductSku;
+use App\Services\CartService;
+use App\Services\OrderTobaccoLimitService;
+use Auth;
 
 class UpdateCartRequest extends Request
 {
@@ -17,7 +20,7 @@ class UpdateCartRequest extends Request
                         return;
                     }
 
-                    $sku = ProductSku::find($value);
+                    $sku = ProductSku::with('product.category')->find($value);
                     if (!$sku) {
                         $fail('该商品不存在');
                         return;
@@ -28,17 +31,35 @@ class UpdateCartRequest extends Request
                         return;
                     }
 
-                    $amount = (int) $this->input('amount');
-                    if ($sku->stock < $amount) {
-                        $fail('该商品库存不足');
+                    if ($sku->isDepleted()) {
+                        $fail('该商品已售罄');
                         return;
                     }
 
-                    // 检查单笔限购限制
+                    $amount = (int) $this->input('amount');
                     $maxAllowed = $sku->getOrderMaxQty();
                     if ($amount > 0 && $maxAllowed > 0 && $amount > $maxAllowed) {
-                        $fail('该商品限购，单笔最多购买 ' . $maxAllowed . ' 件');
+                        $fail('该商品限购，单笔最多购买 '.$maxAllowed.' 件');
                         return;
+                    }
+
+                    $user = Auth::user();
+                    if ($user && is_site_mode_a()) {
+                        $cartItems = app(CartService::class)->get();
+                        $payload = app(OrderTobaccoLimitService::class)
+                            ->buildItemsPayloadFromCart($cartItems, $value, $amount);
+
+                        try {
+                            app(OrderTobaccoLimitService::class)->validateCartItems($payload);
+                        } catch (\App\Exceptions\InvalidRequestException $e) {
+                            $fail($e->getMessage());
+                            return;
+                        }
+
+                        $emsMax = app(OrderTobaccoLimitService::class)->maxUnitsForSku($sku);
+                        if ($emsMax !== null && $amount > $emsMax) {
+                            $fail('按 EMS 计费重量与烟草限额，该商品单笔最多购买 '.$emsMax.' 件');
+                        }
                     }
                 },
             ],
@@ -52,4 +73,3 @@ class UpdateCartRequest extends Request
         ];
     }
 }
-
