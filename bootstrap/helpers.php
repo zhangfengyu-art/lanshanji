@@ -39,8 +39,8 @@ function site_mode()
     $envModeRaw = strtoupper((string) env('SITE_MODE', config('site.mode', '')));
     $envMode = in_array($envModeRaw, ['A', 'B'], true) ? $envModeRaw : null;
 
-    // Dual-track strategy: local or dedicated dev ports can force mode via .env.A/.env.B.
-    if ((!$isProduction || $isDevPort) && $envMode !== null) {
+    // Dual-server production: trust .env SITE_MODE (skip remote schema checks).
+    if ($envMode !== null && ($isProduction || $isDevPort)) {
         return $envMode;
     }
 
@@ -185,6 +185,14 @@ function site_logo_url()
     }
 
     return $url;
+}
+
+/**
+ * 浏览器标签页图标（favicon），默认与站点 Logo 相同。
+ */
+function site_favicon_url()
+{
+    return site_logo_url();
 }
 
 /**
