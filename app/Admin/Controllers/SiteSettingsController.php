@@ -63,16 +63,21 @@ class SiteSettingsController extends Controller
 
     public function updateLogo(Request $request)
     {
-        $request->validate([
-            'logo' => 'nullable|image|max:8192',
-            'brand_text_zh' => 'nullable|string|max:60',
-            'brand_text_en' => 'nullable|string|max:120',
-            'disable_email_verification_for_testing' => 'nullable|boolean',
-            'active_site_mode' => 'required|in:A,B',
-            'jpy_per_cny' => 'required|numeric|min:0.01',
-        ]);
+        try {
+            $this->validate($request, [
+                'logo' => 'nullable|file|mimes:jpeg,jpg,png,gif,webp|max:8192',
+                'brand_text_zh' => 'nullable|string|max:60',
+                'brand_text_en' => 'nullable|string|max:120',
+                'disable_email_verification_for_testing' => 'nullable|boolean',
+                'active_site_mode' => 'required|in:A,B',
+                'jpy_per_cny' => 'required|numeric|min:0.01',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        }
 
-        $setting = SiteSetting::query()->firstOrCreate(
+        try {
+            $setting = SiteSetting::query()->firstOrCreate(
             ['key' => 'header_logo'],
             ['value' => '']
         );
@@ -148,9 +153,22 @@ class SiteSettingsController extends Controller
         Cache::forget('site.active_mode');
         ExchangeRateService::forgetCache();
 
-        return redirect()
-            ->route('admin.site_settings.logo.edit')
-            ->with('logo_upload_success', '站点品牌信息已更新。');
+            return redirect()
+                ->route('admin.site_settings.logo.edit')
+                ->with('logo_upload_success', '站点品牌信息已更新。');
+        } catch (\Throwable $e) {
+            Log::error('站点设置保存失败', [
+                'message' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+
+            return redirect()
+                ->route('admin.site_settings.logo.edit')
+                ->withInput($request->except('logo'))
+                ->withErrors([
+                    'logo' => '保存失败：'.$e->getMessage(),
+                ]);
+        }
     }
 
     /**
@@ -280,8 +298,19 @@ class SiteSettingsController extends Controller
     protected function ensureBrandDirectoryExists()
     {
         $disk = Storage::disk('public');
-        if (!$disk->exists('images/brand')) {
-            $disk->makeDirectory('images/brand');
+        $root = storage_path('app/public');
+        if (!is_dir($root) && !@mkdir($root, 0775, true) && !is_dir($root)) {
+            throw new \RuntimeException('storage/app/public 目录不存在且无法创建，请检查 storage 权限。');
+        }
+
+        foreach (['images', 'images/brand'] as $dir) {
+            if ($disk->exists($dir)) {
+                continue;
+            }
+
+            if (!$disk->makeDirectory($dir)) {
+                throw new \RuntimeException('无法创建 '.$dir.' 目录，请执行 chmod/chown storage。');
+            }
         }
     }
 
