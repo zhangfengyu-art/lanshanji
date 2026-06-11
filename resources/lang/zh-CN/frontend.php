@@ -3,7 +3,7 @@
 return [
     'site' => [
         'title' => '岚山烟务所',
-        'subtitle' => '日本烟草海淘专门店',
+        'subtitle' => '岚山烟务所 · 日本烟草选品',
     ],
 
     'nav' => [
