@@ -4,6 +4,7 @@ namespace App\Admin\Controllers;
 
 use App\Models\SiteSetting;
 use App\Services\ExchangeRateService;
+use App\Services\SiteFaviconService;
 use Encore\Admin\Facades\Admin;
 use Encore\Admin\Layout\Content;
 use Illuminate\Http\Request;
@@ -128,7 +129,7 @@ class SiteSettingsController extends Controller
                 }
 
                 $setting->update(['value' => $path]);
-                $this->publishPublicFavicon($path);
+                app(SiteFaviconService::class)->publishFromStoragePath($path);
             }
 
             $brandTextZh->update([
@@ -330,72 +331,6 @@ class SiteSettingsController extends Controller
                 throw new \RuntimeException('无法创建 '.$dir.' 目录，请执行 chmod/chown storage。');
             }
         }
-    }
-
-    /**
-     * 从 storage Logo 生成 public/favicon.png 与 favicon.ico（浏览器默认会请求 /favicon.ico）。
-     */
-    protected function publishPublicFavicon($storageRelativePath)
-    {
-        $relative = ltrim(str_replace('\\', '/', (string) $storageRelativePath), '/');
-        if ($relative === '') {
-            return;
-        }
-
-        $sourcePath = storage_path('app/public/'.$relative);
-        if (!is_readable($sourcePath)) {
-            return;
-        }
-
-        $targetPng = public_path('favicon.png');
-        $targetIco = public_path('favicon.ico');
-
-        if (!function_exists('imagecreatetruecolor')) {
-            @copy($sourcePath, $targetPng);
-            @copy($sourcePath, $targetIco);
-
-            return;
-        }
-
-        $imageInfo = @getimagesize($sourcePath);
-        if (!$imageInfo || !isset($imageInfo['mime'])) {
-            @copy($sourcePath, $targetPng);
-            @copy($sourcePath, $targetIco);
-
-            return;
-        }
-
-        $src = $this->createImageResource($sourcePath, $imageInfo['mime']);
-        if (!$src) {
-            @copy($sourcePath, $targetPng);
-            @copy($sourcePath, $targetIco);
-
-            return;
-        }
-
-        $size = 32;
-        $dst = imagecreatetruecolor($size, $size);
-        if (!$dst) {
-            imagedestroy($src);
-            @copy($sourcePath, $targetPng);
-            @copy($sourcePath, $targetIco);
-
-            return;
-        }
-
-        imagealphablending($dst, false);
-        imagesavealpha($dst, true);
-        $transparent = imagecolorallocatealpha($dst, 255, 255, 255, 127);
-        imagefilledrectangle($dst, 0, 0, $size, $size, $transparent);
-
-        $srcWidth = max(1, imagesx($src));
-        $srcHeight = max(1, imagesy($src));
-        imagecopyresampled($dst, $src, 0, 0, 0, 0, $size, $size, $srcWidth, $srcHeight);
-        imagepng($dst, $targetPng, 2);
-        @copy($targetPng, $targetIco);
-
-        imagedestroy($src);
-        imagedestroy($dst);
     }
 
     protected function createImageResource($path, $mime)
