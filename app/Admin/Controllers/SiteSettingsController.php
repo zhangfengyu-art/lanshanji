@@ -9,6 +9,7 @@ use Encore\Admin\Layout\Content;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
 
@@ -98,10 +99,31 @@ class SiteSettingsController extends Controller
 
         $logoFile = $request->file('logo');
         if ($logoFile) {
-            $path = $this->storeOptimizedLogo($logoFile);
+            try {
+                $path = $this->storeOptimizedLogo($logoFile);
+            } catch (\Throwable $e) {
+                Log::error('站点 Logo 上传失败', [
+                    'message' => $e->getMessage(),
+                    'file' => $logoFile->getClientOriginalName(),
+                ]);
+
+                return redirect()
+                    ->route('admin.site_settings.logo.edit')
+                    ->withInput($request->except('logo'))
+                    ->withErrors([
+                        'logo' => 'Logo 保存失败，请检查 storage 目录权限或换一张较小的图片后重试。',
+                    ]);
+            }
 
             if ($setting->value && $setting->value !== $path) {
-                Storage::disk('public')->delete($setting->value);
+                try {
+                    Storage::disk('public')->delete($setting->value);
+                } catch (\Throwable $e) {
+                    Log::warning('删除旧 Logo 失败', [
+                        'path' => $setting->value,
+                        'message' => $e->getMessage(),
+                    ]);
+                }
             }
 
             $setting->update(['value' => $path]);
@@ -136,25 +158,37 @@ class SiteSettingsController extends Controller
      */
     protected function storeOptimizedLogo(UploadedFile $file)
     {
+        $this->ensureBrandDirectoryExists();
+
         $realPath = $file->getRealPath();
+        if (!$realPath || !is_readable($realPath)) {
+            throw new \RuntimeException('无法读取上传的 Logo 文件。');
+        }
+
         $imageInfo = @getimagesize($realPath);
 
         if (!$imageInfo || !isset($imageInfo['mime'])) {
-            return $file->store('images/brand', 'public');
+            return $this->storeRawLogo($file);
         }
 
         $mime = $imageInfo['mime'];
         if (!function_exists('imagecreatetruecolor')) {
-            return $file->store('images/brand', 'public');
+            return $this->storeRawLogo($file);
         }
 
         $src = $this->createImageResource($realPath, $mime);
         if (!$src) {
-            return $file->store('images/brand', 'public');
+            return $this->storeRawLogo($file);
         }
 
         $srcWidth = imagesx($src);
         $srcHeight = imagesy($src);
+        if ($srcWidth <= 0 || $srcHeight <= 0) {
+            imagedestroy($src);
+
+            return $this->storeRawLogo($file);
+        }
+
         // Keep output crisp while avoiding oversized files.
         $maxWidth = 640;
         $maxHeight = 220;
@@ -165,10 +199,17 @@ class SiteSettingsController extends Controller
         // If the upload is already small enough, keep original bytes to avoid recompression blur.
         if ($ratio >= 0.999) {
             imagedestroy($src);
-            return $file->store('images/brand', 'public');
+
+            return $this->storeRawLogo($file);
         }
 
         $dst = imagecreatetruecolor($targetWidth, $targetHeight);
+        if (!$dst) {
+            imagedestroy($src);
+
+            return $this->storeRawLogo($file);
+        }
+
         if (in_array($mime, ['image/png', 'image/gif', 'image/webp'], true)) {
             imagealphablending($dst, false);
             imagesavealpha($dst, true);
@@ -213,9 +254,35 @@ class SiteSettingsController extends Controller
         imagedestroy($src);
         imagedestroy($dst);
 
-        Storage::disk('public')->put($outputPath, $binary);
+        if (!is_string($binary) || $binary === '') {
+            throw new \RuntimeException('Logo 图片压缩失败，请换一张较小的图片。');
+        }
+
+        if (!Storage::disk('public')->put($outputPath, $binary)) {
+            throw new \RuntimeException('无法写入 Logo 文件，请检查 storage/app/public 目录权限。');
+        }
 
         return $outputPath;
+    }
+
+    protected function storeRawLogo(UploadedFile $file)
+    {
+        $this->ensureBrandDirectoryExists();
+
+        $path = $file->store('images/brand', 'public');
+        if (!$path) {
+            throw new \RuntimeException('无法保存 Logo 文件，请检查 storage/app/public 目录权限。');
+        }
+
+        return $path;
+    }
+
+    protected function ensureBrandDirectoryExists()
+    {
+        $disk = Storage::disk('public');
+        if (!$disk->exists('images/brand')) {
+            $disk->makeDirectory('images/brand');
+        }
     }
 
     protected function createImageResource($path, $mime)
