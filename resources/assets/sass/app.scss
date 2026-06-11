@@ -154,8 +154,8 @@ a {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 22px;
-    font-size: 16px;
+    gap: 24px;
+    font-size: 17.6px;
     color: #333333;
 
     a {
@@ -187,7 +187,7 @@ a {
     .dropdown-toggle {
       color: #333333;
       text-decoration: none;
-      font-size: 16px;
+      font-size: 17.6px;
     }
 
     .dropdown-menu {
@@ -213,11 +213,11 @@ a {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     border: 0;
     background: transparent;
     color: #333333;
-    font-size: 16px;
+    font-size: 17.6px;
     padding: 0;
     line-height: 1;
     outline: none;
@@ -227,11 +227,11 @@ a {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 26px;
-      height: 26px;
+      width: 29px;
+      height: 29px;
 
       .glyphicon {
-        font-size: 20px;
+        font-size: 22px;
       }
     }
 
@@ -245,13 +245,13 @@ a {
     position: absolute;
     top: -8px;
     right: -8px;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     background: #d93025;
     color: #ffffff;
-    font-size: 11px;
-    line-height: 18px;
+    font-size: 12px;
+    line-height: 20px;
     text-align: center;
     font-weight: 600;
   }
@@ -260,7 +260,7 @@ a {
     .dropdown-toggle {
       color: #333333;
       text-decoration: none;
-      font-size: 16px;
+      font-size: 17.6px;
     }
 
     .dropdown-menu {
