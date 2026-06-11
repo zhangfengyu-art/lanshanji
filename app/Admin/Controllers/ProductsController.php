@@ -231,7 +231,10 @@ class ProductsController extends Controller
                 config('heated_tobacco_classification.category_name_patterns', []),
                 JSON_UNESCAPED_UNICODE
             );
-            Admin::script(<<<JS
+            Admin::script(str_replace(
+                '__HEATED_PATTERNS__',
+                $heatedCategoryPatternsJson,
+                <<<'JS'
 (function () {
     function syncPurchaseLimitField() {
         var status = $('select[name="sale_status"]').val();
@@ -254,7 +257,7 @@ class ProductsController extends Controller
             $('input[name="unit_sticks"]').val(0);
         }
     }
-    var heatedCategoryPatterns = {$heatedCategoryPatternsJson};
+    var heatedCategoryPatterns = __HEATED_PATTERNS__;
     function syncTobaccoTypeFromCategory() {
         var catText = $('select[name="category_id"] option:selected').text() || '';
         var isHeated = heatedCategoryPatterns.some(function (p) {
@@ -272,7 +275,7 @@ class ProductsController extends Controller
     syncTobaccoTypeFromCategory();
 })();
 JS
-            );
+            ));
             Admin::script(<<<'JS'
 (function () {
     var panelId = '#product-image-live-preview';
