@@ -64,98 +64,92 @@ class SiteSettingsController extends Controller
     public function updateLogo(Request $request)
     {
         try {
+            // 不用 mimes/image 规则：服务器未装 fileinfo 时会直接 500。
             $this->validate($request, [
-                'logo' => 'nullable|file|mimes:jpeg,jpg,png,gif,webp|max:8192',
+                'logo' => 'nullable|file|max:8192',
                 'brand_text_zh' => 'nullable|string|max:60',
                 'brand_text_en' => 'nullable|string|max:120',
                 'disable_email_verification_for_testing' => 'nullable|boolean',
                 'active_site_mode' => 'required|in:A,B',
                 'jpy_per_cny' => 'required|numeric|min:0.01',
             ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
-        }
 
-        try {
             $setting = SiteSetting::query()->firstOrCreate(
-            ['key' => 'header_logo'],
-            ['value' => '']
-        );
-        $brandTextZh = SiteSetting::query()->firstOrCreate(
-            ['key' => 'header_brand_text_zh'],
-            ['value' => '岚山烟务所']
-        );
-        $brandTextEn = SiteSetting::query()->firstOrCreate(
-            ['key' => 'header_brand_text_en'],
-            ['value' => 'ARASHIYAMA TOBACCO SHOP']
-        );
-        $disableEmailVerificationForTesting = SiteSetting::query()->firstOrCreate(
-            ['key' => 'disable_email_verification_for_testing'],
-            ['value' => '0']
-        );
-        $activeSiteMode = SiteSetting::query()->firstOrCreate(
-            ['key' => 'active_site_mode'],
-            ['value' => strtoupper((string) config('site.mode', 'A')) === 'B' ? 'B' : 'A']
-        );
-        $jpyPerCny = SiteSetting::query()->firstOrCreate(
-            ['key' => ExchangeRateService::SETTING_KEY],
-            ['value' => (string) config('site.default_jpy_per_cny', 22)]
-        );
+                ['key' => 'header_logo'],
+                ['value' => '']
+            );
+            $brandTextZh = SiteSetting::query()->firstOrCreate(
+                ['key' => 'header_brand_text_zh'],
+                ['value' => '岚山烟务所']
+            );
+            $brandTextEn = SiteSetting::query()->firstOrCreate(
+                ['key' => 'header_brand_text_en'],
+                ['value' => 'ARASHIYAMA TOBACCO SHOP']
+            );
+            $disableEmailVerificationForTesting = SiteSetting::query()->firstOrCreate(
+                ['key' => 'disable_email_verification_for_testing'],
+                ['value' => '0']
+            );
+            $activeSiteMode = SiteSetting::query()->firstOrCreate(
+                ['key' => 'active_site_mode'],
+                ['value' => strtoupper((string) config('site.mode', 'A')) === 'B' ? 'B' : 'A']
+            );
+            $jpyPerCny = SiteSetting::query()->firstOrCreate(
+                ['key' => ExchangeRateService::SETTING_KEY],
+                ['value' => (string) config('site.default_jpy_per_cny', 22)]
+            );
 
-        $logoFile = $request->file('logo');
-        if ($logoFile) {
-            try {
-                $path = $this->storeOptimizedLogo($logoFile);
-            } catch (\Throwable $e) {
-                Log::error('站点 Logo 上传失败', [
-                    'message' => $e->getMessage(),
-                    'file' => $logoFile->getClientOriginalName(),
-                ]);
-
-                return redirect()
-                    ->route('admin.site_settings.logo.edit')
-                    ->withInput($request->except('logo'))
-                    ->withErrors([
-                        'logo' => 'Logo 保存失败，请检查 storage 目录权限或换一张较小的图片后重试。',
-                    ]);
-            }
-
-            if ($setting->value && $setting->value !== $path) {
-                try {
-                    Storage::disk('public')->delete($setting->value);
-                } catch (\Throwable $e) {
-                    Log::warning('删除旧 Logo 失败', [
-                        'path' => $setting->value,
-                        'message' => $e->getMessage(),
-                    ]);
+            $logoFile = $request->file('logo');
+            if ($logoFile) {
+                if (!$this->isAllowedLogoFile($logoFile)) {
+                    return redirect()
+                        ->route('admin.site_settings.logo.edit')
+                        ->withInput($request->except('logo'))
+                        ->withErrors([
+                            'logo' => '仅支持 JPG、PNG、GIF、WebP 格式的图片。',
+                        ]);
                 }
+
+                $path = $this->storeOptimizedLogo($logoFile);
+
+                if ($setting->value && $setting->value !== $path) {
+                    try {
+                        Storage::disk('public')->delete($setting->value);
+                    } catch (\Throwable $e) {
+                        Log::warning('删除旧 Logo 失败', [
+                            'path' => $setting->value,
+                            'message' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                $setting->update(['value' => $path]);
             }
 
-            $setting->update(['value' => $path]);
-        }
-
-        $brandTextZh->update([
-            'value' => trim((string) $request->input('brand_text_zh', '')) ?: '岚山烟务所',
-        ]);
-        $brandTextEn->update([
-            'value' => trim((string) $request->input('brand_text_en', '')) ?: 'ARASHIYAMA TOBACCO SHOP',
-        ]);
-        $disableToggleInput = $request->input('disable_email_verification_for_testing');
-        $disableEmailVerificationForTesting->update([
-            'value' => in_array($disableToggleInput, ['1', 1, true, 'on', 'yes'], true) ? '1' : '0',
-        ]);
-        $activeSiteMode->update([
-            'value' => strtoupper((string) $request->input('active_site_mode', 'A')) === 'B' ? 'B' : 'A',
-        ]);
-        $jpyPerCny->update([
-            'value' => (string) round((float) $request->input('jpy_per_cny'), 6),
-        ]);
-        Cache::forget('site.active_mode');
-        ExchangeRateService::forgetCache();
+            $brandTextZh->update([
+                'value' => trim((string) $request->input('brand_text_zh', '')) ?: '岚山烟务所',
+            ]);
+            $brandTextEn->update([
+                'value' => trim((string) $request->input('brand_text_en', '')) ?: 'ARASHIYAMA TOBACCO SHOP',
+            ]);
+            $disableToggleInput = $request->input('disable_email_verification_for_testing');
+            $disableEmailVerificationForTesting->update([
+                'value' => in_array($disableToggleInput, ['1', 1, true, 'on', 'yes'], true) ? '1' : '0',
+            ]);
+            $activeSiteMode->update([
+                'value' => strtoupper((string) $request->input('active_site_mode', 'A')) === 'B' ? 'B' : 'A',
+            ]);
+            $jpyPerCny->update([
+                'value' => (string) round((float) $request->input('jpy_per_cny'), 6),
+            ]);
+            Cache::forget('site.active_mode');
+            ExchangeRateService::forgetCache();
 
             return redirect()
                 ->route('admin.site_settings.logo.edit')
                 ->with('logo_upload_success', '站点品牌信息已更新。');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             Log::error('站点设置保存失败', [
                 'message' => $e->getMessage(),
@@ -169,6 +163,25 @@ class SiteSettingsController extends Controller
                     'logo' => '保存失败：'.$e->getMessage(),
                 ]);
         }
+    }
+
+    protected function isAllowedLogoFile(UploadedFile $file)
+    {
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+
+        if (!in_array($extension, $allowedExtensions, true)) {
+            return false;
+        }
+
+        $realPath = $file->getRealPath();
+        if (!$realPath || !is_readable($realPath)) {
+            return false;
+        }
+
+        $imageInfo = @getimagesize($realPath);
+
+        return is_array($imageInfo) && isset($imageInfo['mime']);
     }
 
     /**
