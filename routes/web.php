@@ -1,5 +1,24 @@
 <?php
 
+Route::get('favicon.ico', function () {
+    $icoPath = public_path('favicon.ico');
+    if (is_file($icoPath)) {
+        return response()->file($icoPath, ['Content-Type' => 'image/png']);
+    }
+
+    $pngPath = public_path('favicon.png');
+    if (is_file($pngPath)) {
+        return response()->file($pngPath, ['Content-Type' => 'image/png']);
+    }
+
+    $logoUrl = site_logo_url();
+    if ($logoUrl) {
+        return redirect($logoUrl);
+    }
+
+    abort(404);
+});
+
 Route::redirect('/', '/products')->name('root');
 Route::get('products', 'ProductsController@index')->name('products.index');
 Route::get('procurement/detail', 'ProductsController@procurementDetail')->name('procurement.detail');

@@ -173,12 +173,6 @@ function site_logo_url()
         }
 
         $relative = ltrim(str_replace('\\', '/', $path), '/');
-        $fullPath = storage_path('app/public/'.$relative);
-
-        if (!is_file($fullPath)) {
-            return $url;
-        }
-
         $url = asset('storage/'.$relative);
     } catch (\Throwable $e) {
         $url = null;
@@ -188,11 +182,55 @@ function site_logo_url()
 }
 
 /**
- * 浏览器标签页图标（favicon），默认与站点 Logo 相同。
+ * 浏览器标签页图标（favicon）。
+ * 优先 public/favicon.png（上传 Logo 时自动生成），否则回退到站点 Logo。
  */
 function site_favicon_url()
 {
-    return site_logo_url();
+    $publicFavicon = public_path('favicon.png');
+    if (is_file($publicFavicon)) {
+        return asset('favicon.png').'?v='.site_favicon_version();
+    }
+
+    $logoUrl = site_logo_url();
+    if ($logoUrl) {
+        return $logoUrl.'?v='.site_favicon_version();
+    }
+
+    return null;
+}
+
+/**
+ * favicon 缓存破坏参数（Logo 更新时间）。
+ */
+function site_favicon_version()
+{
+    static $version = null;
+
+    if ($version !== null) {
+        return $version;
+    }
+
+    try {
+        if (\Illuminate\Support\Facades\Schema::hasTable('site_settings')) {
+            $updatedAt = \App\Models\SiteSetting::query()
+                ->where('key', 'header_logo')
+                ->value('updated_at');
+
+            if ($updatedAt) {
+                $version = (string) strtotime((string) $updatedAt);
+
+                return $version;
+            }
+        }
+    } catch (\Throwable $e) {
+        // ignore
+    }
+
+    $publicFavicon = public_path('favicon.png');
+    $version = is_file($publicFavicon) ? (string) filemtime($publicFavicon) : (string) time();
+
+    return $version;
 }
 
 /**
