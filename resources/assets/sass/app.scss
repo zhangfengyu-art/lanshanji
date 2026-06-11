@@ -87,7 +87,7 @@ a {
 
   .site-header__logo-wrap {
     flex: 0 0 auto;
-    max-width: 240px;
+    max-width: 288px;
   }
 
   .site-header__logo {
@@ -97,7 +97,7 @@ a {
 
     img {
       display: block;
-      max-height: 96px;
+      max-height: 115px;
       width: auto;
       max-width: 100%;
       object-fit: contain;
@@ -699,12 +699,12 @@ a {
     }
 
     .site-header__logo-wrap {
-      max-width: 160px;
+      max-width: 192px;
     }
 
     .site-header__logo {
       img {
-        max-height: 72px;
+        max-height: 86px;
       }
     }
 
