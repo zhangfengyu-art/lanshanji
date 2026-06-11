@@ -8,9 +8,14 @@
                 <a class="site-header__logo" href="{{ site_home_url() }}" aria-label="{{ site_brand_zh() }}">
                     @php $headerLogoUrl = site_logo_url() ?: ($siteLogoUrl ?? null); @endphp
                     @if(!empty($headerLogoUrl))
-                        <img src="{{ $headerLogoUrl }}" alt="{{ site_brand_zh() }}" style="height: 152px; width: auto; max-height: none;">
+                        <img src="{{ $headerLogoUrl }}" alt="{{ site_brand_zh() }}">
                     @endif
                 </a>
+            </div>
+
+            <div class="site-header__brand-center">
+                <p class="site-header__brand-center-zh">{{ trim((string) ($siteBrandZh ?? site_brand_zh())) }} · 日本烟草选品</p>
+                <p class="site-header__brand-center-en">{{ trim((string) ($siteBrandEn ?? 'ARASHIYAMA TOBACCO SHOP')) }}</p>
             </div>
 
             <div class="site-header__actions">
