@@ -140,7 +140,26 @@ function site_home_url()
 }
 
 /**
- * 后台上传的站点 Logo 访问地址（文件不存在时返回 null）。
+ * 将 site_settings 中的相对路径转为可访问 URL。
+ */
+function site_setting_image_url($storageRelativePath)
+{
+    $path = trim((string) $storageRelativePath);
+    if ($path === '') {
+        return null;
+    }
+
+    if (preg_match('#^https?://#i', $path)) {
+        return $path;
+    }
+
+    $relative = ltrim(str_replace('\\', '/', $path), '/');
+
+    return asset('storage/'.$relative);
+}
+
+/**
+ * A 站首页左上角 Logo（header_logo）。
  */
 function site_logo_url()
 {
@@ -162,18 +181,7 @@ function site_logo_url()
             ->where('key', 'header_logo')
             ->value('value'));
 
-        if ($path === '') {
-            return $url;
-        }
-
-        if (preg_match('#^https?://#i', $path)) {
-            $url = $path;
-
-            return $url;
-        }
-
-        $relative = ltrim(str_replace('\\', '/', $path), '/');
-        $url = asset('storage/'.$relative);
+        $url = site_setting_image_url($path);
     } catch (\Throwable $e) {
         $url = null;
     }
@@ -182,26 +190,53 @@ function site_logo_url()
 }
 
 /**
- * 浏览器标签页图标（favicon）。
- * 优先 public/favicon.png（上传 Logo 时自动生成），否则回退到站点 Logo。
+ * 当前站点模式对应的 favicon 存储相对路径。
  */
-function site_favicon_url()
+function site_favicon_storage_path()
 {
-    $publicFavicon = public_path('favicon.png');
-    if (is_file($publicFavicon)) {
-        return asset('favicon.png').'?v='.site_favicon_version();
-    }
+    try {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('site_settings')) {
+            return '';
+        }
 
-    $logoUrl = site_logo_url();
-    if ($logoUrl) {
-        return $logoUrl.'?v='.site_favicon_version();
+        return app(\App\Services\SiteFaviconService::class)->storagePathForMode();
+    } catch (\Throwable $e) {
+        return '';
     }
-
-    return null;
 }
 
 /**
- * favicon 缓存破坏参数（Logo 更新时间）。
+ * 当前站点模式 favicon 的本地绝对路径（供 /favicon.ico 路由使用）。
+ */
+function site_favicon_absolute_path()
+{
+    try {
+        return app(\App\Services\SiteFaviconService::class)->absolutePathForMode();
+    } catch (\Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * 浏览器标签页图标：A 站用 favicon_a，B 站用 favicon_b。
+ */
+function site_favicon_url()
+{
+    $relative = site_favicon_storage_path();
+    if ($relative === '') {
+        return null;
+    }
+
+    $url = site_setting_image_url($relative);
+    if (!$url) {
+        return null;
+    }
+
+    return $url.'?v='.site_favicon_version();
+}
+
+/**
+ * favicon 缓存破坏参数。
  */
 function site_favicon_version()
 {
@@ -213,8 +248,10 @@ function site_favicon_version()
 
     try {
         if (\Illuminate\Support\Facades\Schema::hasTable('site_settings')) {
+            $service = app(\App\Services\SiteFaviconService::class);
+            $key = $service->faviconKeyForMode();
             $updatedAt = \App\Models\SiteSetting::query()
-                ->where('key', 'header_logo')
+                ->where('key', $key)
                 ->value('updated_at');
 
             if ($updatedAt) {
@@ -222,13 +259,24 @@ function site_favicon_version()
 
                 return $version;
             }
+
+            if ($key === \App\Services\SiteFaviconService::KEY_FAVICON_A) {
+                $logoUpdatedAt = \App\Models\SiteSetting::query()
+                    ->where('key', \App\Services\SiteFaviconService::KEY_HEADER_LOGO)
+                    ->value('updated_at');
+
+                if ($logoUpdatedAt) {
+                    $version = (string) strtotime((string) $logoUpdatedAt);
+
+                    return $version;
+                }
+            }
         }
     } catch (\Throwable $e) {
         // ignore
     }
 
-    $publicFavicon = public_path('favicon.png');
-    $version = is_file($publicFavicon) ? (string) filemtime($publicFavicon) : (string) time();
+    $version = (string) time();
 
     return $version;
 }

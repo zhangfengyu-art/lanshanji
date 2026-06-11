@@ -3,36 +3,62 @@
 namespace App\Services;
 
 use App\Models\SiteSetting;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class SiteFaviconService
 {
-    public function needsRepublish()
+    const KEY_HEADER_LOGO = 'header_logo';
+    const KEY_FAVICON_A = 'favicon_a';
+    const KEY_FAVICON_B = 'favicon_b';
+
+    public function faviconKeyForMode($mode = null)
     {
-        $png = public_path('favicon.png');
-        $ico = public_path('favicon.ico');
+        $mode = strtoupper((string) ($mode ?: site_mode()));
 
-        if (!is_file($png) || filesize($png) < 1) {
-            return true;
-        }
-
-        if (!is_file($ico) || filesize($ico) < 1) {
-            return true;
-        }
-
-        return false;
+        return $mode === 'B' ? self::KEY_FAVICON_B : self::KEY_FAVICON_A;
     }
 
-    public function publishFromCurrentLogo()
+    public function storagePathForMode($mode = null)
     {
-        $path = trim((string) SiteSetting::query()
-            ->where('key', 'header_logo')
-            ->value('value'));
+        $key = $this->faviconKeyForMode($mode);
+        $path = trim((string) SiteSetting::query()->where('key', $key)->value('value'));
 
-        if ($path === '') {
+        if ($path !== '') {
+            return ltrim(str_replace('\\', '/', $path), '/');
+        }
+
+        if ($key === self::KEY_FAVICON_A) {
+            $fallback = trim((string) SiteSetting::query()
+                ->where('key', self::KEY_HEADER_LOGO)
+                ->value('value'));
+
+            return $fallback !== '' ? ltrim(str_replace('\\', '/', $fallback), '/') : '';
+        }
+
+        return '';
+    }
+
+    public function absolutePathForMode($mode = null)
+    {
+        $relative = $this->storagePathForMode($mode);
+        if ($relative === '') {
+            return null;
+        }
+
+        $fullPath = storage_path('app/public/'.$relative);
+
+        return is_file($fullPath) && filesize($fullPath) > 0 ? $fullPath : null;
+    }
+
+    public function publishFromCurrentFavicon()
+    {
+        $relative = $this->storagePathForMode();
+        if ($relative === '') {
             return false;
         }
 
-        return $this->publishFromStoragePath($path);
+        return $this->publishFromStoragePath($relative);
     }
 
     public function publishFromStoragePath($storageRelativePath)
@@ -81,6 +107,74 @@ class SiteFaviconService
         $this->removeBrokenFaviconFiles();
 
         return false;
+    }
+
+    /**
+     * 保存上传的标签页图标（32x32 PNG）到 storage。
+     */
+    public function storeUploadedFavicon(UploadedFile $file, $namePrefix)
+    {
+        $this->ensureBrandDirectoryExists();
+
+        $realPath = $file->getRealPath();
+        if (!$realPath || !is_readable($realPath)) {
+            throw new \RuntimeException('无法读取上传的图标文件。');
+        }
+
+        $outputPath = 'images/brand/'.$namePrefix.'-'.time().'.png';
+
+        if (!function_exists('imagecreatetruecolor')) {
+            $stored = $file->storeAs('images/brand', basename($outputPath), 'public');
+            if (!$stored) {
+                throw new \RuntimeException('无法保存图标文件。');
+            }
+
+            return $stored;
+        }
+
+        $imageInfo = @getimagesize($realPath);
+        if (!$imageInfo || !isset($imageInfo['mime'])) {
+            $stored = $file->storeAs('images/brand', basename($outputPath), 'public');
+            if (!$stored) {
+                throw new \RuntimeException('无法保存图标文件。');
+            }
+
+            return $stored;
+        }
+
+        $src = $this->createImageResource($realPath, $imageInfo['mime']);
+        if (!$src) {
+            $stored = $file->storeAs('images/brand', basename($outputPath), 'public');
+            if (!$stored) {
+                throw new \RuntimeException('无法保存图标文件。');
+            }
+
+            return $stored;
+        }
+
+        $targetPng = storage_path('app/public/'.$outputPath);
+        $saved = $this->resizeToFaviconPng($src, $targetPng);
+        imagedestroy($src);
+
+        if (!$saved) {
+            throw new \RuntimeException('图标压缩失败，请换一张较小的图片。');
+        }
+
+        return $outputPath;
+    }
+
+    public function ensureBrandDirectoryExists()
+    {
+        $disk = Storage::disk('public');
+        foreach (['images', 'images/brand'] as $dir) {
+            if ($disk->exists($dir)) {
+                continue;
+            }
+
+            if (!$disk->makeDirectory($dir)) {
+                throw new \RuntimeException('无法创建 '.$dir.' 目录。');
+            }
+        }
     }
 
     protected function removeBrokenFaviconFiles()

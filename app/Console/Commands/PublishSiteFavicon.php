@@ -15,8 +15,8 @@ class PublishSiteFavicon extends Command
     {
         $service = app(SiteFaviconService::class);
 
-        if (!$service->publishFromCurrentLogo()) {
-            $this->error('生成失败：请确认后台已上传 Logo，且 storage/app/public 下文件可读。');
+        if (!$service->publishFromCurrentFavicon()) {
+            $this->error('生成失败：请确认后台已上传对应站点的标签页图标，且 storage/app/public 下文件可读。');
 
             return 1;
         }

@@ -1,6 +1,15 @@
+@php
+    $preview = function ($path) {
+        if (!$path) {
+            return null;
+        }
+
+        return site_setting_image_url($path);
+    };
+@endphp
 <div class="box box-primary">
     <div class="box-header with-border">
-        <h3 class="box-title">站点品牌信息</h3>
+        <h3 class="box-title">站点品牌与图标</h3>
     </div>
     @if(session('logo_upload_success'))
         <div class="alert alert-success" style="margin: 10px 15px 0;">
@@ -41,7 +50,7 @@
                     <option value="A" {{ old('active_site_mode', $activeSiteMode->value) === 'A' ? 'selected' : '' }}>A 模式（选品主站）</option>
                     <option value="B" {{ old('active_site_mode', $activeSiteMode->value) === 'B' ? 'selected' : '' }}>B 模式（互助代购大厅）</option>
                 </select>
-                <p class="help-block">保存后将优先作为全站 site_mode 判定来源（高于 .env 的 SITE_MODE）。</p>
+                <p class="help-block">保存后将优先作为全站 site_mode 判定来源（高于 .env 的 SITE_MODE）。生产双机部署时仍以各机 .env 的 SITE_MODE 为准。</p>
                 @if($errors->has('active_site_mode'))
                     <span class="help-block">{{ $errors->first('active_site_mode') }}</span>
                 @endif
@@ -58,27 +67,67 @@
                     >
                     跳过前台邮箱验证（仅测试期使用）
                 </label>
-                <p class="help-block">开启后，登录用户可直接访问原本要求邮箱已验证的页面；关闭后恢复正常验证。</p>
                 @if($errors->has('disable_email_verification_for_testing'))
                     <span class="help-block">{{ $errors->first('disable_email_verification_for_testing') }}</span>
                 @endif
             </div>
 
+            <hr>
+            <h4>A 站首页图标</h4>
+            <p class="help-block">显示在 A 站（美国选品站）首页左上角，建议透明 PNG，宽不超过 640px。</p>
+
             @if($setting->value)
                 <div class="form-group">
-                    <label>当前站点 Logo</label>
+                    <label>当前 A 站首页 Logo</label>
                     <div>
-                        <img src="{{ asset('storage/'.ltrim(str_replace('\\', '/', $setting->value), '/')) }}" alt="当前站点 Logo" style="max-height: 64px; border: 1px solid #eeeeee; padding: 4px; background: #ffffff;">
+                        <img src="{{ $preview($setting->value) }}" alt="A 站首页 Logo" style="max-height: 64px; border: 1px solid #eeeeee; padding: 4px; background: #ffffff;">
                     </div>
                 </div>
             @endif
 
             <div class="form-group {{ $errors->has('logo') ? 'has-error' : '' }}">
-                <label for="logo">上传站点 Logo（建议透明 PNG）<span class="text-danger">*</span></label>
-                <input id="logo" type="file" name="logo" class="form-control" accept="image/*"{{ $setting->value ? '' : ' required' }}>
-                <p class="help-block">保存后首页左上角将显示此图片，不再显示中文品牌文字。上传后会自动压缩并缩放（最长边不超过 640px）。若当前未显示 Logo，请在此选择图片后点击保存。</p>
+                <label for="logo">上传 A 站首页 Logo</label>
+                <input id="logo" type="file" name="logo" class="form-control" accept="image/*">
                 @if($errors->has('logo'))
                     <span class="help-block">{{ $errors->first('logo') }}</span>
+                @endif
+            </div>
+
+            <hr>
+            <h4>标签页图标（Favicon）</h4>
+            <p class="help-block">浏览器标签页上的小图标，建议 32×32 或更大的正方形 PNG。A/B 站可分别设置；未上传 A 站 favicon 时会暂时回退为首页 Logo。</p>
+
+            @if($faviconA->value)
+                <div class="form-group">
+                    <label>当前 A 站标签页图标</label>
+                    <div>
+                        <img src="{{ $preview($faviconA->value) }}" alt="A 站 favicon" style="width: 32px; height: 32px; border: 1px solid #eeeeee; padding: 2px; background: #ffffff;">
+                    </div>
+                </div>
+            @endif
+
+            <div class="form-group {{ $errors->has('favicon_a') ? 'has-error' : '' }}">
+                <label for="favicon_a">上传 A 站标签页图标</label>
+                <input id="favicon_a" type="file" name="favicon_a" class="form-control" accept="image/*">
+                @if($errors->has('favicon_a'))
+                    <span class="help-block">{{ $errors->first('favicon_a') }}</span>
+                @endif
+            </div>
+
+            @if($faviconB->value)
+                <div class="form-group">
+                    <label>当前 B 站标签页图标</label>
+                    <div>
+                        <img src="{{ $preview($faviconB->value) }}" alt="B 站 favicon" style="width: 32px; height: 32px; border: 1px solid #eeeeee; padding: 2px; background: #ffffff;">
+                    </div>
+                </div>
+            @endif
+
+            <div class="form-group {{ $errors->has('favicon_b') ? 'has-error' : '' }}">
+                <label for="favicon_b">上传 B 站标签页图标</label>
+                <input id="favicon_b" type="file" name="favicon_b" class="form-control" accept="image/*">
+                @if($errors->has('favicon_b'))
+                    <span class="help-block">{{ $errors->first('favicon_b') }}</span>
                 @endif
             </div>
         </div>

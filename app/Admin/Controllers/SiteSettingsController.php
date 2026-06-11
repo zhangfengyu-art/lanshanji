@@ -18,45 +18,41 @@ class SiteSettingsController extends Controller
 {
     public function editLogo()
     {
-        // Avoid conflict with laravel-admin built-in success message bag key.
         if (session()->has('success') && is_string(session('success'))) {
             session()->forget('success');
         }
 
-        $setting = SiteSetting::query()->firstOrCreate(
-            ['key' => 'header_logo'],
-            ['value' => '']
+        $setting = $this->firstOrCreateSetting(SiteFaviconService::KEY_HEADER_LOGO, '');
+        $faviconA = $this->firstOrCreateSetting(SiteFaviconService::KEY_FAVICON_A, '');
+        $faviconB = $this->firstOrCreateSetting(SiteFaviconService::KEY_FAVICON_B, '');
+        $brandTextZh = $this->firstOrCreateSetting('header_brand_text_zh', '岚山烟务所');
+        $brandTextEn = $this->firstOrCreateSetting('header_brand_text_en', 'ARASHIYAMA TOBACCO SHOP');
+        $disableEmailVerificationForTesting = $this->firstOrCreateSetting('disable_email_verification_for_testing', '0');
+        $activeSiteMode = $this->firstOrCreateSetting(
+            'active_site_mode',
+            strtoupper((string) config('site.mode', 'A')) === 'B' ? 'B' : 'A'
         );
-        $brandTextZh = SiteSetting::query()->firstOrCreate(
-            ['key' => 'header_brand_text_zh'],
-            ['value' => '岚山烟务所']
-        );
-        $brandTextEn = SiteSetting::query()->firstOrCreate(
-            ['key' => 'header_brand_text_en'],
-            ['value' => 'ARASHIYAMA TOBACCO SHOP']
-        );
-        $disableEmailVerificationForTesting = SiteSetting::query()->firstOrCreate(
-            ['key' => 'disable_email_verification_for_testing'],
-            ['value' => '0']
-        );
-        $activeSiteMode = SiteSetting::query()->firstOrCreate(
-            ['key' => 'active_site_mode'],
-            ['value' => strtoupper((string) config('site.mode', 'A')) === 'B' ? 'B' : 'A']
-        );
-        $jpyPerCny = SiteSetting::query()->firstOrCreate(
-            ['key' => ExchangeRateService::SETTING_KEY],
-            ['value' => (string) config('site.default_jpy_per_cny', 22)]
+        $jpyPerCny = $this->firstOrCreateSetting(
+            ExchangeRateService::SETTING_KEY,
+            (string) config('site.default_jpy_per_cny', 22)
         );
 
-        if ($setting->value && !is_file(public_path('favicon.png'))) {
-            $this->publishPublicFavicon($setting->value);
-        }
-
-        return Admin::content(function (Content $content) use ($setting, $brandTextZh, $brandTextEn, $disableEmailVerificationForTesting, $activeSiteMode, $jpyPerCny) {
+        return Admin::content(function (Content $content) use (
+            $setting,
+            $faviconA,
+            $faviconB,
+            $brandTextZh,
+            $brandTextEn,
+            $disableEmailVerificationForTesting,
+            $activeSiteMode,
+            $jpyPerCny
+        ) {
             $content->header('站点设置');
             $content->description('维护站点品牌信息与运行模式');
             $content->body(view('admin.site_settings.logo', [
                 'setting' => $setting,
+                'faviconA' => $faviconA,
+                'faviconB' => $faviconB,
                 'brandTextZh' => $brandTextZh,
                 'brandTextEn' => $brandTextEn,
                 'disableEmailVerificationForTesting' => $disableEmailVerificationForTesting,
@@ -69,9 +65,10 @@ class SiteSettingsController extends Controller
     public function updateLogo(Request $request)
     {
         try {
-            // 不用 mimes/image 规则：服务器未装 fileinfo 时会直接 500。
             $this->validate($request, [
                 'logo' => 'nullable|file|max:8192',
+                'favicon_a' => 'nullable|file|max:2048',
+                'favicon_b' => 'nullable|file|max:2048',
                 'brand_text_zh' => 'nullable|string|max:60',
                 'brand_text_en' => 'nullable|string|max:120',
                 'disable_email_verification_for_testing' => 'nullable|boolean',
@@ -79,57 +76,57 @@ class SiteSettingsController extends Controller
                 'jpy_per_cny' => 'required|numeric|min:0.01',
             ]);
 
-            $setting = SiteSetting::query()->firstOrCreate(
-                ['key' => 'header_logo'],
-                ['value' => '']
+            $setting = $this->firstOrCreateSetting(SiteFaviconService::KEY_HEADER_LOGO, '');
+            $faviconA = $this->firstOrCreateSetting(SiteFaviconService::KEY_FAVICON_A, '');
+            $faviconB = $this->firstOrCreateSetting(SiteFaviconService::KEY_FAVICON_B, '');
+            $brandTextZh = $this->firstOrCreateSetting('header_brand_text_zh', '岚山烟务所');
+            $brandTextEn = $this->firstOrCreateSetting('header_brand_text_en', 'ARASHIYAMA TOBACCO SHOP');
+            $disableEmailVerificationForTesting = $this->firstOrCreateSetting('disable_email_verification_for_testing', '0');
+            $activeSiteMode = $this->firstOrCreateSetting(
+                'active_site_mode',
+                strtoupper((string) config('site.mode', 'A')) === 'B' ? 'B' : 'A'
             );
-            $brandTextZh = SiteSetting::query()->firstOrCreate(
-                ['key' => 'header_brand_text_zh'],
-                ['value' => '岚山烟务所']
+            $jpyPerCny = $this->firstOrCreateSetting(
+                ExchangeRateService::SETTING_KEY,
+                (string) config('site.default_jpy_per_cny', 22)
             );
-            $brandTextEn = SiteSetting::query()->firstOrCreate(
-                ['key' => 'header_brand_text_en'],
-                ['value' => 'ARASHIYAMA TOBACCO SHOP']
-            );
-            $disableEmailVerificationForTesting = SiteSetting::query()->firstOrCreate(
-                ['key' => 'disable_email_verification_for_testing'],
-                ['value' => '0']
-            );
-            $activeSiteMode = SiteSetting::query()->firstOrCreate(
-                ['key' => 'active_site_mode'],
-                ['value' => strtoupper((string) config('site.mode', 'A')) === 'B' ? 'B' : 'A']
-            );
-            $jpyPerCny = SiteSetting::query()->firstOrCreate(
-                ['key' => ExchangeRateService::SETTING_KEY],
-                ['value' => (string) config('site.default_jpy_per_cny', 22)]
-            );
+
+            $faviconService = app(SiteFaviconService::class);
 
             $logoFile = $request->file('logo');
             if ($logoFile) {
-                if (!$this->isAllowedLogoFile($logoFile)) {
-                    return redirect()
-                        ->route('admin.site_settings.logo.edit')
-                        ->withInput($request->except('logo'))
-                        ->withErrors([
-                            'logo' => '仅支持 JPG、PNG、GIF、WebP 格式的图片。',
-                        ]);
+                if (!$this->isAllowedImageFile($logoFile)) {
+                    return $this->redirectWithImageError($request, 'logo', '仅支持 JPG、PNG、GIF、WebP 格式的图片。');
                 }
 
                 $path = $this->storeOptimizedLogo($logoFile);
+                $this->replaceStoredImage($setting, $path);
+            }
 
-                if ($setting->value && $setting->value !== $path) {
-                    try {
-                        Storage::disk('public')->delete($setting->value);
-                    } catch (\Throwable $e) {
-                        Log::warning('删除旧 Logo 失败', [
-                            'path' => $setting->value,
-                            'message' => $e->getMessage(),
-                        ]);
-                    }
+            $faviconAFile = $request->file('favicon_a');
+            if ($faviconAFile) {
+                if (!$this->isAllowedImageFile($faviconAFile)) {
+                    return $this->redirectWithImageError($request, 'favicon_a', 'A 站标签页图标格式无效。');
                 }
 
-                $setting->update(['value' => $path]);
-                app(SiteFaviconService::class)->publishFromStoragePath($path);
+                $path = $faviconService->storeUploadedFavicon($faviconAFile, 'favicon-a');
+                $this->replaceStoredImage($faviconA, $path);
+                if (!is_site_mode_b()) {
+                    $faviconService->publishFromStoragePath($path);
+                }
+            }
+
+            $faviconBFile = $request->file('favicon_b');
+            if ($faviconBFile) {
+                if (!$this->isAllowedImageFile($faviconBFile)) {
+                    return $this->redirectWithImageError($request, 'favicon_b', 'B 站标签页图标格式无效。');
+                }
+
+                $path = $faviconService->storeUploadedFavicon($faviconBFile, 'favicon-b');
+                $this->replaceStoredImage($faviconB, $path);
+                if (is_site_mode_b()) {
+                    $faviconService->publishFromStoragePath($path);
+                }
             }
 
             $brandTextZh->update([
@@ -164,14 +161,46 @@ class SiteSettingsController extends Controller
 
             return redirect()
                 ->route('admin.site_settings.logo.edit')
-                ->withInput($request->except('logo'))
+                ->withInput($request->except(['logo', 'favicon_a', 'favicon_b']))
                 ->withErrors([
                     'logo' => '保存失败：'.$e->getMessage(),
                 ]);
         }
     }
 
-    protected function isAllowedLogoFile(UploadedFile $file)
+    protected function firstOrCreateSetting($key, $defaultValue)
+    {
+        return SiteSetting::query()->firstOrCreate(
+            ['key' => $key],
+            ['value' => $defaultValue]
+        );
+    }
+
+    protected function redirectWithImageError(Request $request, $field, $message)
+    {
+        return redirect()
+            ->route('admin.site_settings.logo.edit')
+            ->withInput($request->except(['logo', 'favicon_a', 'favicon_b']))
+            ->withErrors([$field => $message]);
+    }
+
+    protected function replaceStoredImage(SiteSetting $setting, $newPath)
+    {
+        if ($setting->value && $setting->value !== $newPath) {
+            try {
+                Storage::disk('public')->delete($setting->value);
+            } catch (\Throwable $e) {
+                Log::warning('删除旧图片失败', [
+                    'path' => $setting->value,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $setting->update(['value' => $newPath]);
+    }
+
+    protected function isAllowedImageFile(UploadedFile $file)
     {
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $extension = strtolower((string) $file->getClientOriginalExtension());
@@ -190,12 +219,9 @@ class SiteSettingsController extends Controller
         return is_array($imageInfo) && isset($imageInfo['mime']);
     }
 
-    /**
-     * Resize and compress uploaded logo to avoid giant display and heavy payload.
-     */
     protected function storeOptimizedLogo(UploadedFile $file)
     {
-        $this->ensureBrandDirectoryExists();
+        app(SiteFaviconService::class)->ensureBrandDirectoryExists();
 
         $realPath = $file->getRealPath();
         if (!$realPath || !is_readable($realPath)) {
@@ -226,14 +252,12 @@ class SiteSettingsController extends Controller
             return $this->storeRawLogo($file);
         }
 
-        // Keep output crisp while avoiding oversized files.
         $maxWidth = 640;
         $maxHeight = 220;
         $ratio = min($maxWidth / $srcWidth, $maxHeight / $srcHeight, 1);
         $targetWidth = max(1, (int) floor($srcWidth * $ratio));
         $targetHeight = max(1, (int) floor($srcHeight * $ratio));
 
-        // If the upload is already small enough, keep original bytes to avoid recompression blur.
         if ($ratio >= 0.999) {
             imagedestroy($src);
 
@@ -267,7 +291,6 @@ class SiteSettingsController extends Controller
             $srcHeight
         );
 
-        // A tiny sharpen pass helps preserve text edges after downscaling.
         if (function_exists('imageconvolution')) {
             @imageconvolution($dst, [
                 [-1, -1, -1],
@@ -304,7 +327,7 @@ class SiteSettingsController extends Controller
 
     protected function storeRawLogo(UploadedFile $file)
     {
-        $this->ensureBrandDirectoryExists();
+        app(SiteFaviconService::class)->ensureBrandDirectoryExists();
 
         $path = $file->store('images/brand', 'public');
         if (!$path) {
@@ -312,25 +335,6 @@ class SiteSettingsController extends Controller
         }
 
         return $path;
-    }
-
-    protected function ensureBrandDirectoryExists()
-    {
-        $disk = Storage::disk('public');
-        $root = storage_path('app/public');
-        if (!is_dir($root) && !@mkdir($root, 0775, true) && !is_dir($root)) {
-            throw new \RuntimeException('storage/app/public 目录不存在且无法创建，请检查 storage 权限。');
-        }
-
-        foreach (['images', 'images/brand'] as $dir) {
-            if ($disk->exists($dir)) {
-                continue;
-            }
-
-            if (!$disk->makeDirectory($dir)) {
-                throw new \RuntimeException('无法创建 '.$dir.' 目录，请执行 chmod/chown storage。');
-            }
-        }
     }
 
     protected function createImageResource($path, $mime)

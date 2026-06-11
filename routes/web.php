@@ -1,19 +1,14 @@
 <?php
 
 Route::get('favicon.ico', function () {
+    $storagePath = site_favicon_absolute_path();
+    if ($storagePath) {
+        return response()->file($storagePath, ['Content-Type' => 'image/png']);
+    }
+
     $icoPath = public_path('favicon.ico');
-    if (is_file($icoPath)) {
+    if (is_file($icoPath) && filesize($icoPath) > 0) {
         return response()->file($icoPath, ['Content-Type' => 'image/png']);
-    }
-
-    $pngPath = public_path('favicon.png');
-    if (is_file($pngPath)) {
-        return response()->file($pngPath, ['Content-Type' => 'image/png']);
-    }
-
-    $logoUrl = site_logo_url();
-    if ($logoUrl) {
-        return redirect($logoUrl);
     }
 
     abort(404);
