@@ -48,6 +48,7 @@ Route::group([
     $router->post('products', 'ProductsController@store');
     $router->get('products/{id}/edit', 'ProductsController@edit');
     $router->put('products/{id}', 'ProductsController@update');
+    $router->delete('products/{id}', 'ProductsController@destroy');
     $router->post('products/batch/category', 'ProductBatchController@setCategory');
     $router->post('products/batch/shipping-mode', 'ProductBatchController@setShippingMode');
     $router->post('products/batch/tobacco-type', 'ProductBatchController@setTobaccoType');
