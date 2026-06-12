@@ -318,3 +318,30 @@ function b2b_fixed_category_name($seed)
 {
     return ((int) $seed % 2 === 0) ? '数码配件' : '办公用品';
 }
+
+/**
+ * 表字段是否已存在（迁移未完成时避免查询报错）。
+ */
+function db_has_column($table, $column)
+{
+    try {
+        return \Illuminate\Support\Facades\Schema::hasTable($table)
+            && \Illuminate\Support\Facades\Schema::hasColumn($table, $column);
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * 列表默认排序：有 sort_order 时优先，否则仅按 id。
+ */
+function apply_list_sort_order($query, $table = null)
+{
+    $table = $table ?: $query->getModel()->getTable();
+
+    if (db_has_column($table, 'sort_order')) {
+        $query->orderBy($table.'.sort_order', 'asc');
+    }
+
+    return $query->orderBy($table.'.id', 'asc');
+}

@@ -11,7 +11,7 @@ class AddSortOrderToCategoriesAndProducts extends Migration
     {
         if (Schema::hasTable('categories') && !Schema::hasColumn('categories', 'sort_order')) {
             Schema::table('categories', function (Blueprint $table) {
-                $table->unsignedInteger('sort_order')->default(0)->after('parent_id');
+                $table->unsignedInteger('sort_order')->default(0);
             });
 
             DB::table('categories')->orderBy('id')->get(['id'])->each(function ($row) {
@@ -21,7 +21,7 @@ class AddSortOrderToCategoriesAndProducts extends Migration
 
         if (Schema::hasTable('products') && !Schema::hasColumn('products', 'sort_order')) {
             Schema::table('products', function (Blueprint $table) {
-                $table->unsignedInteger('sort_order')->default(0)->after('category_id');
+                $table->unsignedInteger('sort_order')->default(0);
             });
 
             DB::table('products')->orderBy('id')->get(['id'])->each(function ($row) {

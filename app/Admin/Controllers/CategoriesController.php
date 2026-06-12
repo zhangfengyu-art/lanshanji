@@ -62,12 +62,17 @@ class CategoriesController extends Controller
     protected function grid()
     {
         return Admin::grid(Category::class, function (Grid $grid) {
-            $grid->model()->with('parent')->withCount(['products', 'children'])
-                ->orderBy('sort_order')
-                ->orderBy('id');
+            $grid->model()->with('parent')->withCount(['products', 'children']);
+            if (db_has_column('categories', 'sort_order')) {
+                $grid->model()->orderBy('sort_order')->orderBy('id');
+            } else {
+                $grid->model()->orderBy('id', 'desc');
+            }
 
             $grid->id('ID')->sortable();
-            $grid->column('sort_order', '排序')->editable()->sortable();
+            if (db_has_column('categories', 'sort_order')) {
+                $grid->column('sort_order', '排序')->editable()->sortable();
+            }
             $grid->name('分类名称');
             $grid->column('parent_id', '父级分类')->display(function ($parentId) {
                 if (!$parentId) {
@@ -133,10 +138,12 @@ class CategoriesController extends Controller
         return Admin::form(Category::class, function (Form $form) {
             $form->display('id', 'ID');
             $form->text('name', '分类名称')->rules('required|max:50');
-            $form->number('sort_order', '排序权重')
-                ->default(0)
-                ->rules('required|integer|min:0')
-                ->help('数字越小越靠前；控制顶部导航与分类列表顺序，与 ID 无关');
+            if (db_has_column('categories', 'sort_order')) {
+                $form->number('sort_order', '排序权重')
+                    ->default(0)
+                    ->rules('required|integer|min:0')
+                    ->help('数字越小越靠前；控制顶部导航与分类列表顺序，与 ID 无关');
+            }
 
             $defaultParentId = (int) request('parent_id', 0);
             $parentOptions = Category::query()

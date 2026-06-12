@@ -136,7 +136,9 @@ class AppServiceProvider extends ServiceProvider
                     $query->whereNull('parent_id')
                         ->orWhere('parent_id', 0);
                 })
-                ->orderBy('sort_order')
+                ->when(db_has_column('categories', 'sort_order'), function ($query) {
+                    $query->orderBy('sort_order');
+                })
                 ->orderBy('id')
                 ->get();
         }

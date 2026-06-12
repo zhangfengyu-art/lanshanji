@@ -25,9 +25,13 @@ class Category extends Model
 
     public function children()
     {
-        return $this->hasMany(Category::class, 'parent_id')
-            ->orderBy('sort_order')
-            ->orderBy('id');
+        $relation = $this->hasMany(Category::class, 'parent_id');
+
+        if (db_has_column('categories', 'sort_order')) {
+            $relation->orderBy('sort_order');
+        }
+
+        return $relation->orderBy('id');
     }
 
     public function products()

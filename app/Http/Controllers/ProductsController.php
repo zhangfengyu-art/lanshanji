@@ -79,7 +79,7 @@ class ProductsController extends Controller
                 }
             }
         } else {
-            $builder->orderBy('sort_order', 'asc')->orderBy('id', 'asc');
+            apply_list_sort_order($builder, 'products');
         }
 
         $products = $builder->paginate(16);
