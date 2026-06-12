@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 use Encore\Admin\Form;
+use Encore\Admin\Form\NestedForm;
 use Encore\Admin\Grid;
 use Encore\Admin\Facades\Admin;
 use Encore\Admin\Layout\Content;
@@ -251,6 +252,33 @@ class ProductsController extends Controller
             $form->saving(function (Form $form) {
                 request()->request->remove('_image_crop_payload');
                 request()->request->remove('_image_crop_meta');
+
+                $minSkuPrice = null;
+                $skus = request()->input('skus', []);
+                if (is_array($skus)) {
+                    foreach ($skus as $sku) {
+                        if (!is_array($sku)) {
+                            continue;
+                        }
+                        if ((int) ($sku[NestedForm::REMOVE_FLAG_NAME] ?? 0) === 1) {
+                            continue;
+                        }
+                        $skuPrice = $sku['price'] ?? null;
+                        if ($skuPrice === null || $skuPrice === '' || !is_numeric($skuPrice)) {
+                            continue;
+                        }
+                        $skuPrice = (float) $skuPrice;
+                        if ($skuPrice > 0 && ($minSkuPrice === null || $skuPrice < $minSkuPrice)) {
+                            $minSkuPrice = $skuPrice;
+                        }
+                    }
+                }
+
+                if ($minSkuPrice !== null) {
+                    $form->price = $minSkuPrice;
+                } elseif (!$form->model()->exists || (float) $form->price <= 0) {
+                    throw new \Exception('请至少添加一个 SKU 规格并填写销售单价');
+                }
 
                 if (\App\Services\OrderTobaccoLimitService::countsTowardStickLimit($form->tobacco_type)) {
                     if ((int) $form->unit_sticks < 1) {
