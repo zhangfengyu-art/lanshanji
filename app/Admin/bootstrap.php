@@ -20,23 +20,11 @@
 
 Encore\Admin\Form::forget(['map']);
 
+Encore\Admin\Admin::css('/css/admin-sweetalert-fix.css');
+
 /*
  * SweetAlert 删除确认：请求失败时恢复按钮，避免「确认」变灰后无法再点。
- * 同时抬高弹层层级，避免被 CKEditor / Bootstrap 遮罩挡住点击。
  */
-Encore\Admin\Admin::style(<<<'CSS'
-.sweet-overlay {
-    z-index: 19891014 !important;
-}
-.sweet-alert {
-    z-index: 19891015 !important;
-}
-.sweet-alert button {
-    pointer-events: auto !important;
-}
-CSS
-);
-
 Encore\Admin\Admin::script(<<<'JS'
 (function () {
     if (typeof $ === 'undefined') {
