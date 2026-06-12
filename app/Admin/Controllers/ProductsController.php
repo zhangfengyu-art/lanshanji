@@ -192,6 +192,9 @@ class ProductsController extends Controller
                 ''
             );
 
+            // 展示价由 SKU 最低价同步；须注册为表单字段否则 insert 不会带上 price
+            $form->hidden('price')->default(0.01);
+
             // 创建一个输入框，第一个参数 title 是模型的字段名，第二个参数是该字段描述
             $form->text('title', '商品名称')->rules('required');
             if (db_has_column('products', 'sort_order')) {
