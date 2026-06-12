@@ -10,6 +10,7 @@ class Category extends Model
         'name',
         'is_directory',
         'parent_id',
+        'sort_order',
         'default_shipping_mode',
     ];
 
@@ -24,7 +25,9 @@ class Category extends Model
 
     public function children()
     {
-        return $this->hasMany(Category::class, 'parent_id');
+        return $this->hasMany(Category::class, 'parent_id')
+            ->orderBy('sort_order')
+            ->orderBy('id');
     }
 
     public function products()

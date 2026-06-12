@@ -77,7 +77,9 @@ class ProductsController extends Controller
     protected function grid()
     {
         return Admin::grid(Product::class, function (Grid $grid) {
-            $grid->model()->with(['category', 'skus']);
+            $grid->model()->with(['category', 'skus'])
+                ->orderBy('sort_order')
+                ->orderBy('id');
             $categoryMode = request('category_mode', 'aggregate');
 
             if ($categoryId = request('category_id')) {
@@ -94,6 +96,7 @@ class ProductsController extends Controller
             }
 
             $grid->id('ID')->sortable();
+            $grid->column('sort_order', '排序')->editable()->sortable();
             $grid->title('商品名称');
             $grid->column('category.name', '所属分类')->display(function ($value) {
                 return $value ?: '-';
@@ -187,6 +190,10 @@ class ProductsController extends Controller
 
             // 创建一个输入框，第一个参数 title 是模型的字段名，第二个参数是该字段描述
             $form->text('title', '商品名称')->rules('required');
+            $form->number('sort_order', '排序权重')
+                ->default(0)
+                ->rules('required|integer|min:0')
+                ->help('数字越小越靠前；控制前台商品列表默认顺序，与 ID 无关');
             $form->select('category_id', '所属分类')
                 ->options($this->categoryOptions())
                 ->help('请为商品选择归属分类，前台导航与筛选依赖此字段');
@@ -295,6 +302,7 @@ class ProductsController extends Controller
         $categories = Category::query()
             ->with('parent:id,name')
             ->orderByRaw('COALESCE(parent_id, 0) asc')
+            ->orderBy('sort_order')
             ->orderBy('id')
             ->get(['id', 'name', 'parent_id']);
 

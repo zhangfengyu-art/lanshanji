@@ -136,6 +136,7 @@ class AppServiceProvider extends ServiceProvider
                     $query->whereNull('parent_id')
                         ->orWhere('parent_id', 0);
                 })
+                ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get();
         }

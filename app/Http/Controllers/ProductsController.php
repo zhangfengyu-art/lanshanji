@@ -11,12 +11,17 @@ use App\Models\Category;
 use App\Models\ProcurementOrder;
 use App\Models\ProcurementReferenceItem;
 use App\Models\User;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 
 class ProductsController extends Controller
 {
     public function index(Request $request)
     {
+        if (is_site_mode_b()) {
+            return view('products.index', $this->buildProcurementHallIndexViewData());
+        }
+
         // 创建一个查询构造器
         $builder = Product::query()->with('skus')->where('on_sale', true);
         $categoryId = $request->input('category');
@@ -73,53 +78,16 @@ class ProductsController extends Controller
                     $builder->orderBy($m[1], $m[2]);
                 }
             }
+        } else {
+            $builder->orderBy('sort_order', 'asc')->orderBy('id', 'asc');
         }
 
         $products = $builder->paginate(16);
-        $procurementOrders = collect();
-        $demoModeEnabled = in_array(strtolower((string) env('DEMO_MODE', 'false')), ['1', 'true', 'yes', 'on'], true);
-        if (is_site_mode_b() && Schema::hasTable('procurement_orders')) {
-            // Mixed feed: show fresh reference seeds first, then real/mock procurement orders.
-            $procurementOrders = ProcurementOrder::query()->orderBy('created_at', 'desc')->limit(42)->get();
-
-            $referenceSeeds = collect();
-            if (Schema::hasTable('procurement_reference_items')) {
-                $referenceSeeds = ProcurementReferenceItem::query()
-                    ->orderBy('id', 'desc')
-                    ->limit(6)
-                    ->get()
-                    ->map(function (ProcurementReferenceItem $item) {
-                        return (object) [
-                            'item_name' => (string) $item->name,
-                            'item_image' => (string) $item->image_url,
-                            'buyer_nickname' => '参考用户',
-                            'proxy_status' => ProcurementOrder::STATUS_PENDING,
-                            'order_narrative' => sprintf('参考商品分类：%s，等待真实用户发起求购。', (string) ($item->category ?: '未分类')),
-                            'budget_amount' => (float) $item->reference_price,
-                            'extra' => [
-                                'is_reference_seed' => true,
-                            ],
-                        ];
-                    });
-            }
-
-            if ($referenceSeeds->isNotEmpty()) {
-                // Keep UGC procurement requests on top; reference seeds act as fallback cards.
-                $procurementOrders = $procurementOrders->concat($referenceSeeds)->take(48)->values();
-            }
-
-            $procurementOrders = $procurementOrders->map(function ($order) {
-                $itemName = trim((string) data_get($order, 'item_name', ''));
-                $order->buy_url = $this->resolveBuyUrl($order, $itemName);
-
-                return $order;
-            });
-        }
 
         return view('products.index', [
             'products' => $products,
-            'procurementOrders' => $procurementOrders,
-            'demoModeEnabled' => $demoModeEnabled,
+            'procurementOrders' => collect(),
+            'demoModeEnabled' => $this->demoModeEnabled(),
             'breadcrumbParent' => $breadcrumbParent,
             'breadcrumbChild' => $breadcrumbChild,
             'filters'  => [
@@ -429,6 +397,61 @@ class ProductsController extends Controller
         $category->save();
 
         return $category;
+    }
+
+    protected function buildProcurementHallIndexViewData()
+    {
+        $procurementOrders = ProcurementOrder::query()
+            ->orderBy('created_at', 'desc')
+            ->limit(42)
+            ->get();
+
+        $referenceSeeds = ProcurementReferenceItem::query()
+            ->orderBy('id', 'desc')
+            ->limit(6)
+            ->get()
+            ->map(function (ProcurementReferenceItem $item) {
+                return (object) [
+                    'item_name' => (string) $item->name,
+                    'item_image' => (string) $item->image_url,
+                    'buyer_nickname' => '参考用户',
+                    'proxy_status' => ProcurementOrder::STATUS_PENDING,
+                    'order_narrative' => sprintf('参考商品分类：%s，等待真实用户发起求购。', (string) ($item->category ?: '未分类')),
+                    'budget_amount' => (float) $item->reference_price,
+                    'extra' => [
+                        'is_reference_seed' => true,
+                    ],
+                ];
+            });
+
+        if ($referenceSeeds->isNotEmpty()) {
+            $procurementOrders = $procurementOrders->concat($referenceSeeds)->take(48)->values();
+        }
+
+        $procurementOrders = $procurementOrders->map(function ($order) {
+            $itemName = trim((string) data_get($order, 'item_name', ''));
+            $order->buy_url = $this->resolveBuyUrl($order, $itemName);
+
+            return $order;
+        });
+
+        return [
+            'products' => new LengthAwarePaginator([], 0, 16),
+            'procurementOrders' => $procurementOrders,
+            'demoModeEnabled' => $this->demoModeEnabled(),
+            'breadcrumbParent' => null,
+            'breadcrumbChild' => null,
+            'filters' => [
+                'category' => null,
+                'search' => '',
+                'order' => '',
+            ],
+        ];
+    }
+
+    protected function demoModeEnabled()
+    {
+        return in_array(strtolower((string) env('DEMO_MODE', 'false')), ['1', 'true', 'yes', 'on'], true);
     }
 
     protected function resolveProcurementUser(Request $request)

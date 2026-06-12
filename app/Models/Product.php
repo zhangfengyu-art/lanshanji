@@ -17,6 +17,7 @@ class Product extends Model
         'review_count',
         'price',
         'category_id',
+        'sort_order',
         'shipping_mode',
         'tobacco_type',
         'unit_weight_grams',
