@@ -1,0 +1,11 @@
+.sweet-overlay {
+    z-index: 19891014 !important;
+}
+
+.sweet-alert {
+    z-index: 19891015 !important;
+}
+
+.sweet-alert button {
+    pointer-events: auto !important;
+}
