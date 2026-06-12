@@ -40,9 +40,10 @@ return [
     'title' => '岚山集管理后台',
 
     /*
-     * 是否使用 https
+     * 是否使用 https（laravel-admin 的 admin_asset 会据此生成资源 URL）
+     * APP_URL 为 https 时默认 true，避免 HTTPS 页面加载 HTTP 静态资源被浏览器拦截
      */
-    'secure' => false,
+    'secure' => env('ADMIN_SECURE', strpos((string) env('APP_URL', ''), 'https://') === 0),
 
     /*
      * Laravel-Admin 用户认证设置
