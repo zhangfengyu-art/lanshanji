@@ -21,6 +21,7 @@
 Encore\Admin\Form::forget(['map']);
 
 Encore\Admin\Admin::css('/css/admin-sweetalert-fix.css');
+Encore\Admin\Admin::js('/js/admin-product-form.js');
 
 /*
  * SweetAlert 删除确认：请求失败时恢复按钮，避免「确认」变灰后无法再点。
