@@ -82,7 +82,7 @@
 
 
 
-        <p class="text-muted" style="font-size: 13px;">能加入购物车并下单的商品，不代表现货，也不保证当日或次日发出；实际发货时间取决于确认供货、打包及所选物流方式。急单建议另寻其它购买途径。改址与退款规则请参见 <a href="{{ url('/pages/change-exchange-return.html') }}">订单改、退相关规则</a>。</p>
+        <p class="policy-footnote">能加入购物车并下单的商品，不代表现货，也不保证当日或次日发出；实际发货时间取决于确认供货、打包及所选物流方式。急单建议另寻其它购买途径。改址与退款规则请参见 <a href="{{ url('/pages/change-exchange-return.html') }}">订单改、退相关规则</a>。</p>
 
 
 
@@ -99,46 +99,6 @@
     </div>
 
 </div>
-
-
-
-<style>
-
-.policy-page-body .lead { margin-bottom: 16px; line-height: 1.75; }
-
-.policy-page-body h4 {
-
-    margin-top: 24px;
-
-    margin-bottom: 10px;
-
-    font-size: 18px;
-
-    font-weight: 700;
-
-    color: #2f3b4a;
-
-}
-
-.policy-page-body h4:first-of-type { margin-top: 0; }
-
-.policy-page-body p { line-height: 1.75; color: #444; margin-bottom: 10px; }
-
-.policy-notice {
-
-    padding: 10px 12px;
-
-    background: #f8fafc;
-
-    border-left: 3px solid #94a3b8;
-
-    margin: 12px 0 16px;
-
-}
-
-.policy-notice p { margin-bottom: 8px; }
-
-</style>
 
 @endsection
 

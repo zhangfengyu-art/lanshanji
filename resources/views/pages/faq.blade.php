@@ -18,7 +18,7 @@
         </ol>
 
         <h4 class="faq-section-title">二、关于中国海关、包裹征税</h4>
-        <p class="text-muted" style="font-size: 13px;">注意：本部分内容来自中国公开的法规，以及根据社交媒体网友经历总结，仅供顾客参考，具体情况以实际为准。如果政策有变化不是本店能够决定的，也未必能及时总结更新内容，通关相关风险是由收件人自行承担。</p>
+        <p class="policy-disclaimer">注意：本部分内容来自中国公开的法规，以及根据社交媒体网友经历总结，仅供顾客参考，具体情况以实际为准。如果政策有变化不是本店能够决定的，也未必能及时总结更新内容，通关相关风险是由收件人自行承担。</p>
 
         <h5 class="faq-subtitle">1、会被海关征税么</h5>
         <p>中国大陆海关的相关规定是，邮寄包裹要收取「行邮税」，税金大于人民币 50 元需要收取，不超 50 元免收，而烟草商品的税率是 50%，所以价值不满 100 元免收此项税费，但请注意不是指某 1 件商品单独的价格，是包裹内全部商品一起算。</p>
@@ -59,7 +59,7 @@
 
         <h4 class="faq-section-title">五、关于退款、改订单</h4>
         <p>订单改址与退款的详细规则请参见 <a href="{{ url('/pages/change-exchange-return.html') }}">订单改、退相关规则</a>。发货时效与物流方式说明请参见 <a href="{{ url('/pages/order-flow.html') }}">下单流程说明</a>。</p>
-        <p class="text-muted" style="font-size: 13px;">能加入购物车并下单的商品，不代表现货，也不保证很快发出；急单建议另寻其它购买途径。</p>
+        <p class="policy-footnote">能加入购物车并下单的商品，不代表现货，也不保证很快发出；急单建议另寻其它购买途径。</p>
 
         <div class="text-center" style="margin-top: 24px;">
             <a class="btn btn-primary" href="{{ route('products.index') }}">返回商品列表</a>
@@ -73,27 +73,4 @@
         </div>
     </div>
 </div>
-
-<style>
-.faq-page-body .faq-section-title {
-    margin-top: 28px;
-    margin-bottom: 12px;
-    font-size: 20px;
-    font-weight: 700;
-    color: #2f3b4a;
-    border-bottom: 1px solid #e5e7eb;
-    padding-bottom: 8px;
-}
-.faq-page-body .faq-section-title:first-of-type { margin-top: 0; }
-.faq-page-body .faq-subtitle {
-    margin-top: 18px;
-    margin-bottom: 8px;
-    font-size: 16px;
-    font-weight: 700;
-    color: #374151;
-}
-.faq-page-body p { line-height: 1.75; color: #444; margin-bottom: 10px; }
-.faq-page-body ol { line-height: 1.75; color: #444; padding-left: 1.4em; }
-.faq-page-body ol li { margin-bottom: 8px; }
-</style>
 @endsection

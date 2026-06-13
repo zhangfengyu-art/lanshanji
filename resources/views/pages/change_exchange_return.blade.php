@@ -47,7 +47,7 @@
 
         <hr>
 
-        <p class="text-muted" style="font-size: 13px; line-height: 1.6;">
+        <p class="policy-footnote">
             能添加购物车并下单的商品，不代表有现货，也不代表很快能发货，具体请参见
             <a href="{{ route('pages.order_flow') }}">下单流程说明</a>。急单建议另寻其它购买途径，给您带来不便非常抱歉。
         </p>
@@ -63,31 +63,4 @@
         </div>
     </div>
 </div>
-
-<style>
-.policy-page-body h4 {
-    margin-top: 22px;
-    margin-bottom: 10px;
-    font-size: 16px;
-    font-weight: 700;
-    color: #2f3b4a;
-}
-.policy-page-body h4:first-child {
-    margin-top: 0;
-}
-.policy-page-body ul {
-    padding-left: 1.25em;
-    margin-bottom: 12px;
-}
-.policy-page-body li {
-    margin-bottom: 8px;
-    line-height: 1.65;
-    color: #444;
-}
-.policy-page-body p {
-    line-height: 1.65;
-    color: #444;
-    margin-bottom: 10px;
-}
-</style>
 @endsection
