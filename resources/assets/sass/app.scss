@@ -122,11 +122,6 @@ a {
     color: #222222;
     letter-spacing: 0.02em;
     line-height: 1.25;
-
-    .site-header__brand-center-zh-line1,
-    .site-header__brand-center-zh-line2 {
-      display: inline;
-    }
   }
 
   .site-header__brand-center-en {
@@ -748,39 +743,42 @@ a {
 
     .site-header__brand-block {
       width: 100%;
-      gap: 12px;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      text-align: center;
     }
 
     .site-header__logo-wrap {
-      max-width: 180px;
+      max-width: none;
     }
 
     .site-header__logo {
       img {
-        max-height: 101px;
+        max-height: 92px;
       }
     }
 
     .site-header__brand-center {
       border-left: 0;
       padding-left: 0;
-      padding-top: 2px;
-      flex: 1 1 auto;
+      padding-top: 0;
+      flex: 0 1 auto;
       min-width: 0;
+      width: 100%;
+      align-items: center;
+      text-align: center;
     }
 
     .site-header__brand-center-zh {
-      font-size: 19px;
-      line-height: 1.3;
-
-      .site-header__brand-center-zh-line1,
-      .site-header__brand-center-zh-line2 {
-        display: block;
-      }
+      font-size: clamp(15px, 4.2vw, 18px);
+      line-height: 1.35;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
     }
 
     .site-header__brand-center-en {
-      font-size: 14px;
+      font-size: 13px;
       letter-spacing: 0.05em;
     }
 
@@ -806,65 +804,73 @@ a {
       max-width: none;
     }
 
+    .site-header__nav {
+      border-top: 1px solid #ececec;
+    }
+
     .site-header__nav-scroll {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 1px;
-      padding: 10px 0 12px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 4px 0;
+      padding: 11px 0 13px;
       overflow: visible;
       white-space: normal;
-      justify-content: stretch;
-      align-items: stretch;
-      background: #e8e8e8;
+      background: transparent;
     }
 
     .top-category-item {
       position: relative;
       min-width: 0;
       display: flex;
-      background: #ffffff;
+      align-items: center;
+      flex: 0 0 auto;
 
       &::before {
         display: none;
       }
 
-      &::after {
-        display: none;
+      &:not(:last-child)::after {
+        content: "";
+        display: block;
+        width: 1px;
+        height: 12px;
+        background: #d4d4d4;
+        flex-shrink: 0;
       }
     }
 
     .top-category-link {
-      width: 100%;
-      flex: 1 1 auto;
-      display: flex;
-      flex-direction: column;
+      width: auto;
+      flex: 0 1 auto;
+      display: inline-flex;
+      flex-direction: row;
       align-items: center;
       justify-content: center;
-      gap: 3px;
-      padding: 8px 6px;
+      gap: 4px;
+      padding: 6px 12px;
       font-size: 14px;
       min-height: auto;
       line-height: 1.3;
       text-align: center;
-      white-space: normal;
+      white-space: nowrap;
       border: 0;
-      background: #ffffff;
+      background: transparent;
 
       &.is-active,
       &.is-active:focus {
         color: #111111;
-        background: #ffffff;
-        border-color: transparent;
+        background: transparent;
         font-weight: 600;
       }
 
       .top-category-link__text {
-        display: block;
-        width: 100%;
+        display: inline;
         max-width: none;
         overflow: visible;
         text-overflow: clip;
-        white-space: normal;
+        white-space: nowrap;
         word-break: keep-all;
         line-height: 1.3;
       }
@@ -874,13 +880,13 @@ a {
       }
 
       &.top-category-link--mobile-only {
-        display: flex;
+        display: inline-flex;
       }
 
       .top-category-caret {
-        display: block;
+        display: inline-block;
         flex-shrink: 0;
-        margin-top: 1px;
+        margin-top: 0;
       }
     }
 
@@ -987,16 +993,12 @@ a {
     }
 
     .site-header__brand-center-en {
-      font-size: 13px;
-    }
-
-    .site-header__nav-scroll {
-      gap: 1px;
+      font-size: 12px;
     }
 
     .top-category-link {
       font-size: 13px;
-      padding: 7px 5px;
+      padding: 6px 10px;
     }
 
     .site-header__notice-search {
@@ -1015,11 +1017,6 @@ a {
 
     .site-header__search {
       max-width: 100%;
-    }
-
-    .top-category-link {
-      padding: 0 14px;
-      font-size: 14px;
     }
   }
 

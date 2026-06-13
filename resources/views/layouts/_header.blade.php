@@ -15,10 +15,7 @@
                 </div>
 
                 <div class="site-header__brand-center">
-                    <p class="site-header__brand-center-zh">
-                        <span class="site-header__brand-center-zh-line1">{{ trim((string) ($siteBrandZh ?? site_brand_zh())) }}</span>
-                        <span class="site-header__brand-center-zh-line2">· 日本烟草选品</span>
-                    </p>
+                    <p class="site-header__brand-center-zh">{{ trim((string) ($siteBrandZh ?? site_brand_zh())) }} · 日本烟草选品</p>
                     <p class="site-header__brand-center-en">{{ trim((string) ($siteBrandEn ?? 'ARASHIYAMA TOBACCO SHOP')) }}</p>
                 </div>
             </div>
