@@ -107,14 +107,24 @@
                     @endphp
                     @php $hasChildCategories = $category->children->count() > 0; @endphp
                     <div class="top-category-item{{ ($isParentActive || $isChildActive) ? ' is-active' : '' }}{{ $hasChildCategories ? ' top-category-item--has-children' : '' }}" data-category-nav="{{ $category->id }}">
-                        <a class="top-category-link{{ $isParentActive ? ' is-active' : '' }}" href="{{ route('products.index', ['category' => $category->id]) }}"@if($hasChildCategories) data-submenu-toggle aria-expanded="false" aria-haspopup="true"@endif>
-                            <span class="top-category-link__text">{{ $category->name }}</span>
-                            @if($hasChildCategories)
+                        @if($hasChildCategories)
+                            <a class="top-category-link top-category-link--desktop-only{{ $isParentActive ? ' is-active' : '' }}" href="{{ route('products.index', ['category' => $category->id]) }}">
+                                <span class="top-category-link__text">{{ $category->name }}</span>
+                            </a>
+                            <button type="button" class="top-category-link top-category-link--toggle top-category-link--mobile-only{{ $isParentActive ? ' is-active' : '' }}" data-submenu-toggle aria-expanded="false" aria-haspopup="true">
+                                <span class="top-category-link__text">{{ $category->name }}</span>
                                 <span class="top-category-caret" aria-hidden="true"></span>
-                            @endif
-                        </a>
+                            </button>
+                        @else
+                            <a class="top-category-link{{ $isParentActive ? ' is-active' : '' }}" href="{{ route('products.index', ['category' => $category->id]) }}">
+                                <span class="top-category-link__text">{{ $category->name }}</span>
+                            </a>
+                        @endif
                         @if($hasChildCategories)
                             <div class="top-category-submenu" role="menu">
+                                <a class="top-category-sublink top-category-sublink--all" href="{{ route('products.index', ['category' => $category->id]) }}">
+                                    <span>查看全部{{ $category->name }}</span>
+                                </a>
                                 @foreach($category->children as $child)
                                     @php $isChildCurrent = $currentCategoryId === (int) $child->id; @endphp
                                     <a class="top-category-sublink{{ $isChildCurrent ? ' is-active' : '' }}" href="{{ route('products.index', ['category' => $child->id]) }}">

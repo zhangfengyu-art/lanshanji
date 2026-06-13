@@ -86,7 +86,7 @@
         window.AppI18n = @json(trans('frontend.js'));
         window.AppI18nCart = @json(trans('frontend.cart'));
     </script>
-    <script src="{{ asset('js/app.js') }}"></script>
+    <script src="{{ asset('js/app.js') }}@if(file_exists(public_path('js/app.js')))?v={{ filemtime(public_path('js/app.js')) }}@endif"></script>
     @yield('scriptsAfterJs')
 </body>
 </html>
