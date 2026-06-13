@@ -88,6 +88,7 @@
                 $reservedCategoryNames = ['所有商品', '全部商品'];
             @endphp
             <nav class="site-header__nav" aria-label="{{ trans('frontend.nav.main_categories_aria') }}">
+                <div class="site-header__nav-scroll">
                 <div class="top-category-item{{ $isAllProductsActive ? ' is-active' : '' }}">
                     <a class="top-category-link{{ $isAllProductsActive ? ' is-active' : '' }}" href="{{ route('products.index') }}">
                         {{ trans('frontend.nav.all_products') }}
@@ -104,11 +105,15 @@
                         $isParentActive = $currentCategoryId === (int) $category->id;
                         $isChildActive = in_array($currentCategoryId, $childIds, true);
                     @endphp
-                    <div class="top-category-item{{ ($isParentActive || $isChildActive) ? ' is-active' : '' }}">
-                        <a class="top-category-link{{ $isParentActive ? ' is-active' : '' }}" href="{{ route('products.index', ['category' => $category->id]) }}">
-                            {{ $category->name }}
+                    @php $hasChildCategories = $category->children->count() > 0; @endphp
+                    <div class="top-category-item{{ ($isParentActive || $isChildActive) ? ' is-active' : '' }}{{ $hasChildCategories ? ' top-category-item--has-children' : '' }}" data-category-nav="{{ $category->id }}">
+                        <a class="top-category-link{{ $isParentActive ? ' is-active' : '' }}" href="{{ route('products.index', ['category' => $category->id]) }}"@if($hasChildCategories) data-submenu-toggle aria-expanded="false" aria-haspopup="true"@endif>
+                            <span class="top-category-link__text">{{ $category->name }}</span>
+                            @if($hasChildCategories)
+                                <span class="top-category-caret" aria-hidden="true"></span>
+                            @endif
                         </a>
-                        @if($category->children->count() > 0)
+                        @if($hasChildCategories)
                             <div class="top-category-submenu" role="menu">
                                 @foreach($category->children as $child)
                                     @php $isChildCurrent = $currentCategoryId === (int) $child->id; @endphp
@@ -121,6 +126,8 @@
                         @endif
                     </div>
                 @endforeach
+                </div>
+                <div class="site-header__submenu-backdrop" data-submenu-backdrop hidden></div>
             </nav>
         </div>
     </div>

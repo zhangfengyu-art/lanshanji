@@ -19,6 +19,10 @@ class AddCartRequest extends Request
                         $fail('该商品不存在');
                         return;
                     }
+                    if (!$sku->product) {
+                        $fail('该商品不存在');
+                        return;
+                    }
                     if (!$sku->product->on_sale) {
                         $fail('该商品未上架');
                         return;

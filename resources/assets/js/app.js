@@ -27,10 +27,62 @@ const app = new Vue({
 $(function () {
     var i18n = window.AppI18n || {};
     var cartI18n = window.AppI18nCart || {};
+    var mobileNavMedia = window.matchMedia('(max-width: 991px)');
 
     function t(dict, key, fallback) {
         return (dict && dict[key]) ? dict[key] : fallback;
     }
+
+    function isMobileNav() {
+        return mobileNavMedia.matches;
+    }
+
+    function closeMobileCategorySubmenu() {
+        $('.top-category-item--has-children').removeClass('is-open');
+        $('[data-submenu-toggle]').attr('aria-expanded', 'false');
+        $('[data-submenu-backdrop]').attr('hidden', true);
+    }
+
+    function positionMobileCategorySubmenu($item) {
+        var $wrap = $('.site-header__nav-wrap');
+        if (!$wrap.length) {
+            return;
+        }
+
+        var top = $wrap.offset().top + $wrap.outerHeight();
+        document.documentElement.style.setProperty('--mobile-submenu-top', top + 'px');
+    }
+
+    $(document).on('click', '[data-submenu-toggle]', function (e) {
+        if (!isMobileNav()) {
+            return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        var $item = $(this).closest('.top-category-item--has-children');
+        var isOpen = $item.hasClass('is-open');
+
+        closeMobileCategorySubmenu();
+
+        if (!isOpen) {
+            $item.addClass('is-open');
+            $(this).attr('aria-expanded', 'true');
+            $('[data-submenu-backdrop]').removeAttr('hidden');
+            positionMobileCategorySubmenu($item);
+        }
+    });
+
+    $(document).on('click', '[data-submenu-backdrop]', function () {
+        closeMobileCategorySubmenu();
+    });
+
+    $(window).on('resize', function () {
+        if (!isMobileNav()) {
+            closeMobileCategorySubmenu();
+        }
+    });
 
     var $root = $('[data-mini-cart]');
     if (!$root.length) {

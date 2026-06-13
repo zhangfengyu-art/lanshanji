@@ -11,7 +11,20 @@ class CartService
 {
     public function get()
     {
-        return Auth::user()->cartItems()->with(['productSku.product'])->get();
+        $items = Auth::user()->cartItems()->with(['productSku.product'])->get();
+        $orphanIds = $items->filter(function ($item) {
+            return !$item->productSku || !$item->productSku->product;
+        })->pluck('id');
+
+        if ($orphanIds->isNotEmpty()) {
+            CartItem::query()->whereIn('id', $orphanIds)->delete();
+
+            return $items->reject(function ($item) {
+                return !$item->productSku || !$item->productSku->product;
+            })->values();
+        }
+
+        return $items;
     }
 
     public function add($skuId, $amount)
