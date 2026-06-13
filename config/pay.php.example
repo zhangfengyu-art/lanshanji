@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * 复制为 config/pay.php 并填入商户密钥（勿提交 pay.php）。
+ * 服务器填好后执行：git update-index --skip-worktree config/pay.php
+ */
+
 return [
     'alipay' => [
         'app_id'         => '',
@@ -14,8 +19,8 @@ return [
         'app_id'      => '',
         'mch_id'      => '',
         'key'         => '',
-        'cert_client' => '',
-        'cert_key'    => '',
+        'cert_client' => storage_path('certs/apiclient_cert.pem'),
+        'cert_key'    => storage_path('certs/apiclient_key.pem'),
         'log'         => [
             'file' => storage_path('logs/wechat_pay.log'),
         ],
