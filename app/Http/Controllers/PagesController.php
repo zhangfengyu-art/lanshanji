@@ -13,17 +13,17 @@ class PagesController extends Controller
 
     public function orderFlow()
     {
-        return view('pages.order_flow');
+        return view(is_site_mode_b() ? 'pages.order_flow_b' : 'pages.order_flow');
     }
 
     public function changeExchangeReturn()
     {
-        return view('pages.change_exchange_return');
+        return view(is_site_mode_b() ? 'pages.change_exchange_return_b' : 'pages.change_exchange_return');
     }
 
     public function faq()
     {
-        return view('pages.faq');
+        return view(is_site_mode_b() ? 'pages.faq_b' : 'pages.faq');
     }
 
     public function emailVerifyNotice(Request $request)

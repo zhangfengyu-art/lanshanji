@@ -13,7 +13,7 @@
       <span>春季跨境代购季 · 新用户发起求购享优先撮合</span>
       <span>资金托管全程可查 · 支付成功即锁定预算</span>
       <span>本周已有 {{ number_format((int) ($stats['week_deals'] ?? 0)) }} 笔订单完成托管支付</span>
-      <span>热门品类：日烟限量 · 药妆护肤 · 动漫周边 · 零食礼盒</span>
+      <span>热门品类：药妆护肤 · 动漫周边 · 零食礼盒 · 家居百货</span>
       <span>春季跨境代购季 · 新用户发起求购享优先撮合</span>
     </div>
   </div>
@@ -52,7 +52,7 @@
     </div>
     <div class="b-promo-card b-promo-card--hot">
       <strong>本周热门</strong>
-      <span>日烟限量 · Peace 铁盒 · 七星系列 · EMS 直邮拼单</span>
+      <span>限定零食 · 药妆护肤 · 动漫手办 · EMS 直邮拼单</span>
     </div>
   </div>
 
@@ -104,7 +104,7 @@
 
   <div class="b-hot-tags" aria-label="热门搜索">
     <span class="b-hot-tags__label">热门搜索</span>
-  @foreach(['七星黑标', 'Peace 铁盒', '药妆面膜', '动漫手办', '限定零食', '保温杯', '相机配件'] as $tag)
+  @foreach(['药妆面膜', '动漫手办', '限定零食', '保温杯', '相机配件', '护肤套装', '联名文具'] as $tag)
     <a class="b-hot-tag" href="{{ route('products.index', ['search' => $tag]) }}">{{ $tag }}</a>
   @endforeach
   </div>
