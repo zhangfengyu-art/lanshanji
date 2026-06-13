@@ -87,7 +87,7 @@ a {
 
   .site-header__logo-wrap {
     flex: 0 0 auto;
-    max-width: 331px;
+    max-width: 381px;
   }
 
   .site-header__logo {
@@ -97,7 +97,7 @@ a {
 
     img {
       display: block;
-      max-height: 132px;
+      max-height: 152px;
       width: auto;
       max-width: 100%;
       object-fit: contain;
@@ -747,12 +747,12 @@ a {
     }
 
     .site-header__logo-wrap {
-      max-width: 190px;
+      max-width: 219px;
     }
 
     .site-header__logo {
       img {
-        max-height: 88px;
+        max-height: 101px;
       }
     }
 
@@ -763,12 +763,12 @@ a {
     }
 
     .site-header__brand-center-zh {
-      font-size: 18px;
+      font-size: 21px;
       line-height: 1.35;
     }
 
     .site-header__brand-center-en {
-      font-size: 12px;
+      font-size: 14px;
       letter-spacing: 0.05em;
     }
 
@@ -927,7 +927,7 @@ a {
     }
 
     .site-header__brand-center-en {
-      font-size: 11px;
+      font-size: 13px;
     }
 
     .site-header__notice-search {
@@ -3070,5 +3070,12 @@ html {
 
   .category-item--child .category-link {
     padding: 8px 14px 8px 24px;
+  }
+}
+
+@media (min-width: 992px) {
+  #app.products-index-page .smoke-breadcrumbs,
+  .show-page-container .show-breadcrumb {
+    font-size: 21px;
   }
 }
