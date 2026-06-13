@@ -121,7 +121,7 @@
                             </a>
                         @endif
                         @if($hasChildCategories)
-                            <div class="top-category-submenu" role="menu">
+                            <div class="top-category-submenu top-category-submenu--inline" role="menu">
                                 <a class="top-category-sublink top-category-sublink--all" href="{{ route('products.index', ['category' => $category->id]) }}">
                                     <span>查看全部{{ $category->name }}</span>
                                 </a>
@@ -137,6 +137,25 @@
                     </div>
                 @endforeach
                 </div>
+                @foreach($categories as $category)
+                    @if(in_array($category->name, $reservedCategoryNames, true))
+                        @continue
+                    @endif
+                    @if($category->children->count() > 0)
+                        <div class="site-header__mobile-submenu top-category-submenu" data-submenu-panel="{{ $category->id }}" hidden role="menu">
+                            <a class="top-category-sublink top-category-sublink--all" href="{{ route('products.index', ['category' => $category->id]) }}">
+                                <span>查看全部{{ $category->name }}</span>
+                            </a>
+                            @foreach($category->children as $child)
+                                @php $isChildCurrent = $currentCategoryId === (int) $child->id; @endphp
+                                <a class="top-category-sublink{{ $isChildCurrent ? ' is-active' : '' }}" href="{{ route('products.index', ['category' => $child->id]) }}">
+                                    <span>{{ $child->name }}</span>
+                                    <span class="top-category-badge">EMS直邮</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                @endforeach
                 <div class="site-header__submenu-backdrop" data-submenu-backdrop hidden></div>
             </nav>
         </div>
