@@ -303,6 +303,23 @@ function site_brand_zh()
 }
 
 /**
+ * 选物站（A 站）品牌名：支付收银台等与 A 站视觉贯通时使用，不受 B 站模式影响。
+ */
+function site_shop_brand_zh()
+{
+    try {
+        $shared = view()->getShared();
+        if (!empty($shared['siteBrandZh'])) {
+            return (string) $shared['siteBrandZh'];
+        }
+    } catch (\Throwable $e) {
+        // ignore
+    }
+
+    return '岚山烟务所';
+}
+
+/**
  * 页面标题后缀（浏览器 title）。
  */
 function site_page_subtitle()

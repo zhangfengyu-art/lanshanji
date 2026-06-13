@@ -20,7 +20,7 @@
         <h2 class="order-title">支付宝支付</h2>
         <div class="meta-lines">订单号：{{ $order->no }}</div>
         <div class="meta-lines">支付渠道：支付宝</div>
-        <div class="meta-lines">说明：您已从岚山选物跳转至此，使用人民币完成支付</div>
+        <div class="meta-lines">说明：您已从岚山选物跳转至此完成付款，支付成功后请返回选物站订单页确认状态。</div>
       </section>
 
       <section class="top-card pay-card">
@@ -46,7 +46,7 @@
           <div class="kv"><span class="k">订单号</span><span class="v">{{ $order->no }}</span></div>
           <div class="kv"><span class="k">应付金额</span><span class="v">￥{{ number_format($payAmount ?? $order->getPaymentAmountCny(), 2, '.', '') }}</span></div>
           <div class="kv"><span class="k">支付渠道</span><span class="v">支付宝</span></div>
-          <div class="kv"><span class="k">收银台</span><span class="v">岚山集支付中心</span></div>
+          <div class="kv"><span class="k">收银台</span><span class="v">岚山选物收银台</span></div>
           @if(!empty($amountJpy))
           <div class="kv"><span class="k">订单核算</span><span class="v">JPY ¥{{ number_format((float) $amountJpy, 2, '.', '') }}</span></div>
           @endif
