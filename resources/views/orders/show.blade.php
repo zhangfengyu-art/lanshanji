@@ -179,11 +179,15 @@
         <div class="amount-value">{{ $moneySymbol }}{{ number_format($amountJpy, 2, '.', '') }}</div>
         @if(is_site_mode_a() && !$isPaid && !$isClosed)
           <div class="meta-lines" style="margin-top: 6px;">约合 ￥{{ number_format($amountCny, 2, '.', '') }}（汇率 1 人民币 = {{ number_format($exchangeRate, 2, '.', '') }} 日元）</div>
-          <div class="meta-lines">支付时将跳转 B 站，按上述汇率以人民币完成支付宝/微信支付。</div>
+          <div class="meta-lines">{{ trans('frontend.order.payment_redirect_hint') }}</div>
+          <div class="payment-redirect-notice" role="status">
+            <span class="payment-redirect-notice__icon" aria-hidden="true">!</span>
+            <span class="payment-redirect-notice__text">{{ trans('frontend.order.payment_redirect_duration_notice') }}</span>
+          </div>
         @endif
 
         @if(!$isPaid && !$isClosed)
-          <div class="action-guide">{{ is_site_mode_a() ? '下一步：跳转 B 站支付' : trans('frontend.order.next_step_pay') }}</div>
+          <div class="action-guide">{{ is_site_mode_a() ? trans('frontend.order.next_step_pay_gateway') : trans('frontend.order.next_step_pay') }}</div>
         @else
           <div class="action-guide">{{ trans('frontend.order.in_settlement') }}</div>
         @endif
