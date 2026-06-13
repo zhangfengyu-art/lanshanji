@@ -91,8 +91,6 @@ class ProcurementOrdersController extends Controller
             });
 
             $grid->actions(function ($actions) {
-                $actions->disableDelete();
-
                 $orderId = (int) $actions->getKey();
                 $currentStatus = (int) data_get($actions->row, 'proxy_status');
                 if ($currentStatus !== ProcurementOrder::STATUS_ACCEPTED) {
@@ -103,9 +101,6 @@ class ProcurementOrdersController extends Controller
 
             $grid->tools(function ($tools) use ($quickStatus) {
                 $tools->append($this->renderStatusQuickTools($quickStatus));
-                $tools->batch(function ($batch) {
-                    $batch->disableDelete();
-                });
             });
         });
     }

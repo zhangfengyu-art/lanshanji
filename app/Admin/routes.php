@@ -104,6 +104,7 @@ Route::group([
     $router->post('procurement-orders', 'ProcurementOrdersController@store')->name('admin.procurement_orders.store');
     $router->get('procurement-orders/{id}/edit', 'ProcurementOrdersController@edit')->name('admin.procurement_orders.edit');
     $router->put('procurement-orders/{id}', 'ProcurementOrdersController@update')->name('admin.procurement_orders.update');
+    $router->delete('procurement-orders/{id}', 'ProcurementOrdersController@destroy')->name('admin.procurement_orders.destroy');
     $router->get('procurement-orders/{id}/quick-accept', 'ProcurementOrdersController@quickAccept')->name('admin.procurement_orders.quick_accept');
 
     $router->resource('procurement-reference-items', 'ProcurementReferenceItemsController');
