@@ -1,3 +1,7 @@
 <footer class="payment-gateway-footer">
-  <p>&copy; 2026 岚山选物. All rights reserved.</p>
+  <p>&copy; {{ date('Y') }} 岚山集 · 跨境互助代购大厅
+    @if(site_icp_record() !== '')
+      · <a href="{{ site_icp_link() }}" target="_blank" rel="noopener noreferrer">{{ site_icp_record() }}</a>
+    @endif
+  </p>
 </footer>

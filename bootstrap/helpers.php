@@ -331,6 +331,24 @@ function site_page_subtitle()
     return trans('frontend.site.subtitle');
 }
 
+/**
+ * B 站 ICP 备案号文案。
+ */
+function site_icp_record()
+{
+    return trim((string) config('site.icp_record', ''));
+}
+
+/**
+ * B 站 ICP 备案查询链接。
+ */
+function site_icp_link()
+{
+    $link = trim((string) config('site.icp_link', 'https://beian.miit.gov.cn/'));
+
+    return $link !== '' ? $link : 'https://beian.miit.gov.cn/';
+}
+
 function b2b_fixed_category_name($seed)
 {
     return ((int) $seed % 2 === 0) ? '数码配件' : '办公用品';

@@ -11,9 +11,6 @@
     <!-- 样式 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="{{ asset('css/app.css') }}@if(file_exists(public_path('css/app.css')))?v={{ filemtime(public_path('css/app.css')) }}@endif" rel="stylesheet">
-    @if(is_site_mode_b())
-    <link href="{{ asset('css/site-b.css') }}" rel="stylesheet">
-    @endif
         <style>
             .mini-cart-drawer {
                 width: 320px !important;

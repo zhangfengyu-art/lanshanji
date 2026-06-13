@@ -1,4 +1,8 @@
 <header class="site-header site-header--b">
+    <div class="b-site-notice" role="status">
+        <span class="b-site-notice__badge">公告</span>
+        平台资金托管通道稳定运行中 · 发起求购后请尽快完成托管支付以锁定预算
+    </div>
     <div class="site-header__accent-bar" aria-hidden="true"></div>
     <div class="site-header__container">
         <div class="site-header__main">

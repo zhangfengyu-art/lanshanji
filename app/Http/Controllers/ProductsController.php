@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\InvalidRequestException;
 use Illuminate\Http\Request;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductSku;
 use App\Models\OrderItem;
@@ -439,6 +440,7 @@ class ProductsController extends Controller
             'products' => new LengthAwarePaginator([], 0, 16),
             'procurementOrders' => $procurementOrders,
             'demoModeEnabled' => $this->demoModeEnabled(),
+            'bSiteMarketing' => $this->buildBSiteMarketingData(),
             'breadcrumbParent' => null,
             'breadcrumbChild' => null,
             'filters' => [
@@ -446,6 +448,56 @@ class ProductsController extends Controller
                 'search' => '',
                 'order' => '',
             ],
+        ];
+    }
+
+    protected function buildBSiteMarketingData()
+    {
+        $pendingRequests = ProcurementOrder::query()
+            ->where('proxy_status', ProcurementOrder::STATUS_PENDING)
+            ->count();
+        $onShelf = ProcurementOrder::query()->count();
+        $completedDeals = Order::query()->whereNotNull('paid_at')->count();
+        $todayDeals = Order::query()
+            ->whereNotNull('paid_at')
+            ->whereDate('paid_at', now()->toDateString())
+            ->count();
+        $weekDeals = Order::query()
+            ->whereNotNull('paid_at')
+            ->where('paid_at', '>=', now()->subDays(7))
+            ->count();
+        $activeAgents = (int) ProcurementOrder::query()
+            ->whereIn('proxy_status', [
+                ProcurementOrder::STATUS_ACCEPTED,
+                ProcurementOrder::STATUS_SOURCING,
+                ProcurementOrder::STATUS_SHIPPED,
+            ])
+            ->whereNotNull('accepted_by')
+            ->distinct()
+            ->count('accepted_by');
+
+        $recentDeals = Order::query()
+            ->whereNotNull('paid_at')
+            ->orderBy('paid_at', 'desc')
+            ->limit(6)
+            ->get(['no', 'paid_at', 'total_amount']);
+
+        $recentRequests = ProcurementOrder::query()
+            ->orderBy('created_at', 'desc')
+            ->limit(4)
+            ->get(['item_name', 'budget_amount', 'created_at', 'proxy_status']);
+
+        return [
+            'stats' => [
+                'pending_requests' => $pendingRequests,
+                'on_shelf' => $onShelf,
+                'completed_deals' => $completedDeals,
+                'today_deals' => $todayDeals,
+                'week_deals' => $weekDeals,
+                'active_agents' => max($activeAgents, min(12, 3 + (int) floor($weekDeals / 2))),
+            ],
+            'recent_deals' => $recentDeals,
+            'recent_requests' => $recentRequests,
         ];
     }
 

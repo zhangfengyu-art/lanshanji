@@ -1,8 +1,9 @@
 @extends('layouts.app')
-@section('title', '商品列表')
+@section('title', is_site_mode_b() ? '互助代购大厅' : '商品列表')
 
 @section('content')
 @if(is_site_mode_b())
+@include('products._b_site_marketing')
 @include('products._procurement_hall')
 @else
 <div class="row">
