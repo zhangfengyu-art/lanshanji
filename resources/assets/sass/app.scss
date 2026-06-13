@@ -733,19 +733,23 @@ a {
 
 @media (max-width: 991px) {
   .site-header {
-    margin-bottom: 24px;
+    margin-bottom: 29px;
+
+    .site-header__container {
+      padding: 0 19px;
+    }
 
     .site-header__main {
       flex-direction: column;
       align-items: stretch;
-      padding: 12px 0 14px;
+      padding: 14px 0 17px;
     }
 
     .site-header__brand-block {
       width: 100%;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       text-align: center;
     }
 
@@ -755,7 +759,7 @@ a {
 
     .site-header__logo {
       img {
-        max-height: 92px;
+        max-height: 110px;
       }
     }
 
@@ -771,14 +775,14 @@ a {
     }
 
     .site-header__brand-center-zh {
-      font-size: clamp(15px, 4.2vw, 18px);
+      font-size: clamp(18px, 5.04vw, 22px);
       line-height: 1.35;
       letter-spacing: 0.01em;
       white-space: nowrap;
     }
 
     .site-header__brand-center-en {
-      font-size: 13px;
+      font-size: 16px;
       letter-spacing: 0.05em;
     }
 
@@ -790,18 +794,36 @@ a {
     .site-header__user-nav {
       justify-content: flex-start;
       flex-wrap: wrap;
-      gap: 12px 16px;
-      font-size: 16px;
+      gap: 14px 19px;
+      font-size: 19px;
     }
 
     .site-header__notice-search {
       width: 100%;
       justify-content: space-between;
+      gap: 14px;
+    }
+
+    .site-header__notice {
+      font-size: 14px;
+      padding: 0 17px;
+      min-width: 0;
     }
 
     .site-header__search {
       width: 100%;
       max-width: none;
+      height: 53px;
+
+      input {
+        font-size: 18px;
+        padding-left: 14px;
+      }
+
+      button {
+        width: 58px;
+        font-size: 19px;
+      }
     }
 
     .site-header__nav {
@@ -813,8 +835,8 @@ a {
       flex-wrap: wrap;
       justify-content: center;
       align-items: center;
-      gap: 4px 0;
-      padding: 11px 0 13px;
+      gap: 5px 0;
+      padding: 13px 0 16px;
       overflow: visible;
       white-space: normal;
       background: transparent;
@@ -835,7 +857,7 @@ a {
         content: "";
         display: block;
         width: 1px;
-        height: 12px;
+        height: 14px;
         background: #d4d4d4;
         flex-shrink: 0;
       }
@@ -848,9 +870,9 @@ a {
       flex-direction: row;
       align-items: center;
       justify-content: center;
-      gap: 4px;
-      padding: 6px 12px;
-      font-size: 14px;
+      gap: 5px;
+      padding: 7px 14px;
+      font-size: 17px;
       min-height: auto;
       line-height: 1.3;
       text-align: center;
@@ -887,6 +909,9 @@ a {
         display: inline-block;
         flex-shrink: 0;
         margin-top: 0;
+        border-left-width: 5px;
+        border-right-width: 5px;
+        border-top-width: 6px;
       }
     }
 
@@ -905,15 +930,26 @@ a {
       display: none !important;
     }
 
+    .top-category-sublink {
+      gap: 12px;
+      padding: 12px 14px;
+      font-size: 16px;
+    }
+
+    .top-category-badge {
+      font-size: 12px;
+      padding: 2px 7px;
+    }
+
     .site-header__mobile-submenu {
       display: none;
       position: fixed;
-      left: 12px;
-      right: 12px;
+      left: 14px;
+      right: 14px;
       top: var(--mobile-submenu-top, 0);
       z-index: 1200;
       min-width: 0;
-      max-height: min(52vh, 360px);
+      max-height: min(52vh, 432px);
       overflow-y: auto;
       box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
       opacity: 1;
@@ -952,8 +988,23 @@ a {
   }
 
   .mini-cart-fab {
-    bottom: 24px;
+    right: 34px;
+    bottom: 29px;
     z-index: 1040;
+
+    .mini-cart-fab__button {
+      width: 70px;
+      height: 70px;
+      font-size: 26px;
+    }
+
+    .mini-cart-fab__badge {
+      min-width: 24px;
+      height: 24px;
+      padding: 0 6px;
+      font-size: 14px;
+      line-height: 24px;
+    }
   }
 
   .products-index-page {
@@ -989,16 +1040,16 @@ a {
 @media (max-width: 767px) {
   .site-header {
     .site-header__main {
-      padding: 10px 0 12px;
+      padding: 12px 0 14px;
     }
 
     .site-header__brand-center-en {
-      font-size: 12px;
+      font-size: 14px;
     }
 
     .top-category-link {
-      font-size: 13px;
-      padding: 6px 10px;
+      font-size: 16px;
+      padding: 7px 12px;
     }
 
     .site-header__notice-search {
@@ -1007,12 +1058,12 @@ a {
     }
 
     .site-header__notice {
-      min-height: 36px;
+      min-height: 43px;
       white-space: normal;
       line-height: 1.4;
       justify-content: center;
       text-align: center;
-      padding: 8px 12px;
+      padding: 10px 14px;
     }
 
     .site-header__search {
