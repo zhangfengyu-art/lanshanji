@@ -91,7 +91,7 @@
                 <div class="site-header__nav-scroll">
                 <div class="top-category-item{{ $isAllProductsActive ? ' is-active' : '' }}">
                     <a class="top-category-link{{ $isAllProductsActive ? ' is-active' : '' }}" href="{{ route('products.index') }}">
-                        {{ trans('frontend.nav.all_products') }}
+                        <span class="top-category-link__text">{{ trans('frontend.nav.all_products') }}</span>
                     </a>
                 </div>
                 @foreach($categories as $category)
