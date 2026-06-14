@@ -1,9 +1,10 @@
 (function () {
+  var ADMIN_BASE = '{{ admin_base_path() }}';
   var routes = {
-    ban: '/admin/users/batch/ban',
-    unban: '/admin/users/batch/unban',
-    'reset-session': '/admin/users/batch/reset-session',
-    'verify-email': '/admin/users/batch/verify-email'
+    ban: ADMIN_BASE + '/users/batch/ban',
+    unban: ADMIN_BASE + '/users/batch/unban',
+    'reset-session': ADMIN_BASE + '/users/batch/reset-session',
+    'verify-email': ADMIN_BASE + '/users/batch/verify-email'
   };
 
   $(document).on('click', '[data-user-batch]', function (e) {

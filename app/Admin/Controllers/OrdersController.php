@@ -370,7 +370,7 @@ $(document).off('click', '.btn-batch-orders-start-processing').on('click', '.btn
     if (!confirm('将选中且处于「待处理 S1」的订单批量标记为开始处理（S2），继续？')) {
         return;
     }
-    $.post('/admin/orders/batch/start-processing', {
+    $.post('{{ admin_url('orders/batch/start-processing') }}', {
         _token: LA.token,
         ids: ids
     }, function (ret) {

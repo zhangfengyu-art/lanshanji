@@ -22,11 +22,11 @@ return [
      */
     'route' => [
         // 路由前缀
-        'prefix' => 'admin',
+        'prefix' => env('ADMIN_ROUTE_PREFIX', 'admin'),
         // 控制器命名空间前缀
         'namespace' => 'App\\Admin\\Controllers',
         // 默认中间件列表
-        'middleware' => ['web', 'admin'],
+        'middleware' => ['web', 'admin', 'admin.password_reminder'],
     ],
 
     /*
@@ -120,7 +120,7 @@ return [
          * 不记操作日志的路由
          */
         'except' => [
-            'admin/auth/logs*',
+            config('admin.route.prefix').'/auth/logs*',
         ],
     ],
 

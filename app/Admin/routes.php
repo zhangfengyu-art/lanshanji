@@ -2,7 +2,28 @@
 
 use Illuminate\Routing\Router;
 
-Admin::registerAuthRoutes();
+$adminPrefix = config('admin.route.prefix');
+$adminMiddleware = config('admin.route.middleware');
+
+Route::group([
+    'prefix' => $adminPrefix,
+    'namespace' => 'Encore\Admin\Controllers',
+    'middleware' => $adminMiddleware,
+], function (Router $router) {
+    $router->group([], function (Router $router) {
+        $router->resource('auth/users', 'UserController');
+        $router->resource('auth/roles', 'RoleController');
+        $router->resource('auth/permissions', 'PermissionController');
+        $router->resource('auth/menu', 'MenuController', ['except' => ['create']]);
+        $router->resource('auth/logs', 'LogController', ['only' => ['index', 'destroy']]);
+    });
+
+    $router->get('auth/login', 'App\Admin\Controllers\AuthController@getLogin');
+    $router->post('auth/login', 'App\Admin\Controllers\AuthController@postLogin');
+    $router->get('auth/logout', 'App\Admin\Controllers\AuthController@getLogout');
+    $router->get('auth/setting', 'App\Admin\Controllers\AuthController@getSetting');
+    $router->put('auth/setting', 'App\Admin\Controllers\AuthController@putSetting');
+});
 
 Route::group([
     'prefix'        => config('admin.route.prefix'),

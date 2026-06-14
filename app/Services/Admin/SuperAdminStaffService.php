@@ -5,8 +5,8 @@ namespace App\Services\Admin;
 use App\Exceptions\InvalidRequestException;
 use App\Models\Admin\Administrator;
 use Encore\Admin\Auth\Database\Role;
-use Encore\Admin\Facades\Admin;
-use Illuminate\Support\Facades\DB;
+use App\Rules\StrongAdminPassword;
+use Illuminate\Support\Facades\Validator;
 
 class SuperAdminStaffService
 {
@@ -37,8 +37,11 @@ class SuperAdminStaffService
     {
         $this->validateUsername($data['username'] ?? '');
         $password = (string) ($data['password'] ?? '');
-        if (strlen($password) < 6) {
-            throw new InvalidRequestException('密码至少 6 位');
+        $validator = Validator::make(['password' => $password], [
+            'password' => [new StrongAdminPassword()],
+        ]);
+        if ($validator->fails()) {
+            throw new InvalidRequestException($validator->errors()->first());
         }
 
         return DB::transaction(function () use ($data, $password) {
@@ -46,6 +49,7 @@ class SuperAdminStaffService
                 'username' => trim($data['username']),
                 'name' => trim($data['name'] ?? $data['username']),
                 'password' => bcrypt($password),
+                'password_changed_at' => now(),
             ]);
 
             $this->syncAccess($user, $data);
@@ -66,10 +70,14 @@ class SuperAdminStaffService
         }
 
         if (!empty($data['password'])) {
-            if (strlen((string) $data['password']) < 6) {
-                throw new InvalidRequestException('密码至少 6 位');
+            $validator = Validator::make(['password' => $data['password']], [
+                'password' => [new StrongAdminPassword()],
+            ]);
+            if ($validator->fails()) {
+                throw new InvalidRequestException($validator->errors()->first());
             }
             $user->password = bcrypt($data['password']);
+            $user->password_changed_at = now();
         }
 
         return DB::transaction(function () use ($user, $data) {

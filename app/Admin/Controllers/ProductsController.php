@@ -278,8 +278,8 @@ class ProductsController extends Controller
                 }
 
                 if ($minSkuPrice !== null) {
-                    $form->price = $minSkuPrice;
-                } elseif (!$form->model()->exists || (float) $form->price <= 0) {
+                    $form->input('price', $minSkuPrice);
+                } elseif (!$form->model()->exists || (float) $form->input('price') <= 0) {
                     throw new \Exception('请至少添加一个 SKU 规格并填写销售单价');
                 }
 
@@ -465,7 +465,7 @@ class ProductsController extends Controller
         fclose($handle);
 
         return redirect()
-            ->to('/admin/products')
+            ->to(admin_base_path('products'))
             ->with('success', 'CSV 导入完成：更新 '.$updated.' 条，跳过 '.$skipped.' 条。');
     }
 

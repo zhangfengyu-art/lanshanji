@@ -23,6 +23,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->app['router']->aliasMiddleware('super.admin', \App\Admin\Middleware\SuperAdminOnly::class);
+        $this->app['router']->aliasMiddleware('admin.password_reminder', \App\Http\Middleware\AdminPasswordExpiryReminder::class);
 
         // 设置中文本地化
         config([
@@ -31,6 +32,11 @@ class AppServiceProvider extends ServiceProvider
             'admin.locale' => 'zh_CN',
         ]);
         app()->setLocale('zh-CN');
+
+        $appUrl = (string) config('app.url', '');
+        if (strpos($appUrl, 'https://') === 0) {
+            URL::forceScheme('https');
+        }
 
         // 同步后台菜单与权限中文命名
         try {

@@ -96,8 +96,8 @@ class CategoriesController extends Controller
                 return $category->aggregateProductsCount();
             });
             $grid->column('manage_products', '商品管理')->display(function () {
-                $directUrl = '/admin/products?category_id=' . $this->id . '&category_mode=direct';
-                $aggregateUrl = '/admin/products?category_id=' . $this->id . '&category_mode=aggregate';
+                $directUrl = admin_url('products?category_id='.$this->id.'&category_mode=direct');
+                $aggregateUrl = admin_url('products?category_id='.$this->id.'&category_mode=aggregate');
 
                 return '<a href="' . $directUrl . '">查看直属商品</a>'
                     . ' / '
@@ -107,7 +107,7 @@ class CategoriesController extends Controller
                 if ($this->parent_id) {
                     return '-';
                 }
-                $url = '/admin/categories/create?parent_id=' . $this->id;
+                $url = admin_url('categories/create?parent_id='.$this->id);
                 return '<a href="' . $url . '">新增子分类</a>';
             });
             $grid->created_at('创建时间');

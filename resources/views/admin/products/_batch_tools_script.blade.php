@@ -46,16 +46,17 @@
     });
   }
 
+  var ADMIN_BASE = '{{ admin_base_path() }}';
   var routes = {
-    category: '/admin/products/batch/category',
-    'shipping-mode': '/admin/products/batch/shipping-mode',
-    'tobacco-type': '/admin/products/batch/tobacco-type',
-    'sale-status': '/admin/products/batch/sale-status',
-    'on-sale': '/admin/products/batch/on-sale',
-    logistics: '/admin/products/batch/logistics',
-    'purchase-limit': '/admin/products/batch/purchase-limit',
-    'inherit-category': '/admin/products/batch/inherit-category',
-    'adjust-price': '/admin/products/batch/adjust-price'
+    category: ADMIN_BASE + '/products/batch/category',
+    'shipping-mode': ADMIN_BASE + '/products/batch/shipping-mode',
+    'tobacco-type': ADMIN_BASE + '/products/batch/tobacco-type',
+    'sale-status': ADMIN_BASE + '/products/batch/sale-status',
+    'on-sale': ADMIN_BASE + '/products/batch/on-sale',
+    logistics: ADMIN_BASE + '/products/batch/logistics',
+    'purchase-limit': ADMIN_BASE + '/products/batch/purchase-limit',
+    'inherit-category': ADMIN_BASE + '/products/batch/inherit-category',
+    'adjust-price': ADMIN_BASE + '/products/batch/adjust-price'
   };
 
   $(document).on('change', '.batch-sale-status', function () {

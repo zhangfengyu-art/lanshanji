@@ -1,8 +1,9 @@
 (function () {
+  var ADMIN_BASE = '{{ admin_base_path() }}';
   var routes = {
-    'mark-handled': '/admin/support-feedbacks/batch/mark-handled',
-    'mark-pending': '/admin/support-feedbacks/batch/mark-pending',
-    reply: '/admin/support-feedbacks/batch/reply'
+    'mark-handled': ADMIN_BASE + '/support-feedbacks/batch/mark-handled',
+    'mark-pending': ADMIN_BASE + '/support-feedbacks/batch/mark-pending',
+    reply: ADMIN_BASE + '/support-feedbacks/batch/reply'
   };
 
   $(document).on('click', '[data-feedback-batch]', function (e) {

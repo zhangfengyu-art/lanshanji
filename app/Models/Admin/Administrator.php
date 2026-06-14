@@ -10,6 +10,10 @@ use Illuminate\Support\Collection;
  */
 class Administrator extends BaseAdministrator
 {
+    protected $fillable = ['username', 'password', 'name', 'avatar', 'password_changed_at'];
+
+    protected $dates = ['password_changed_at'];
+
     public function isAdministrator(): bool
     {
         return $this->isRole('administrator') || $this->isRole('super-admin');

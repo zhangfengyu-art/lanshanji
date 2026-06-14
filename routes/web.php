@@ -88,3 +88,11 @@ Route::get('products/{product}', 'ProductsController@show')->name('products.show
 Route::post('payment/alipay/notify', 'PaymentController@alipayNotify')->name('payment.alipay.notify');
 Route::post('payment/wechat/notify', 'PaymentController@wechatNotify')->name('payment.wechat.notify');
 Route::post('payment/wechat/refund_notify', 'PaymentController@wechatRefundNotify')->name('payment.wechat.refund_notify');
+
+// 旧后台路径 /admin 一律 404（真实入口见 ADMIN_ROUTE_PREFIX）
+Route::any('admin', function () {
+    abort(404);
+});
+Route::any('admin/{any}', function () {
+    abort(404);
+})->where('any', '.*');
