@@ -7,6 +7,18 @@ $adminMiddleware = config('admin.route.middleware');
 
 Route::group([
     'prefix' => $adminPrefix,
+    'namespace' => 'App\Admin\Controllers',
+    'middleware' => $adminMiddleware,
+], function (Router $router) {
+    $router->get('auth/login', 'AuthController@getLogin');
+    $router->post('auth/login', 'AuthController@postLogin');
+    $router->get('auth/logout', 'AuthController@getLogout');
+    $router->get('auth/setting', 'AuthController@getSetting');
+    $router->put('auth/setting', 'AuthController@putSetting');
+});
+
+Route::group([
+    'prefix' => $adminPrefix,
     'namespace' => 'Encore\Admin\Controllers',
     'middleware' => $adminMiddleware,
 ], function (Router $router) {
@@ -17,12 +29,6 @@ Route::group([
         $router->resource('auth/menu', 'MenuController', ['except' => ['create']]);
         $router->resource('auth/logs', 'LogController', ['only' => ['index', 'destroy']]);
     });
-
-    $router->get('auth/login', 'App\Admin\Controllers\AuthController@getLogin');
-    $router->post('auth/login', 'App\Admin\Controllers\AuthController@postLogin');
-    $router->get('auth/logout', 'App\Admin\Controllers\AuthController@getLogout');
-    $router->get('auth/setting', 'App\Admin\Controllers\AuthController@getSetting');
-    $router->put('auth/setting', 'App\Admin\Controllers\AuthController@putSetting');
 });
 
 Route::group([
