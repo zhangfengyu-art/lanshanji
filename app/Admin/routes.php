@@ -88,6 +88,7 @@ Route::group([
     $router->get('products/export-incomplete-logistics', 'ProductBatchController@exportIncompleteLogistics')->name('admin.products.export_incomplete_logistics');
     $router->get('products/import-template', 'ProductsController@downloadImportTemplate')->name('admin.products.import_template');
     $router->post('products/import-csv', 'ProductsController@importCsv')->name('admin.products.import_csv');
+    $router->post('products/import-zip', 'ProductsController@importZip')->name('admin.products.import_zip');
     $router->get('orders', 'OrdersController@index')->name('admin.orders.index');
     $router->get('orders/export', 'OrdersController@export')->name('admin.orders.export');
     $router->post('orders/batch/start-processing', 'OrdersController@batchStartProcessing');

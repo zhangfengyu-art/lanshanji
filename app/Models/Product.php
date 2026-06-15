@@ -24,6 +24,7 @@ class Product extends Model
         'unit_sticks',
         'sale_status',
         'purchase_limit',
+        'source_ref_id',
     ];
 
     protected $casts = [

@@ -7,6 +7,8 @@ use App\Models\Product;
 use App\Models\ProductSku;
 use App\Services\HeatedTobaccoClassificationService;
 use App\Services\OrderTobaccoLimitService;
+use App\Services\ProductImageUploadService;
+use App\Services\ProductZipImportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -170,6 +172,7 @@ class ProductsController extends Controller
                     .'<i class="fa fa-download"></i> 导入模板</a>'
                 );
                 $tools->append(view('admin.products._import_csv'));
+                $tools->append(view('admin.products._import_zip'));
             });
 
             Admin::script(view('admin.products._batch_tools_script')->render());
@@ -223,12 +226,19 @@ class ProductsController extends Controller
                 ->min(1)
                 ->default(0)
                 ->help('烟草分类为「香烟」或「加热烟」时必填，计入单笔 400 支限额（二者合计）');
+            $imageRules = $form->model()->exists
+                ? 'nullable|mimes:jpeg,jpg,png,gif,webp,bmp|max:5120'
+                : 'required|mimes:jpeg,jpg,png,gif,webp,bmp|max:5120';
             // 创建一个选择图片的框
-            $form->image('image', '商品主图')->rules('required|image')->help('上传后会弹出裁切器，支持缩放和拖拽；保存后前台使用裁切后的图片。');
+            $form->image('image', '商品主图')->rules($imageRules)->help(
+                '支持 JPG、PNG、GIF、WebP；上传后会弹出裁切器，建议点击「应用裁切」（自动转为 JPG）。'
+                .'前台商品列表仅显示「已上架」商品，新建默认未上架。'
+            );
             // 创建一个富文本编辑器
             $form->editor('description', '商品描述')->rules('required');
             // 创建一组单选框
-            $form->radio('on_sale', '上架状态')->options(['1' => '已上架', '0' => '未上架'])->default('0');
+            $form->radio('on_sale', '上架状态')->options(['1' => '已上架', '0' => '未上架'])->default('0')
+                ->help('须设为「已上架」，前台才会出现该商品卡片');
             $form->select('sale_status', '销售状态')
                 ->options(Product::saleStatusOptions())
                 ->default(ProductSku::STATUS_ACTIVE)
@@ -320,6 +330,10 @@ class ProductsController extends Controller
             // SKU 在 saving 之后才写入，展示价必须在保存完成后按 SKU 最低价同步
             $form->saved(function (Form $form) {
                 $product = $form->model()->fresh(['skus']);
+
+                app(ProductImageUploadService::class)->normalizeStoredImageToJpeg($product);
+                $product->refresh();
+
                 $minPrice = $product->skus->min('price');
 
                 if ($minPrice === null || (float) $minPrice <= 0) {
@@ -467,6 +481,25 @@ class ProductsController extends Controller
         return redirect()
             ->to(admin_base_path('products'))
             ->with('success', 'CSV 导入完成：更新 '.$updated.' 条，跳过 '.$skipped.' 条。');
+    }
+
+    public function importZip(Request $request, ProductZipImportService $importService)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:zip', 'max:512000'],
+        ]);
+
+        $path = $request->file('file')->getRealPath();
+        $result = $importService->importFromZip($path);
+
+        $message = 'ZIP 导入完成：新建 '.$result['created'].' 条，更新 '.$result['updated'].' 条，跳过 '.$result['skipped'].' 条。';
+        if (!empty($result['errors'])) {
+            $message .= ' 失败 '.count($result['errors']).' 条（首条：'.$result['errors'][0].'）';
+        }
+
+        return redirect()
+            ->to(admin_base_path('products'))
+            ->with('success', $message);
     }
 
 }
