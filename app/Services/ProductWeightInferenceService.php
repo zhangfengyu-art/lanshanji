@@ -21,7 +21,7 @@ class ProductWeightInferenceService
         }
 
         if ($type === OrderTobaccoLimitService::TYPE_HEATED_TOBACCO) {
-            return $this->inferStickPackWeight($text, $unitSticks);
+            return $this->inferHeatedTobaccoWeight($text, $unitSticks);
         }
 
         $explicit = $this->parseExplicitGrams($text);
@@ -46,6 +46,14 @@ class ProductWeightInferenceService
     public function inferCigaretteWeightGrams($title, $unitSticks = null, $subtitle = '')
     {
         return $this->inferCigaretteWeight(trim((string) $title.' '.(string) $subtitle), $unitSticks);
+    }
+
+    /**
+     * 仅加热烟重量推断，供批量脚本专用。
+     */
+    public function inferHeatedTobaccoWeightGrams($title, $unitSticks = null, $subtitle = '')
+    {
+        return $this->inferHeatedTobaccoWeight(trim((string) $title.' '.(string) $subtitle), $unitSticks);
     }
 
     protected function inferRollingTobaccoWeight($text)
@@ -109,7 +117,7 @@ class ProductWeightInferenceService
         $config = config('cigarette_weight_inference', []);
 
         foreach ($config['product_rules'] ?? [] as $rule) {
-            if ($this->matchesCigaretteRule($text, $sticks, $rule)) {
+            if ($this->matchesProductRule($text, $sticks, $rule)) {
                 return (int) $rule['grams'];
             }
         }
@@ -151,6 +159,41 @@ class ProductWeightInferenceService
         }
 
         return $this->weightBySticks($sticks, $isSlim ? -3 : 0);
+    }
+
+    protected function inferHeatedTobaccoWeight($text, $unitSticks)
+    {
+        $explicit = $this->parseExplicitGrams($text);
+        if ($explicit !== null && !$this->looksLikeTarMg($text, $explicit)) {
+            return $explicit;
+        }
+
+        $sticks = $this->resolveHeatedStickCount($text, $unitSticks);
+        $config = config('heated_tobacco_weight_inference', []);
+        $referenceSticks = (int) ($config['default_sticks'] ?? 20);
+        $grams = null;
+
+        foreach ($config['product_rules'] ?? [] as $rule) {
+            if ($this->matchesProductRule($text, $sticks, $rule)) {
+                $grams = (int) $rule['grams'];
+                break;
+            }
+        }
+
+        if ($grams === null) {
+            foreach ($config['device_defaults'] ?? [] as $device) {
+                if ($this->matchesPattern($text, $device['pattern'] ?? '')) {
+                    $grams = (int) $device['grams'];
+                    break;
+                }
+            }
+        }
+
+        if ($grams === null) {
+            $grams = (int) ($config['default_grams'] ?? 24);
+        }
+
+        return $this->scalePackWeight($grams, $sticks, $referenceSticks);
     }
 
     protected function inferStickPackWeight($text, $unitSticks)
@@ -275,7 +318,30 @@ class ProductWeightInferenceService
         return $sticks;
     }
 
-    protected function matchesCigaretteRule($text, $sticks, array $rule)
+    protected function resolveHeatedStickCount($text, $unitSticks)
+    {
+        $sticks = (int) $unitSticks;
+        if ($sticks < 1) {
+            if (preg_match('/(\d+)\s*(?:支|本)/ui', $text, $m)) {
+                $sticks = (int) $m[1];
+            } else {
+                $sticks = (int) config('heated_tobacco_weight_inference.default_sticks', 20);
+            }
+        }
+
+        return $sticks;
+    }
+
+    protected function scalePackWeight($grams, $sticks, $referenceSticks)
+    {
+        if ($referenceSticks <= 0 || $sticks === $referenceSticks) {
+            return max(1, (int) $grams);
+        }
+
+        return max(1, (int) round($grams * $sticks / $referenceSticks));
+    }
+
+    protected function matchesProductRule($text, $sticks, array $rule)
     {
         if (!$this->matchesBrand($text, $rule['needles'] ?? [])) {
             return false;
@@ -294,6 +360,11 @@ class ProductWeightInferenceService
         }
 
         return true;
+    }
+
+    protected function matchesCigaretteRule($text, $sticks, array $rule)
+    {
+        return $this->matchesProductRule($text, $sticks, $rule);
     }
 
     protected function matchesPattern($text, $pattern)
