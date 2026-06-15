@@ -346,10 +346,14 @@ a {
   }
 
   .site-header__nav-scroll {
-    display: flex;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 10px 0 12px;
+    gap: 6px 0;
+    justify-items: stretch;
     align-items: center;
-    padding: 15px 0;
   }
 
   .site-header__submenu-backdrop {
@@ -358,6 +362,10 @@ a {
 
   .top-category-item {
     position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 0;
 
     &::before {
       content: "";
@@ -368,14 +376,19 @@ a {
       height: 14px;
     }
 
-    &:not(:last-child)::after {
+    &:not(:nth-child(4n))::after {
       content: "";
       width: 1px;
+      height: 18px;
       background-color: #cccccc;
       right: 0;
       top: 50%;
       transform: translateY(-50%);
       position: absolute;
+    }
+
+    &:last-child::after {
+      display: none;
     }
 
     &:hover .top-category-submenu,
@@ -390,18 +403,21 @@ a {
   .top-category-link {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    padding: 0 56px;
+    padding: 0 12px;
     position: relative;
     color: #333333;
     min-height: 32px;
     text-decoration: none;
-    font-size: 18px;
+    font-size: 17px;
     border: 0;
     background: transparent;
     cursor: pointer;
     font-family: inherit;
     line-height: 1.2;
+    white-space: nowrap;
+    max-width: 100%;
 
     &.top-category-link--toggle {
       -webkit-tap-highlight-color: transparent;
@@ -409,6 +425,7 @@ a {
 
     .top-category-link__text {
       display: inline-block;
+      white-space: nowrap;
     }
 
     .top-category-caret {
@@ -840,6 +857,9 @@ a {
       overflow: visible;
       white-space: normal;
       background: transparent;
+      max-width: none;
+      margin: 0;
+      grid-template-columns: none;
     }
 
     .top-category-item {
@@ -850,6 +870,10 @@ a {
       flex: 0 0 auto;
 
       &::before {
+        display: none;
+      }
+
+      &:not(:nth-child(4n))::after {
         display: none;
       }
 
