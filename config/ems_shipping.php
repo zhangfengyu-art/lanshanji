@@ -39,6 +39,7 @@ return [
     ],
     'tobacco_limits' => [
         'max_cigarette_sticks' => 400,
+        'max_cigarette_boxes' => 20,
         'max_rolling_tobacco_grams' => 5000,
     ],
 ];

@@ -33,6 +33,11 @@ class OrderTobaccoLimitService
         return (int) config('ems_shipping.tobacco_limits.max_cigarette_sticks', 400);
     }
 
+    public function maxCigaretteBoxes()
+    {
+        return (int) config('ems_shipping.tobacco_limits.max_cigarette_boxes', 20);
+    }
+
     public function maxRollingTobaccoGrams()
     {
         return (int) config('ems_shipping.tobacco_limits.max_rolling_tobacco_grams', 5000);
@@ -46,6 +51,7 @@ class OrderTobaccoLimitService
         $lines = [];
         $totalWeightGrams = 0;
         $totalCigaretteSticks = 0;
+        $totalCigaretteBoxes = 0;
         $totalRollingTobaccoGrams = 0;
 
         foreach ($items as $row) {
@@ -72,6 +78,9 @@ class OrderTobaccoLimitService
                 }
                 $lineSticks = $amount * $sticksPerUnit;
                 $totalCigaretteSticks += $lineSticks;
+                if ($product->tobacco_type === self::TYPE_CIGARETTE) {
+                    $totalCigaretteBoxes += $amount;
+                }
             } elseif ($product->tobacco_type === self::TYPE_ROLLING_TOBACCO) {
                 $totalRollingTobaccoGrams += $lineWeight;
             }
@@ -99,6 +108,7 @@ class OrderTobaccoLimitService
             'lines' => $lines,
             'total_weight_grams' => $totalWeightGrams,
             'total_cigarette_sticks' => $totalCigaretteSticks,
+            'total_cigarette_boxes' => $totalCigaretteBoxes,
             'total_rolling_tobacco_grams' => $totalRollingTobaccoGrams,
         ];
     }
@@ -106,11 +116,18 @@ class OrderTobaccoLimitService
     public function validateLimits(array $summary)
     {
         $maxSticks = $this->maxCigaretteSticks();
+        $maxBoxes = $this->maxCigaretteBoxes();
         $maxRollingGrams = $this->maxRollingTobaccoGrams();
 
         if ((int) data_get($summary, 'total_cigarette_sticks', 0) > $maxSticks) {
             throw new InvalidRequestException(
                 '单笔订单香烟、加热烟合计不得超过 '.$maxSticks.' 支（当前 '.(int) $summary['total_cigarette_sticks'].' 支）。'
+            );
+        }
+
+        if ((int) data_get($summary, 'total_cigarette_boxes', 0) > $maxBoxes) {
+            throw new InvalidRequestException(
+                '单笔订单香烟合计不得超过 '.$maxBoxes.' 盒/包（当前 '.(int) $summary['total_cigarette_boxes'].' 盒/包）。'
             );
         }
 
@@ -203,7 +220,12 @@ class OrderTobaccoLimitService
         $byWeight = (int) floor($maxGrams / $weight);
 
         $limits = [];
-        if (self::countsTowardStickLimit($product->tobacco_type) && (int) $product->unit_sticks > 0) {
+        if ($product->tobacco_type === self::TYPE_CIGARETTE) {
+            if ((int) $product->unit_sticks > 0) {
+                $limits[] = (int) floor($this->maxCigaretteSticks() / (int) $product->unit_sticks);
+            }
+            $limits[] = $this->maxCigaretteBoxes();
+        } elseif (self::countsTowardStickLimit($product->tobacco_type) && (int) $product->unit_sticks > 0) {
             $limits[] = (int) floor($this->maxCigaretteSticks() / (int) $product->unit_sticks);
         }
         if ($product->tobacco_type === self::TYPE_ROLLING_TOBACCO) {

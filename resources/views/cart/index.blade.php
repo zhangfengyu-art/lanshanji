@@ -137,7 +137,7 @@
                 <strong><span id="settlement-weight-grams">0</span> g</strong>
               </div>
               <div class="summary-line text-muted" style="font-size:12px;" id="settlement-tobacco-hint">
-                单笔限：香烟+加热烟 ≤ {{ $tobaccoLimits['max_sticks'] }} 支，手卷烟丝 ≤ {{ round($tobaccoLimits['max_rolling_grams'] / 1000, 1) }}kg；EMS 计费上限 {{ round($tobaccoLimits['max_billable_grams'] / 1000, 1) }}kg
+                单笔限：香烟 ≤ {{ $tobaccoLimits['max_boxes'] }} 盒/包、香烟+加热烟 ≤ {{ $tobaccoLimits['max_sticks'] }} 支，手卷烟丝 ≤ {{ round($tobaccoLimits['max_rolling_grams'] / 1000, 1) }}kg；EMS 计费上限 {{ round($tobaccoLimits['max_billable_grams'] / 1000, 1) }}kg
               </div>
               <div class="summary-line text-muted" style="font-size:12px;" id="settlement-tobacco-progress"></div>
               <div class="summary-line summary-line-payable">
@@ -166,6 +166,7 @@
   $(document).ready(function () {
     var IS_SITE_MODE_A = @json(is_site_mode_a());
     var TOBACCO_MAX_STICKS = {{ (int) $tobaccoLimits['max_sticks'] }};
+    var TOBACCO_MAX_BOXES = {{ (int) $tobaccoLimits['max_boxes'] }};
     var TOBACCO_MAX_ROLLING_GRAMS = {{ (int) $tobaccoLimits['max_rolling_grams'] }};
     var SERVICE_FEE_RATE = 0.13;
     var PACKAGING_FEE = 300;
@@ -293,6 +294,9 @@
           var progress = [];
           if (typeof data.total_cigarette_sticks === 'number') {
             progress.push('香烟+加热烟 ' + data.total_cigarette_sticks + ' / ' + TOBACCO_MAX_STICKS + ' 支（剩余 ' + (data.remaining_cigarette_sticks || 0) + '）');
+          }
+          if (typeof data.total_cigarette_boxes === 'number') {
+            progress.push('香烟 ' + data.total_cigarette_boxes + ' / ' + TOBACCO_MAX_BOXES + ' 盒/包（剩余 ' + (data.remaining_cigarette_boxes || 0) + '）');
           }
           if (typeof data.total_rolling_tobacco_grams === 'number') {
             progress.push('烟丝 ' + (data.total_rolling_tobacco_grams / 1000).toFixed(2) + ' / ' + (TOBACCO_MAX_ROLLING_GRAMS / 1000).toFixed(1) + ' kg（剩余 ' + ((data.remaining_rolling_tobacco_grams || 0) / 1000).toFixed(2) + ' kg）');

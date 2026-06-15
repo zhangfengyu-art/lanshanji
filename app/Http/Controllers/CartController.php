@@ -52,6 +52,7 @@ class CartController extends Controller
             'emsTiers' => $this->emsShipping->tiers(),
             'tobaccoLimits' => [
                 'max_sticks' => $this->tobaccoLimits->maxCigaretteSticks(),
+                'max_boxes' => $this->tobaccoLimits->maxCigaretteBoxes(),
                 'max_rolling_grams' => $this->tobaccoLimits->maxRollingTobaccoGrams(),
                 'max_billable_grams' => $this->emsShipping->maxBillableGrams(),
             ],

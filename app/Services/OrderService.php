@@ -128,6 +128,7 @@ class OrderService
                 $extra['tobacco_summary'] = [
                     'total_weight_grams' => $tobaccoSummary['total_weight_grams'],
                     'total_cigarette_sticks' => $tobaccoSummary['total_cigarette_sticks'],
+                    'total_cigarette_boxes' => $tobaccoSummary['total_cigarette_boxes'],
                     'total_rolling_tobacco_grams' => $tobaccoSummary['total_rolling_tobacco_grams'],
                 ];
             }

@@ -53,6 +53,7 @@ class OrderCheckoutQuoteService
 
         $payable = round($productsTotal + $serviceFee + $packagingFee + $emsFee, 2);
         $maxSticks = $this->tobaccoLimits->maxCigaretteSticks();
+        $maxBoxes = $this->tobaccoLimits->maxCigaretteBoxes();
         $maxRolling = $this->tobaccoLimits->maxRollingTobaccoGrams();
 
         return [
@@ -67,8 +68,10 @@ class OrderCheckoutQuoteService
             'payable' => $payable,
             'total_weight_grams' => (int) $tobaccoSummary['total_weight_grams'],
             'total_cigarette_sticks' => (int) $tobaccoSummary['total_cigarette_sticks'],
+            'total_cigarette_boxes' => (int) $tobaccoSummary['total_cigarette_boxes'],
             'total_rolling_tobacco_grams' => (int) $tobaccoSummary['total_rolling_tobacco_grams'],
             'remaining_cigarette_sticks' => max(0, $maxSticks - (int) $tobaccoSummary['total_cigarette_sticks']),
+            'remaining_cigarette_boxes' => max(0, $maxBoxes - (int) $tobaccoSummary['total_cigarette_boxes']),
             'remaining_rolling_tobacco_grams' => max(0, $maxRolling - (int) $tobaccoSummary['total_rolling_tobacco_grams']),
             'max_billable_grams' => $this->emsShipping->maxBillableGrams(),
             'tobacco_summary' => $tobaccoSummary,
