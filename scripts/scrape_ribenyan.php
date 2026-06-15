@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\ImageJpegConverter;
 use App\Services\Ribenyan\RibenyanHttpClient;
 use App\Services\Ribenyan\RibenyanProductListParser;
 use App\Services\Ribenyan\RibenyanScraper;
@@ -20,7 +21,8 @@ if (!is_dir($outputDir)) {
 $scraper = new RibenyanScraper(
     new RibenyanHttpClient(),
     new RibenyanProductListParser(),
-    new ProductImportLogisticsInferrer()
+    new ProductImportLogisticsInferrer(),
+    new ImageJpegConverter()
 );
 
 echo "输出目录: {$outputDir}\n";

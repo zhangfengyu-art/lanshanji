@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\ProductSku;
+use App\Services\ImageJpegConverter;
 use App\Services\Ribenyan\RibenyanImportCategoryResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -15,13 +16,16 @@ class ProductZipImportService
 {
     protected $categoryResolver;
     protected $imageService;
+    protected $imageConverter;
 
     public function __construct(
         RibenyanImportCategoryResolver $categoryResolver,
-        ProductImageUploadService $imageService
+        ProductImageUploadService $imageService,
+        ImageJpegConverter $imageConverter
     ) {
         $this->categoryResolver = $categoryResolver;
         $this->imageService = $imageService;
+        $this->imageConverter = $imageConverter;
     }
 
     public function importFromZip($zipAbsolutePath)
@@ -218,55 +222,11 @@ class ProductZipImportService
 
         File::makeDirectory(dirname($targetAbsolute), 0755, true, true);
 
-        if (!$this->convertFileToJpeg($sourceAbsolutePath, $targetAbsolute)) {
+        if (!$this->imageConverter->convertFileToJpeg($sourceAbsolutePath, $targetAbsolute)) {
             throw new \RuntimeException('图片处理失败');
         }
 
         return $relative;
-    }
-
-    protected function convertFileToJpeg($sourcePath, $targetPath)
-    {
-        $type = @exif_imagetype($sourcePath);
-        $image = null;
-
-        switch ($type) {
-            case IMAGETYPE_JPEG:
-                $image = @imagecreatefromjpeg($sourcePath);
-                break;
-            case IMAGETYPE_PNG:
-                $image = @imagecreatefrompng($sourcePath);
-                break;
-            case IMAGETYPE_GIF:
-                $image = @imagecreatefromgif($sourcePath);
-                break;
-            case IMAGETYPE_WEBP:
-                if (function_exists('imagecreatefromwebp')) {
-                    $image = @imagecreatefromwebp($sourcePath);
-                }
-                break;
-        }
-
-        if (!$image) {
-            return false;
-        }
-
-        if (function_exists('imagepalettetotruecolor')) {
-            imagepalettetotruecolor($image);
-        }
-
-        $width = imagesx($image);
-        $height = imagesy($image);
-        $canvas = imagecreatetruecolor($width, $height);
-        $white = imagecolorallocate($canvas, 255, 255, 255);
-        imagefill($canvas, 0, 0, $white);
-        imagecopy($canvas, $image, 0, 0, 0, 0, $width, $height);
-        imagedestroy($image);
-
-        $saved = @imagejpeg($canvas, $targetPath, 90);
-        imagedestroy($canvas);
-
-        return $saved;
     }
 
     protected function findCsvPath($root)

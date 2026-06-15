@@ -2,6 +2,7 @@
 
 namespace App\Services\Ribenyan;
 
+use App\Services\ImageJpegConverter;
 use Illuminate\Support\Facades\File;
 
 class RibenyanScraper
@@ -9,16 +10,19 @@ class RibenyanScraper
     protected $client;
     protected $parser;
     protected $logisticsInferrer;
+    protected $imageConverter;
     protected $seenRefIds = [];
 
     public function __construct(
         RibenyanHttpClient $client,
         RibenyanProductListParser $parser,
-        ProductImportLogisticsInferrer $logisticsInferrer
+        ProductImportLogisticsInferrer $logisticsInferrer,
+        ImageJpegConverter $imageConverter
     ) {
         $this->client = $client;
         $this->parser = $parser;
         $this->logisticsInferrer = $logisticsInferrer;
+        $this->imageConverter = $imageConverter;
     }
 
     public function scrapeToDirectory($outputDir, $progressCallback = null)
@@ -77,6 +81,7 @@ class RibenyanScraper
                         'title' => $item['title'],
                         'subtitle' => $item['subtitle'],
                         'price' => $item['price'],
+                        'image_url' => $item['image_url'],
                         'image_file' => $imageFile,
                         'category_parent' => $item['category_parent'],
                         'category_brand' => $item['category_brand'],
@@ -186,10 +191,10 @@ class RibenyanScraper
                 throw new \RuntimeException('图片为空');
             }
 
-            $tempPath = $targetPath.'.tmp';
+            $tempPath = $this->buildTempImagePath($imagesDir, $safeRef, $imageUrl);
             file_put_contents($tempPath, $binary);
 
-            if ($this->convertToJpeg($tempPath, $targetPath)) {
+            if ($this->imageConverter->convertFileToJpeg($tempPath, $targetPath)) {
                 @unlink($tempPath);
 
                 return basename($targetPath);
@@ -204,48 +209,15 @@ class RibenyanScraper
         }
     }
 
-    protected function convertToJpeg($sourcePath, $targetPath)
+    protected function buildTempImagePath($imagesDir, $safeRef, $imageUrl)
     {
-        $image = null;
-        $type = @exif_imagetype($sourcePath);
-
-        switch ($type) {
-            case IMAGETYPE_JPEG:
-                $image = @imagecreatefromjpeg($sourcePath);
-                break;
-            case IMAGETYPE_PNG:
-                $image = @imagecreatefrompng($sourcePath);
-                break;
-            case IMAGETYPE_GIF:
-                $image = @imagecreatefromgif($sourcePath);
-                break;
-            case IMAGETYPE_WEBP:
-                if (function_exists('imagecreatefromwebp')) {
-                    $image = @imagecreatefromwebp($sourcePath);
-                }
-                break;
+        $pathPart = (string) parse_url($imageUrl, PHP_URL_PATH);
+        $ext = strtolower((string) pathinfo($pathPart, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+            $ext = 'webp';
         }
 
-        if (!$image) {
-            return false;
-        }
-
-        if (function_exists('imagepalettetotruecolor')) {
-            imagepalettetotruecolor($image);
-        }
-
-        $width = imagesx($image);
-        $height = imagesy($image);
-        $canvas = imagecreatetruecolor($width, $height);
-        $white = imagecolorallocate($canvas, 255, 255, 255);
-        imagefill($canvas, 0, 0, $white);
-        imagecopy($canvas, $image, 0, 0, 0, 0, $width, $height);
-        imagedestroy($image);
-
-        $saved = @imagejpeg($canvas, $targetPath, 90);
-        imagedestroy($canvas);
-
-        return $saved;
+        return rtrim($imagesDir, '/\\').'/'.$safeRef.'.'.$ext;
     }
 
     protected function writeCsv($csvPath, array $rows)
@@ -256,6 +228,7 @@ class RibenyanScraper
             'title',
             'subtitle',
             'price',
+            'image_url',
             'image_file',
             'category_parent',
             'category_brand',
