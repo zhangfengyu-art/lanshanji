@@ -4,18 +4,20 @@ namespace App\Listeners;
 
 use App\Notifications\EmailVerificationNotification;
 use Illuminate\Auth\Events\Registered;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Support\Facades\Log;
 
-// implements ShouldQueue 让这个监听器异步执行
-class RegisteredListener implements ShouldQueue
+class RegisteredListener
 {
-    // 当事件被触发时，对应该事件的监听器的 handle() 方法就会被调用
     public function handle(Registered $event)
     {
-        // 获取到刚刚注册的用户
-        $user = $event->user;
-        // 调用 notify 发送通知
-        $user->notify(new EmailVerificationNotification());
+        try {
+            $event->user->notify(new EmailVerificationNotification());
+        } catch (\Throwable $e) {
+            Log::error('注册验证邮件发送失败', [
+                'user_id' => $event->user->id,
+                'email' => $event->user->email,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 }

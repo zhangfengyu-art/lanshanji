@@ -1,7 +1,13 @@
 <?php
 function route_class()
 {
-    return str_replace('.', '-', Route::currentRouteName());
+    $name = Route::currentRouteName();
+
+    if ($name === null || $name === '') {
+        return 'unknown';
+    }
+
+    return str_replace('.', '-', $name);
 }
 
 function site_mode()
