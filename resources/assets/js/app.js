@@ -143,6 +143,17 @@ $(function () {
         $count.toggleClass('is-zero', count <= 0);
     }
 
+    function applyAddCartResponse(response) {
+        var data = response && response.data;
+        if (data && typeof data.count !== 'undefined') {
+            setCartCount(data.count);
+
+            return true;
+        }
+
+        return false;
+    }
+
     function refresh() {
         if (!isAuth || !summaryUrl) {
             setCartCount(0);
@@ -170,7 +181,11 @@ $(function () {
             }, 500);
             return;
         }
+        var willOpen = !$drawer.hasClass('is-open');
         $drawer.toggleClass('is-open');
+        if (willOpen) {
+            refresh();
+        }
     });
 
     $(document).on('click', function (e) {
@@ -184,7 +199,8 @@ $(function () {
 
     window.MiniCart = {
         refresh: refresh,
-        toast: toast
+        toast: toast,
+        setCount: setCartCount
     };
 
     $(document).on('click', '[data-add-cart]', function () {

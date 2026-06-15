@@ -62,7 +62,7 @@ class CartController extends Controller
     {
         $this->cartService->add($request->input('sku_id'), $request->input('amount'));
 
-        return [];
+        return ['count' => $this->cartService->getTotalAmount()];
     }
 
     public function summary(Request $request)

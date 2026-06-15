@@ -27,6 +27,19 @@ class CartService
         return $items;
     }
 
+    /**
+     * 购物车商品总件数（轻量查询，用于角标）。
+     */
+    public function getTotalAmount()
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return 0;
+        }
+
+        return (int) $user->cartItems()->sum('amount');
+    }
+
     public function add($skuId, $amount)
     {
         $user = Auth::user();

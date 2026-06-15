@@ -38,7 +38,60 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        // 同步后台菜单与权限中文命名
+        $this->syncAdminLabelsOnAdminRequest();
+
+        $categories = collect();
+        $siteLogoUrl = null;
+        $siteBrandZh = '岚山烟务所';
+        $siteBrandEn = 'ARASHIYAMA TOBACCO SHOP';
+
+        if (Schema::hasTable('categories')) {
+            $categories = Category::query()
+                ->with('children')
+                ->where(function ($query) {
+                    $query->whereNull('parent_id')
+                        ->orWhere('parent_id', 0);
+                })
+                ->when(db_has_column('categories', 'sort_order'), function ($query) {
+                    $query->orderBy('sort_order');
+                })
+                ->orderBy('id')
+                ->get();
+        }
+
+        if (Schema::hasTable('site_settings')) {
+            $siteSettings = SiteSetting::query()
+                ->whereIn('key', ['header_logo', 'header_brand_text_zh', 'header_brand_text_en'])
+                ->pluck('value', 'key');
+
+            $siteBrandZh = (string) ($siteSettings->get('header_brand_text_zh') ?: $siteBrandZh);
+            $siteBrandEn = (string) ($siteSettings->get('header_brand_text_en') ?: $siteBrandEn);
+        }
+
+        if (function_exists('site_logo_url')) {
+            $siteLogoUrl = site_logo_url();
+        }
+
+        View::share('categories', $categories);
+        View::share('siteLogoUrl', $siteLogoUrl);
+        View::share('siteBrandZh', $siteBrandZh);
+        View::share('siteBrandEn', $siteBrandEn);
+    }
+
+    /**
+     * 仅在访问后台时同步菜单/权限中文名，避免拖慢前台 API（如加购）。
+     */
+    protected function syncAdminLabelsOnAdminRequest()
+    {
+        if (app()->runningInConsole()) {
+            return;
+        }
+
+        $adminPrefix = trim((string) config('admin.route.prefix', 'admin'), '/');
+        if ($adminPrefix === '' || !request()->is($adminPrefix, $adminPrefix.'/*')) {
+            return;
+        }
+
         try {
             if (Schema::hasTable('admin_menu')) {
                 $menuTitleMap = [
@@ -96,7 +149,6 @@ class AppServiceProvider extends ServiceProvider
 
                                 $like = str_replace('*', '%', ltrim($pathPattern, '/'));
 
-                                // admin_permissions.http_path 可能是多行规则，也可能带 / 前缀。
                                 $query->orWhere('http_path', 'like', '%'.$like.'%');
                                 $query->orWhere('http_path', 'like', '%/'.$like.'%');
                             }
@@ -130,48 +182,6 @@ class AppServiceProvider extends ServiceProvider
         } catch (\Throwable $e) {
             // Keep admin pages available even when table is not ready.
         }
-
-        $categories = collect();
-        $siteLogoUrl = null;
-        $siteBrandZh = '岚山烟务所';
-        $siteBrandEn = 'ARASHIYAMA TOBACCO SHOP';
-
-        if (Schema::hasTable('categories')) {
-            $categories = Category::query()
-                ->with('children')
-                ->where(function ($query) {
-                    $query->whereNull('parent_id')
-                        ->orWhere('parent_id', 0);
-                })
-                ->when(db_has_column('categories', 'sort_order'), function ($query) {
-                    $query->orderBy('sort_order');
-                })
-                ->orderBy('id')
-                ->get();
-        }
-
-        if (Schema::hasTable('site_settings')) {
-            $logoPath = SiteSetting::query()
-                ->where('key', 'header_logo')
-                ->value('value');
-
-            $siteBrandZh = SiteSetting::query()
-                ->where('key', 'header_brand_text_zh')
-                ->value('value') ?: $siteBrandZh;
-            $siteBrandEn = SiteSetting::query()
-                ->where('key', 'header_brand_text_en')
-                ->value('value') ?: $siteBrandEn;
-
-        }
-
-        if (function_exists('site_logo_url')) {
-            $siteLogoUrl = site_logo_url();
-        }
-
-        View::share('categories', $categories);
-        View::share('siteLogoUrl', $siteLogoUrl);
-        View::share('siteBrandZh', $siteBrandZh);
-        View::share('siteBrandEn', $siteBrandEn);
     }
 
     /**

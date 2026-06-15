@@ -123,9 +123,13 @@
         axios.post('{{ route('cart.add') }}', {
           sku_id: skuId,
           amount: amount
-        }).then(function () {
-          if (window.MiniCart && window.MiniCart.refresh) {
-            window.MiniCart.refresh();
+        }).then(function (res) {
+          if (window.MiniCart) {
+            if (window.MiniCart.setCount && res.data && typeof res.data.count !== 'undefined') {
+              window.MiniCart.setCount(res.data.count);
+            } else if (window.MiniCart.refresh) {
+              window.MiniCart.refresh();
+            }
           }
           if (window.MiniCart && window.MiniCart.toast) {
             window.MiniCart.toast('{{ trans('frontend.js.added_to_cart') }}');
