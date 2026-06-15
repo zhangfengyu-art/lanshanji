@@ -13,15 +13,15 @@ class ProductWeightInferenceService
         $type = (string) $tobaccoType;
 
         if ($type === OrderTobaccoLimitService::TYPE_ROLLING_TOBACCO) {
-            return $this->inferRollingTobaccoWeight($text);
+            return $this->applyTobaccoWeightMarkup($this->inferRollingTobaccoWeight($text));
         }
 
         if ($type === OrderTobaccoLimitService::TYPE_CIGARETTE) {
-            return $this->inferCigaretteWeight($text, $unitSticks);
+            return $this->applyTobaccoWeightMarkup($this->inferCigaretteWeight($text, $unitSticks));
         }
 
         if ($type === OrderTobaccoLimitService::TYPE_HEATED_TOBACCO) {
-            return $this->inferHeatedTobaccoWeight($text, $unitSticks);
+            return $this->applyTobaccoWeightMarkup($this->inferHeatedTobaccoWeight($text, $unitSticks));
         }
 
         $explicit = $this->parseExplicitGrams($text);
@@ -37,7 +37,9 @@ class ProductWeightInferenceService
      */
     public function inferShagWeightGrams($title, $subtitle = '')
     {
-        return $this->inferRollingTobaccoWeight(trim((string) $title.' '.(string) $subtitle));
+        return $this->applyTobaccoWeightMarkup(
+            $this->inferRollingTobaccoWeight(trim((string) $title.' '.(string) $subtitle))
+        );
     }
 
     /**
@@ -45,7 +47,9 @@ class ProductWeightInferenceService
      */
     public function inferCigaretteWeightGrams($title, $unitSticks = null, $subtitle = '')
     {
-        return $this->inferCigaretteWeight(trim((string) $title.' '.(string) $subtitle), $unitSticks);
+        return $this->applyTobaccoWeightMarkup(
+            $this->inferCigaretteWeight(trim((string) $title.' '.(string) $subtitle), $unitSticks)
+        );
     }
 
     /**
@@ -53,7 +57,26 @@ class ProductWeightInferenceService
      */
     public function inferHeatedTobaccoWeightGrams($title, $unitSticks = null, $subtitle = '')
     {
-        return $this->inferHeatedTobaccoWeight(trim((string) $title.' '.(string) $subtitle), $unitSticks);
+        return $this->applyTobaccoWeightMarkup(
+            $this->inferHeatedTobaccoWeight(trim((string) $title.' '.(string) $subtitle), $unitSticks)
+        );
+    }
+
+    public function getTobaccoWeightMarkupPercent()
+    {
+        return (float) config('tobacco_weight.markup_percent', 0);
+    }
+
+    public function applyTobaccoWeightMarkup($grams)
+    {
+        $grams = (int) $grams;
+        $percent = $this->getTobaccoWeightMarkupPercent();
+
+        if ($grams < 1 || $percent <= 0) {
+            return max(1, $grams);
+        }
+
+        return max(1, (int) round($grams * (1 + $percent / 100)));
     }
 
     protected function inferRollingTobaccoWeight($text)
