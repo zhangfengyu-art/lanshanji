@@ -258,12 +258,6 @@
               <span class="settlement-label">劳务费</span>
               <span class="value">￥{{ number_format($serviceFee, 2, '.', '') }}</span>
             </div>
-            @if(data_get($feeDetails, 'ems_weight_grams'))
-            <div class="settlement-row">
-              <span class="settlement-label">计费重量</span>
-              <span class="value">{{ (int) data_get($feeDetails, 'ems_weight_grams') }} g（{{ data_get($feeDetails, 'ems_zone', 'EMS') }}）</span>
-            </div>
-            @endif
             <div class="settlement-row">
               <span class="settlement-label">国际运费</span>
               <span class="value">￥{{ number_format($emsShippingFee, 2, '.', '') }}</span>
