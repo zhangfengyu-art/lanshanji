@@ -29,6 +29,8 @@ return [
         'password_confirm' => '确认密码',
         'remember_me' => '记住我',
         'forgot_password' => '忘记密码？',
+        'no_account_hint' => '如果还没有账号，',
+        'click_here_register' => '点击这里注册新账号',
         'name' => '昵称',
         'send_password_reset_link' => '发送密码重置链接',
         'reset_password' => '重置密码',
@@ -191,6 +193,10 @@ return [
 
     'js' => [
         'login_required' => '请先登录后使用购物车',
+        'please_login_to_shop' => '请先登录后再选物',
+        'login_to_shop_detail' => '登录后即可加入购物车、收藏商品并结算下单。',
+        'go_login' => '去登录',
+        'cancel_later' => '稍后',
         'insufficient_stock' => '库存不足',
         'update_failed' => '更新失败',
         'remove_failed' => '移除失败',

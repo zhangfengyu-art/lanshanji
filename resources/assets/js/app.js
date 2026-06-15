@@ -29,6 +29,28 @@ window.formatShopPrice = function (value) {
     return window.AppSiteModeA ? n + '日元' : '￥' + n;
 };
 
+window.promptLoginToShop = function (loginUrl) {
+    loginUrl = loginUrl || window.AppLoginUrl || '/login';
+    var jsI18n = window.AppI18n || {};
+
+    swal({
+        title: jsI18n.please_login_to_shop || '请先登录后再选物',
+        text: jsI18n.login_to_shop_detail || '登录后即可加入购物车、收藏商品并结算下单。',
+        icon: 'warning',
+        buttons: {
+            cancel: jsI18n.cancel_later || '稍后',
+            confirm: {
+                text: jsI18n.go_login || '去登录',
+                value: true,
+            },
+        },
+    }).then(function (value) {
+        if (value) {
+            location.href = loginUrl;
+        }
+    });
+};
+
 $(function () {
     var i18n = window.AppI18n || {};
     var cartI18n = window.AppI18nCart || {};
@@ -180,10 +202,7 @@ $(function () {
         e.preventDefault();
         e.stopPropagation();
         if (!isAuth) {
-            toast(t(i18n, 'login_required', '请先登录后使用购物车'));
-            setTimeout(function () {
-                location.href = loginUrl;
-            }, 500);
+            window.promptLoginToShop(loginUrl);
             return;
         }
         var willOpen = !$drawer.hasClass('is-open');

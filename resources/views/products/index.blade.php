@@ -101,6 +101,8 @@
   @if(!is_site_mode_b())
   <script>
     var filters = {!! json_encode($filters) !!};
+    var isLoggedIn = @json(auth()->check());
+    var loginUrl = '{{ route('login') }}';
     $(document).ready(function () {
       $('.search-form input[name=search]').val(filters.search);
       $('.search-form select[name=order]').val(filters.order);
@@ -110,6 +112,11 @@
       });
 
       $('[data-add-cart]').on('click', function () {
+        if (!isLoggedIn) {
+          window.promptLoginToShop(loginUrl);
+          return;
+        }
+
         var skuId = $(this).data('sku-id');
         var amount = $(this).data('sku-amount') || 1;
 
@@ -136,7 +143,7 @@
           }
         }).catch(function (error) {
           if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-            location.href = '{{ route('login') }}';
+            window.promptLoginToShop(loginUrl);
             return;
           }
           if (error.response && error.response.status === 400 && error.response.data && error.response.data.msg) {

@@ -8,6 +8,11 @@
                 <div class="panel-heading">{{ trans('frontend.auth.login') }}</div>
 
                 <div class="panel-body">
+                    <p class="login-register-hint text-center" style="margin-bottom: 20px; color: #666; font-size: 14px;">
+                        {{ trans('frontend.auth.no_account_hint') }}
+                        <a href="{{ route('register') }}">{{ trans('frontend.auth.click_here_register') }}</a>
+                    </p>
+
                     <form class="form-horizontal" method="POST" action="{{ route('login') }}">
                         {{ csrf_field() }}
 

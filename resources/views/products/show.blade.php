@@ -144,6 +144,8 @@
   $(document).ready(function () {
     var productI18n = @json(trans('frontend.product'));
     var jsI18n = @json(trans('frontend.js'));
+    var isLoggedIn = @json(auth()->check());
+    var loginUrl = '{{ route('login') }}';
     var defaultAddText = $('.btn-add-to-cart').text();
     var defaultBuyText = $('.btn-buy-now').text();
 
@@ -233,7 +235,19 @@
       $('.qty-input').val(qty);
     }
 
+    function ensureLoggedInForShop() {
+      if (isLoggedIn) {
+        return true;
+      }
+      window.promptLoginToShop(loginUrl);
+      return false;
+    }
+
     function addCurrentSkuToCart(redirectToCheckout) {
+      if (!ensureLoggedInForShop()) {
+        return;
+      }
+
       if ($('.btn-add-to-cart').prop('disabled')) {
         return;
       }
@@ -276,7 +290,7 @@
         swal(jsI18n.added_to_cart || '已加入购物车', '', 'success');
       }).catch(function (error) {
         if (error.response && error.response.status === 401) {
-          swal(jsI18n.please_login || '请先登录', '', 'error');
+          window.promptLoginToShop(loginUrl);
           return;
         }
         if (error.response && error.response.status === 400 && error.response.data && error.response.data.msg) {
@@ -336,13 +350,17 @@
     });
 
     $('.btn-favor').on('click', function () {
+      if (!ensureLoggedInForShop()) {
+        return;
+      }
+
       axios.post('{{ route('products.favor', ['product' => $product->id]) }}').then(function () {
         swal(jsI18n.action_success || '操作成功', '', 'success').then(function () {
           location.reload();
         });
       }).catch(function (error) {
         if (error.response && error.response.status === 401) {
-          swal(jsI18n.please_login || '请先登录', '', 'error');
+          window.promptLoginToShop(loginUrl);
         } else if (error.response && error.response.data && error.response.data.msg) {
           swal(error.response.data.msg, '', 'error');
         } else {
@@ -358,7 +376,7 @@
         });
       }).catch(function (error) {
         if (error.response && error.response.status === 401) {
-          swal(jsI18n.please_login || '请先登录', '', 'error');
+          window.promptLoginToShop(loginUrl);
         } else if (error.response && error.response.data && error.response.data.msg) {
           swal(error.response.data.msg, '', 'error');
         } else {
