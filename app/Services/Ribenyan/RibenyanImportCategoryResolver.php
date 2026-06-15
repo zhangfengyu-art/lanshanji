@@ -3,6 +3,7 @@
 namespace App\Services\Ribenyan;
 
 use App\Models\Category;
+use App\Services\CategoryNameCleanupService;
 use App\Services\ShippingModeService;
 
 class RibenyanImportCategoryResolver
@@ -21,14 +22,12 @@ class RibenyanImportCategoryResolver
             return $root->id;
         }
 
-        $childName = $this->formatBrandCategoryName($brandName);
+        $cleanup = app(CategoryNameCleanupService::class);
+        $childName = $cleanup->stripEmsDirectMailLabel($this->formatBrandCategoryName($brandName));
 
         $child = Category::query()
             ->where('parent_id', $root->id)
-            ->where(function ($query) use ($childName) {
-                $query->where('name', $childName)
-                    ->orWhere('name', $childName.' EMS直邮');
-            })
+            ->whereIn('name', [$childName, $childName.' EMS直邮'])
             ->first();
 
         if ($child) {
