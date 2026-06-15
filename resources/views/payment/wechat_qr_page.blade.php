@@ -25,7 +25,7 @@
         <div class="action-guide">请使用微信扫描下方二维码完成支付。</div>
         <div class="fx-summary">
           @if(!empty($amountJpy))
-          <div class="meta-lines">订单核算（日元）：JPY ¥{{ number_format((float) $amountJpy, 2, '.', '') }}</div>
+          <div class="meta-lines">订单核算（日元）：{{ format_jpy_price($amountJpy) }}</div>
           @endif
           <div class="meta-lines">汇率快照：1 人民币 = {{ number_format((float) ($exchangeRate ?? 22), 2, '.', '') }} 日元</div>
         </div>
@@ -56,7 +56,7 @@
             <div class="kv"><span class="k">订单号</span><span class="v">{{ $order->no }}</span></div>
             <div class="kv"><span class="k">应付金额</span><span class="v">￥{{ $payCny }}</span></div>
             @if(!empty($amountJpy))
-            <div class="kv"><span class="k">订单核算</span><span class="v">JPY ¥{{ number_format((float) $amountJpy, 2, '.', '') }}</span></div>
+            <div class="kv"><span class="k">订单核算</span><span class="v">{{ format_jpy_price($amountJpy) }}</span></div>
             @endif
             <div class="kv"><span class="k">支付提示</span><span class="v">若状态未更新，请返回订单页手动刷新；勿重复支付。</span></div>
             <div class="payment-actions">

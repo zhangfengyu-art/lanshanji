@@ -29,7 +29,7 @@
         <div class="action-guide">点击下方按钮跳转支付宝收银台；支付成功后请返回订单页确认状态。</div>
         <div class="fx-summary">
           @if(!empty($amountJpy))
-          <div class="meta-lines">订单核算（日元）：JPY ¥{{ number_format((float) $amountJpy, 2, '.', '') }}</div>
+          <div class="meta-lines">订单核算（日元）：{{ format_jpy_price($amountJpy) }}</div>
           @endif
           <div class="meta-lines">汇率快照：1 人民币 = {{ number_format((float) ($exchangeRate ?? 22), 2, '.', '') }} 日元</div>
         </div>
@@ -48,7 +48,7 @@
           <div class="kv"><span class="k">支付渠道</span><span class="v">支付宝</span></div>
           <div class="kv"><span class="k">收银台</span><span class="v">岚山选物收银台</span></div>
           @if(!empty($amountJpy))
-          <div class="kv"><span class="k">订单核算</span><span class="v">JPY ¥{{ number_format((float) $amountJpy, 2, '.', '') }}</span></div>
+          <div class="kv"><span class="k">订单核算</span><span class="v">{{ format_jpy_price($amountJpy) }}</span></div>
           @endif
           <div class="kv"><span class="k">汇率快照</span><span class="v">1 人民币 = {{ number_format((float) ($exchangeRate ?? 22), 2, '.', '') }} 日元</span></div>
           <div class="kv"><span class="k">支付提示</span><span class="v">页面将自动跳转支付宝；若未跳转请手动点击「前往支付宝支付」。</span></div>

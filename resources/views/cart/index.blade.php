@@ -49,7 +49,7 @@
               @endif
             </div>
           </td>
-          <td><span class="price">￥{{ $item->productSku->price }}</span></td>
+          <td><span class="price">{{ format_shop_price($item->productSku->price) }}</span></td>
           <td>
             <div class="amount-group">
               <button type="button" class="btn btn-default btn-amount-minus" @if(!$item->productSku->product->on_sale) disabled @endif>-</button>
@@ -118,19 +118,19 @@
               </div>
               <div class="summary-line">
                 <span>{{ trans('frontend.cart.products_total') }}</span>
-                <strong><span class="money-prefix">@if(is_site_mode_a())JPY ¥@else￥@endif</span><span id="settlement-products-total">0.00</span></strong>
+                <strong><span id="settlement-products-total">{{ is_site_mode_a() ? '0.00日元' : '￥0.00' }}</span></strong>
               </div>
                <div class="summary-line">
                  <span>{{ trans('frontend.cart.service_fee') }}</span>
-                 <strong><span class="money-prefix">@if(is_site_mode_a())JPY ¥@else￥@endif</span><span id="settlement-service-fee">0.00</span></strong>
+                 <strong><span id="settlement-service-fee">{{ is_site_mode_a() ? '0.00日元' : '￥0.00' }}</span></strong>
                </div>
                <div class="summary-line">
                  <span>{{ trans('frontend.cart.packaging_fee') }}</span>
-                 <strong><span class="money-prefix">@if(is_site_mode_a())JPY ¥@else￥@endif</span><span id="settlement-packaging-fee">0.00</span></strong>
+                 <strong><span id="settlement-packaging-fee">{{ is_site_mode_a() ? '0.00日元' : '￥0.00' }}</span></strong>
                </div>
               <div class="summary-line" id="settlement-ems-fee-line">
                 <span>{{ trans('frontend.cart.ems_shipping_fee') }}</span>
-                <strong><span class="money-prefix">@if(is_site_mode_a())JPY ¥@else￥@endif</span><span id="settlement-ems-shipping-fee">0.00</span></strong>
+                <strong><span id="settlement-ems-shipping-fee">{{ is_site_mode_a() ? '0.00日元' : '￥0.00' }}</span></strong>
               </div>
               <div class="summary-line text-muted" style="font-size:12px;" id="settlement-tobacco-hint">
                 单笔限：香烟 ≤ {{ $tobaccoLimits['max_boxes'] }} 盒/包、香烟+加热烟 ≤ {{ $tobaccoLimits['max_sticks'] }} 支，手卷烟丝 ≤ {{ round($tobaccoLimits['max_rolling_grams'] / 1000, 1) }}kg；EMS 计费上限 {{ round($tobaccoLimits['max_billable_grams'] / 1000, 1) }}kg
@@ -138,7 +138,7 @@
               <div class="summary-line text-muted" style="font-size:12px;" id="settlement-tobacco-progress"></div>
               <div class="summary-line summary-line-payable">
                 <span>{{ trans('frontend.cart.payable_amount') }}@if(is_site_mode_a())（日元）@endif</span>
-                <strong><span class="money-prefix">@if(is_site_mode_a())JPY ¥@else￥@endif</span><span id="settlement-payable">0.00</span></strong>
+                <strong><span id="settlement-payable">{{ is_site_mode_a() ? '0.00日元' : '￥0.00' }}</span></strong>
               </div>
               <p class="text-danger" id="settlement-error" style="display:none; margin-top:8px; font-size:13px;"></p>
             </div>
@@ -198,7 +198,8 @@
     }
 
     function formatMoney(value) {
-      return (Math.round(value * 100) / 100).toFixed(2);
+      var n = (Math.round(value * 100) / 100).toFixed(2);
+      return IS_SITE_MODE_A ? n + '日元' : '￥' + n;
     }
 
 
@@ -254,7 +255,6 @@
         $('#settlement-packaging-fee').text(formatMoney(PACKAGING_FEE));
         $('#settlement-ems-shipping-fee').text(formatMoney(emsFee));
         $('#settlement-payable').text(formatMoney(payable));
-        $('#settlement-weight-grams').text('—');
         $('#settlement-error').hide();
         $('.btn-create-order').prop('disabled', false);
         return;
@@ -272,7 +272,6 @@
           $('#settlement-packaging-fee').text(formatMoney(data.packaging_fee || 0));
           $('#settlement-ems-shipping-fee').text(formatMoney(data.ems_shipping_fee || 0));
           $('#settlement-payable').text(formatMoney(data.payable || 0));
-          $('#settlement-weight-grams').text(data.total_weight_grams || 0);
           if (data.shipping_mode_label) {
             $('#settlement-shipping-mode-line').show();
             $('#settlement-shipping-mode').text(data.shipping_mode_label);
@@ -281,10 +280,8 @@
           }
           if (data.shipping_mode === 'tax_included') {
             $('#settlement-ems-fee-line').hide();
-            $('#settlement-weight-line').hide();
           } else {
             $('#settlement-ems-fee-line').show();
-            $('#settlement-weight-line').show();
           }
           var progress = [];
           if (typeof data.total_cigarette_sticks === 'number') {
@@ -310,7 +307,6 @@
           $('#settlement-packaging-fee').text('0.00');
           $('#settlement-ems-shipping-fee').text('0.00');
           $('#settlement-payable').text(formatMoney(data.payable || data.products_total || 0));
-          $('#settlement-weight-grams').text(data.total_weight_grams || '—');
           $('#settlement-tobacco-progress').text('');
           $('#settlement-error').show().text(data.message || '{{ trans('frontend.js.operation_failed_retry') }}');
           $('.btn-create-order').prop('disabled', true);

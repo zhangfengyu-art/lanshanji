@@ -17,7 +17,7 @@
                   <img src="{{ $product->image_url }}" alt="">
                 </a>
               </div>
-              <div class="price"><b>￥</b>{{ $product->price }}</div>
+              <div class="price">{{ format_shop_price($product->price) }}</div>
               <a href="{{ route('products.show', ['product' => $product->id]) }}">{{ $product->title }}</a>
             </div>
             <div class="bottom">

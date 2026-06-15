@@ -386,3 +386,23 @@ function apply_list_sort_order($query, $table = null)
 
     return $query->orderBy($table.'.id', 'asc');
 }
+
+/**
+ * 日元金额展示：420.00日元
+ */
+function format_jpy_price($amount, $decimals = 2)
+{
+    return number_format((float) $amount, $decimals, '.', '').'日元';
+}
+
+/**
+ * 前台商品价格：A 站为日元后缀，B 站为人民币前缀。
+ */
+function format_shop_price($amount, $decimals = 2)
+{
+    if (is_site_mode_a()) {
+        return format_jpy_price($amount, $decimals);
+    }
+
+    return '￥'.number_format((float) $amount, $decimals, '.', '');
+}

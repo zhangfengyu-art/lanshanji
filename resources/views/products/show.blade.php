@@ -70,9 +70,7 @@
       </div>
 
       <div class="pricing-section">
-        <div class="price-display">
-          <span class="currency">¥</span><span class="amount">{{ $product->price }}</span>
-        </div>
+        <div class="price-display">{{ format_shop_price($product->price) }}</div>
       </div>
 
       @if($product->skus->count() > 1)
@@ -148,6 +146,10 @@
     var jsI18n = @json(trans('frontend.js'));
     var defaultAddText = $('.btn-add-to-cart').text();
     var defaultBuyText = $('.btn-buy-now').text();
+
+    function formatShopPrice(value) {
+      return window.formatShopPrice(value);
+    }
 
     function getSelectedSkuId() {
       var checkedSkuId = $('input[name=skus]:checked').val();
@@ -303,7 +305,7 @@
 
     $('input[name=skus]').on('change', function () {
       var $activeSku = $(this).closest('.sku-option');
-      $('.price-display .amount').text($activeSku.data('price'));
+      $('.price-display').text(formatShopPrice($activeSku.data('price')));
       var description = String($activeSku.data('description') || '').trim();
       if (!description) {
         description = '{{ addslashes(trans('frontend.product.subtitle')) }}';

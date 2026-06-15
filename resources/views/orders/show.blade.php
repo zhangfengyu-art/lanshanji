@@ -31,7 +31,6 @@
   $amountJpy = $order->getAmountJpy();
   $amountCny = $order->getPaymentAmountCny();
   $exchangeRate = $order->getExchangeRateJpyPerCny();
-  $moneySymbol = is_site_mode_a() ? 'JPY ¥' : '￥';
   $fulfillmentStage = $order->fulfillment_stage;
   $fulfillmentStageLabel = $order->fulfillment_stage_label;
   $canChangeAddress = $order->canSelfChangeAddress();
@@ -176,7 +175,7 @@
         @endif
 
         <div class="amount-label">{{ trans('frontend.cart.payable_amount') }}@if(is_site_mode_a())（日元）@endif</div>
-        <div class="amount-value">{{ $moneySymbol }}{{ number_format($amountJpy, 2, '.', '') }}</div>
+        <div class="amount-value">{{ format_shop_price($amountJpy) }}</div>
         @if(is_site_mode_a() && !$isPaid && !$isClosed)
           <div class="meta-lines" style="margin-top: 6px;">约合 ￥{{ number_format($amountCny, 2, '.', '') }}（汇率 1 人民币 = {{ number_format($exchangeRate, 2, '.', '') }} 日元）</div>
           <div class="meta-lines">{{ trans('frontend.order.payment_redirect_hint') }}</div>
@@ -237,9 +236,9 @@
                 <div class="item-sku">{{ $skuTitle }}</div>
               </div>
 
-              <div class="metric price">￥{{ number_format($item->price, 2, '.', '') }}</div>
+              <div class="metric price">{{ format_shop_price($item->price) }}</div>
               <div class="metric qty">x {{ (int) $item->amount }}</div>
-              <div class="metric subtotal">￥{{ number_format($item->price * $item->amount, 2, '.', '') }}</div>
+              <div class="metric subtotal">{{ format_shop_price($item->price * $item->amount) }}</div>
             </article>
           @endforeach
         </div>
@@ -252,23 +251,23 @@
           <div class="side-body settlement-breakdown">
             <div class="settlement-row">
               <span class="settlement-label">商品费</span>
-              <span class="value">￥{{ number_format($goodsAmount, 2, '.', '') }}</span>
+              <span class="value">{{ format_shop_price($goodsAmount) }}</span>
             </div>
             <div class="settlement-row">
               <span class="settlement-label">劳务费</span>
-              <span class="value">￥{{ number_format($serviceFee, 2, '.', '') }}</span>
+              <span class="value">{{ format_shop_price($serviceFee) }}</span>
             </div>
             <div class="settlement-row">
               <span class="settlement-label">国际运费</span>
-              <span class="value">￥{{ number_format($emsShippingFee, 2, '.', '') }}</span>
+              <span class="value">{{ format_shop_price($emsShippingFee) }}</span>
             </div>
             <div class="settlement-row">
               <span class="settlement-label">打包费</span>
-              <span class="value">￥{{ number_format($packagingFee, 2, '.', '') }}</span>
+              <span class="value">{{ format_shop_price($packagingFee) }}</span>
             </div>
             <div class="settlement-row settlement-total">
               <span class="settlement-label">应付总额</span>
-              <span class="value">{{ $moneySymbol }}{{ number_format($amountJpy, 2, '.', '') }}</span>
+              <span class="value">{{ format_shop_price($amountJpy) }}</span>
             </div>
           </div>
         </section>

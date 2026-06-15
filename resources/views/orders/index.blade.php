@@ -58,10 +58,10 @@
                   </div>
                   @endif
                 </td>
-                <td class="sku-price text-center">￥{{ $item->price }}</td>
+                <td class="sku-price text-center">{{ format_shop_price($item->price) }}</td>
                 <td class="sku-amount text-center">{{ $item->amount }}</td>
                 @if($index === 0)
-                <td rowspan="{{ count($order->items) }}" class="text-center total-amount">￥{{ $order->total_amount }}</td>
+                <td rowspan="{{ count($order->items) }}" class="text-center total-amount">{{ format_shop_price($order->total_amount) }}</td>
                 @php
                   $displayStatus = $order->display_status;
                   $statusClass = 'status-neutral';

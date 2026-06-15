@@ -24,6 +24,11 @@ const app = new Vue({
     el: '#app'
 });
 
+window.formatShopPrice = function (value) {
+    var n = (Math.round(parseFloat(value) * 100) / 100).toFixed(2);
+    return window.AppSiteModeA ? n + '日元' : '￥' + n;
+};
+
 $(function () {
     var i18n = window.AppI18n || {};
     var cartI18n = window.AppI18nCart || {};
@@ -123,7 +128,7 @@ $(function () {
                 '<div class="mini-cart-item__meta">' +
                 '<a class="mini-cart-item__title" href="' + item.product_url + '">' + item.title + '</a>' +
                 '<div class="mini-cart-item__sku">' + item.sku_title + '</div>' +
-                '<div class="mini-cart-item__price">￥' + item.price + '</div>' +
+                '<div class="mini-cart-item__price">' + window.formatShopPrice(item.price) + '</div>' +
                 '<div class="mini-cart-item__actions" data-sku-id="' + item.sku_id + '" data-stock="' + stock + '">' +
                 '<button type="button" class="mini-cart-item__btn" data-mini-cart-minus>-</button>' +
                 '<span class="mini-cart-item__qty">x' + item.amount + '</span>' +

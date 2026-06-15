@@ -74,7 +74,7 @@
                   <div class="product-rating{{ $skuDescription === '' ? ' is-empty' : '' }}" aria-label="SKU描述">{{ $skuDescription }}</div>
                 </div>
                 <div class="product-card-commerce">
-                <div class="product-price {{ $isDepleted ? 'is-depleted' : '' }}"><span class="currency">¥</span>{{ number_format($product->price, 2, '.', '') }}</div>
+                <div class="product-price {{ $isDepleted ? 'is-depleted' : '' }}">{{ format_shop_price($product->price) }}</div>
                 @if($isLimited && $limitQty > 0)
                   <p class="limit-note">{{ trans('frontend.product.limit_per_order', ['count' => $limitQty]) }}</p>
                 @else

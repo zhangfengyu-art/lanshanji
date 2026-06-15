@@ -82,6 +82,7 @@
     <script>
         window.AppI18n = @json(trans('frontend.js'));
         window.AppI18nCart = @json(trans('frontend.cart'));
+        window.AppSiteModeA = @json(is_site_mode_a());
     </script>
     <script src="{{ asset('js/app.js') }}@if(file_exists(public_path('js/app.js')))?v={{ filemtime(public_path('js/app.js')) }}@endif"></script>
     @yield('scriptsAfterJs')
