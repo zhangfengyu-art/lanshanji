@@ -2,19 +2,21 @@
 
 namespace App\Services\Ribenyan;
 
+use App\Services\ProductWeightInferenceService;
+
 class ProductImportLogisticsInferrer
 {
+    protected $weightInference;
+
+    public function __construct(ProductWeightInferenceService $weightInference)
+    {
+        $this->weightInference = $weightInference;
+    }
+
     public function infer($title, $subtitle, $tobaccoType)
     {
         $text = trim((string) $title.' '.(string) $subtitle);
-        $weight = 20;
         $sticks = null;
-
-        if (preg_match('/(\d+)\s*g装/ui', $text, $m)) {
-            $weight = (int) $m[1];
-        } elseif (preg_match('/(\d+)\s*g(?:\s|装|$)/ui', $text, $m)) {
-            $weight = (int) $m[1];
-        }
 
         if (\App\Services\OrderTobaccoLimitService::countsTowardStickLimit($tobaccoType)) {
             if (preg_match('/(\d+)\s*支/ui', $text, $m)) {
@@ -23,6 +25,8 @@ class ProductImportLogisticsInferrer
                 $sticks = 20;
             }
         }
+
+        $weight = $this->weightInference->inferUnitWeightGrams($title, $subtitle, $tobaccoType, $sticks);
 
         return [
             'unit_weight_grams' => max(1, $weight),

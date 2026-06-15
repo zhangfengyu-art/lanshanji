@@ -21,7 +21,7 @@ if (!is_dir($outputDir)) {
 $scraper = new RibenyanScraper(
     new RibenyanHttpClient(),
     new RibenyanProductListParser(),
-    new ProductImportLogisticsInferrer(),
+    app(ProductImportLogisticsInferrer::class),
     new ImageJpegConverter()
 );
 
