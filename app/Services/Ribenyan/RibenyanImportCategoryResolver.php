@@ -25,7 +25,10 @@ class RibenyanImportCategoryResolver
 
         $child = Category::query()
             ->where('parent_id', $root->id)
-            ->where('name', $childName)
+            ->where(function ($query) use ($childName) {
+                $query->where('name', $childName)
+                    ->orWhere('name', $childName.' EMS直邮');
+            })
             ->first();
 
         if ($child) {
@@ -65,11 +68,6 @@ class RibenyanImportCategoryResolver
 
     protected function formatBrandCategoryName($brand)
     {
-        $brand = preg_replace('/\s*\/\s*/', ' / ', trim($brand));
-        if (stripos($brand, 'EMS') === false) {
-            $brand .= ' EMS直邮';
-        }
-
-        return $brand;
+        return preg_replace('/\s*\/\s*/', ' / ', trim($brand));
     }
 }
