@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Product;
+use App\Services\OrderTobaccoLimitService;
 use App\Services\ProductWeightInferenceService;
 
 require __DIR__.'/../vendor/autoload.php';
@@ -13,11 +14,36 @@ $apply = in_array('--apply', $argv, true);
 $onlyDefault20 = in_array('--only-20', $argv, true);
 $exportPath = null;
 
+$scope = 'rolling';
+if (in_array('--all-types', $argv, true)) {
+    $scope = 'all';
+} elseif (in_array('--cigarette-only', $argv, true)) {
+    $scope = 'cigarette';
+} elseif (in_array('--heated-only', $argv, true)) {
+    $scope = 'heated';
+} elseif (in_array('--rolling-only', $argv, true)) {
+    $scope = 'rolling';
+}
+
 foreach ($argv as $arg) {
     if (strpos($arg, '--export=') === 0) {
         $exportPath = substr($arg, 9);
     }
 }
+
+$scopeLabels = [
+    'rolling' => '仅手卷烟丝 (rolling_tobacco)',
+    'cigarette' => '仅香烟 (cigarette)',
+    'heated' => '仅加热烟 (heated_tobacco)',
+    'all' => '全部烟草类型（慎用）',
+];
+
+echo '范围: '.($scopeLabels[$scope] ?? $scope)."\n";
+echo $apply ? "模式: 写入数据库\n" : "模式: 预览（不加 --apply 不会改库）\n";
+if ($onlyDefault20) {
+    echo "附加过滤: 仅处理当前重量为 20g 的商品\n";
+}
+echo "\n";
 
 $service = app(ProductWeightInferenceService::class);
 
@@ -30,12 +56,18 @@ Product::query()->orderBy('id')->chunk(200, function ($products) use (
     $service,
     $apply,
     $onlyDefault20,
+    $scope,
     &$updated,
     &$skipped,
     &$unchanged,
     &$rows
 ) {
     foreach ($products as $product) {
+        if (!matchesScope($product, $scope)) {
+            $skipped++;
+            continue;
+        }
+
         $oldWeight = (int) $product->unit_weight_grams;
 
         if ($onlyDefault20 && $oldWeight !== 20) {
@@ -43,12 +75,16 @@ Product::query()->orderBy('id')->chunk(200, function ($products) use (
             continue;
         }
 
-        $newWeight = $service->inferUnitWeightGrams(
-            $product->title,
-            '',
-            $product->tobacco_type,
-            $product->unit_sticks
-        );
+        if ($scope === 'rolling') {
+            $newWeight = $service->inferShagWeightGrams($product->title);
+        } else {
+            $newWeight = $service->inferUnitWeightGrams(
+                $product->title,
+                '',
+                $product->tobacco_type,
+                $product->unit_sticks
+            );
+        }
 
         $rows[] = [
             'id' => $product->id,
@@ -100,8 +136,27 @@ if ($apply) {
     echo "已更新: {$updated}\n";
 } else {
     echo "预览将变更: {$updated}\n";
-    echo "确认后执行: php scripts/reinfer_product_weights.php --apply\n";
-    echo "仅改当前为 20g 的: php scripts/reinfer_product_weights.php --only-20 --apply\n";
+    echo "手卷烟丝: php scripts/reinfer_product_weights.php --apply\n";
+    echo "恢复香烟重量: php scripts/reinfer_product_weights.php --cigarette-only --apply\n";
+    echo "恢复加热烟: php scripts/reinfer_product_weights.php --heated-only --apply\n";
 }
 echo "无变化: {$unchanged}\n";
 echo "跳过: {$skipped}\n";
+
+function matchesScope(Product $product, $scope)
+{
+    $type = (string) $product->tobacco_type;
+
+    switch ($scope) {
+        case 'rolling':
+            return $type === OrderTobaccoLimitService::TYPE_ROLLING_TOBACCO;
+        case 'cigarette':
+            return $type === OrderTobaccoLimitService::TYPE_CIGARETTE;
+        case 'heated':
+            return $type === OrderTobaccoLimitService::TYPE_HEATED_TOBACCO;
+        case 'all':
+            return true;
+        default:
+            return false;
+    }
+}

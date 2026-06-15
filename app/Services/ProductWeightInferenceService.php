@@ -28,6 +28,14 @@ class ProductWeightInferenceService
         return 26;
     }
 
+    /**
+     * 仅手卷烟丝（Shag）重量推断，供批量脚本专用。
+     */
+    public function inferShagWeightGrams($title, $subtitle = '')
+    {
+        return $this->inferRollingTobaccoWeight(trim((string) $title.' '.(string) $subtitle));
+    }
+
     protected function inferRollingTobaccoWeight($text)
     {
         $explicit = $this->parseExplicitGrams($text);
@@ -35,35 +43,41 @@ class ProductWeightInferenceService
             return $explicit;
         }
 
+        $config = config('shag_weight_inference', []);
+        $tiers = $config['brand_tiers'] ?? [];
+
+        foreach ($tiers as $tier) {
+            if ($this->matchesShagTier($text, $tier)) {
+                return (int) $tier['grams'];
+            }
+        }
+
         if ($this->matchesRollingTinPackaging($text)) {
-            return 100;
+            return (int) ($config['tin_default_grams'] ?? 100);
         }
 
         if ($this->matchesKizamiBoxPackaging($text)) {
             return 10;
         }
 
-        if ($this->matchesBrand($text, ['ゴールデンバージニア', 'Golden Virginia', 'GV', 'ドラム', 'DRUM', 'バリシャグ', 'Bali Shag'])) {
-            return 50;
+        return (int) ($config['default_grams'] ?? 25);
+    }
+
+    protected function matchesShagTier($text, array $tier)
+    {
+        if (!$this->matchesBrand($text, $tier['needles'] ?? [])) {
+            return false;
         }
 
-        if ($this->matchesBrand($text, ['コルツ', 'COLTS', 'アンバーリーフ', 'Amber Leaf', 'ペペ', 'Pepe', 'マックバレン', 'Mac Baren', 'MAC BAREN'])) {
-            return 30;
+        if (!empty($tier['require']) && !preg_match($tier['require'], $text)) {
+            return false;
         }
 
-        if ($this->matchesBrand($text, ['キャメル', 'Camel', 'チェ', 'Che', 'ソブラニー', 'Sobranie', '寿百年'])) {
-            if ($this->looksLikeCigaretteProduct($text)) {
-                return 26;
-            }
-
-            return 25;
+        if (!empty($tier['exclude']) && preg_match($tier['exclude'], $text)) {
+            return false;
         }
 
-        if (preg_match('/(パウチ|pouch|シャグ|shag|手卷|手捲)/ui', $text)) {
-            return 30;
-        }
-
-        return 30;
+        return true;
     }
 
     protected function inferStickPackWeight($text, $unitSticks)
@@ -162,18 +176,12 @@ class ProductWeightInferenceService
 
     protected function matchesRollingTinPackaging($text)
     {
-        return (bool) preg_match('/(缶入|缶|罐装|铁罐|tin)/ui', $text);
+        return (bool) preg_match('/(缶入|缶|罐装|铁罐|tin|can|筒装)/ui', $text);
     }
 
     protected function matchesKizamiBoxPackaging($text)
     {
         return (bool) preg_match('/(小粋|こいき|宝船|たからぶね|刻み|箱入|箱装)/ui', $text);
-    }
-
-    protected function looksLikeCigaretteProduct($text)
-    {
-        return (bool) preg_match('/(硬盒|软盒|ボックス|box|盒|支装|カートン)/ui', $text)
-            && !preg_match('/(シャグ|shag|パウチ|pouch)/ui', $text);
     }
 
     protected function matchesBrand($text, array $needles)
