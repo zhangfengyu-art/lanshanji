@@ -69,11 +69,18 @@
         <div class="form-group">
           <label class="control-label col-sm-3">{{ is_site_mode_b() ? '国内转寄地址（Domestic Forwarding Address）' : trans('frontend.cart.select_address') }}</label>
           <div class="col-sm-9 col-md-7">
-            <select class="form-control" name="address">
-              @foreach($addresses as $address)
-                <option value="{{ $address->id }}">{{ $address->is_default ? '[默认] ' : '' }}{{ $address->full_address }} {{ $address->contact_name }} {{ $address->contact_phone }}</option>
-              @endforeach
-            </select>
+            <div class="cart-address-actions">
+              <select class="form-control" name="address" id="cart-address-select" @if($addresses->isEmpty()) disabled @endif>
+                @if($addresses->isEmpty())
+                  <option value="">{{ trans('frontend.cart.no_address_placeholder') }}</option>
+                @else
+                  @foreach($addresses as $address)
+                    <option value="{{ $address->id }}" @if($address->is_default) selected @endif>{{ $address->is_default ? '[默认] ' : '' }}{{ $address->full_address }} {{ $address->contact_name }} {{ $address->contact_phone }}</option>
+                  @endforeach
+                @endif
+              </select>
+              <a class="btn btn-default cart-address-actions__btn" href="{{ route('user_addresses.create', ['redirect' => request()->getRequestUri()]) }}">{{ trans('frontend.cart.add_address') }}</a>
+            </div>
             @if(is_site_mode_b())
               <span class="help-block">请确保填写准确，代购人在完成境外代买并入境后，将通过国内顺丰/邮政转寄至此地址。</span>
             @endif
@@ -167,6 +174,31 @@
     var buyNowSku = parseInt(urlParams.get('buy_now_sku'), 10);
     var buyNowAmount = parseInt(urlParams.get('buy_now_amount'), 10);
     var isBuyNowMode = !isNaN(buyNowSku) && buyNowSku > 0;
+    var createAddressUrl = '{{ route('user_addresses.create', ['redirect' => request()->getRequestUri()]) }}';
+
+    function promptAddShippingAddress() {
+      swal({
+        title: '{{ trans('frontend.cart.address_required_title') }}',
+        text: '{{ trans('frontend.cart.address_required_text') }}',
+        icon: 'warning',
+        buttons: {
+          cancel: '{{ trans('frontend.cart.address_required_cancel') }}',
+          confirm: {
+            text: '{{ trans('frontend.cart.address_required_confirm') }}',
+            value: true,
+          },
+        },
+      }).then(function (confirmed) {
+        if (confirmed) {
+          location.href = createAddressUrl;
+        }
+      });
+    }
+
+    function getSelectedAddressId() {
+      var value = $('#order-form').find('select[name=address]').val();
+      return value ? String(value).trim() : '';
+    }
 
     function formatMoney(value) {
       return (Math.round(value * 100) / 100).toFixed(2);
@@ -460,6 +492,11 @@
         return;
       }
 
+      if (!getSelectedAddressId()) {
+        promptAddShippingAddress();
+        return;
+      }
+
       axios.post('{{ route('orders.store') }}', req)
         .then(function (response) {
           swal('{{ trans('frontend.js.order_submitted_success') }}', '', 'success')
@@ -468,9 +505,14 @@
             });
         }, function (error) {
           if (error.response.status === 422) {
+            var errors = error.response.data.errors || {};
+            if (errors.address_id) {
+              promptAddShippingAddress();
+              return;
+            }
             // http 状态码为 422 代表用户输入校验失败
             var html = '<div>';
-            _.each(error.response.data.errors, function (errors) {
+            _.each(errors, function (errors) {
               _.each(errors, function (error) {
                 html += error+'<br>';
               })

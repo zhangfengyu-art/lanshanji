@@ -2072,6 +2072,22 @@ html {
     opacity: .45;
   }
 
+  .cart-address-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    select {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .cart-address-actions__btn {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+  }
+
   .cart-checkout-summary {
     border: 1px solid #eeeeee;
     background: #fafafa;

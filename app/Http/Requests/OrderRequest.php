@@ -82,4 +82,19 @@ class OrderRequest extends Request
         
         return $rules;
     }
+
+    public function attributes()
+    {
+        return [
+            'address_id' => '收货地址',
+        ];
+    }
+
+    public function messages()
+    {
+        return [
+            'address_id.required' => '请先选择或添加收货地址。',
+            'address_id.exists' => '收货地址无效，请重新选择或新建。',
+        ];
+    }
 }

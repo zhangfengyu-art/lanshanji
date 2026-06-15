@@ -103,5 +103,6 @@ return [
         'disable_email_verification_for_testing' => '邮箱验证测试开关',
         'express_company' => '物流公司/代购人',
         'express_no' => '物流单号/转寄单号',
+        'address_id' => '收货地址',
     ],
 ];
