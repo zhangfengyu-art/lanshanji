@@ -77,6 +77,8 @@ Product::query()->orderBy('id')->chunk(200, function ($products) use (
 
         if ($scope === 'rolling') {
             $newWeight = $service->inferShagWeightGrams($product->title);
+        } elseif ($scope === 'cigarette') {
+            $newWeight = $service->inferCigaretteWeightGrams($product->title, $product->unit_sticks);
         } else {
             $newWeight = $service->inferUnitWeightGrams(
                 $product->title,

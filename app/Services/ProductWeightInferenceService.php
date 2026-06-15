@@ -16,7 +16,11 @@ class ProductWeightInferenceService
             return $this->inferRollingTobaccoWeight($text);
         }
 
-        if (OrderTobaccoLimitService::countsTowardStickLimit($type)) {
+        if ($type === OrderTobaccoLimitService::TYPE_CIGARETTE) {
+            return $this->inferCigaretteWeight($text, $unitSticks);
+        }
+
+        if ($type === OrderTobaccoLimitService::TYPE_HEATED_TOBACCO) {
             return $this->inferStickPackWeight($text, $unitSticks);
         }
 
@@ -34,6 +38,14 @@ class ProductWeightInferenceService
     public function inferShagWeightGrams($title, $subtitle = '')
     {
         return $this->inferRollingTobaccoWeight(trim((string) $title.' '.(string) $subtitle));
+    }
+
+    /**
+     * 仅成品纸卷烟重量推断，供批量脚本专用。
+     */
+    public function inferCigaretteWeightGrams($title, $unitSticks = null, $subtitle = '')
+    {
+        return $this->inferCigaretteWeight(trim((string) $title.' '.(string) $subtitle), $unitSticks);
     }
 
     protected function inferRollingTobaccoWeight($text)
@@ -80,6 +92,66 @@ class ProductWeightInferenceService
         return true;
     }
 
+    protected function inferCigaretteWeight($text, $unitSticks)
+    {
+        $explicit = $this->parseExplicitGrams($text);
+        if ($explicit !== null && !$this->looksLikeTarMg($text, $explicit)) {
+            return $explicit;
+        }
+
+        if (preg_match(config('cigarette_weight_inference.cigarillo_pattern', '/(小雪茄)/ui'), $text)) {
+            $sticks = $this->resolveStickCount($text, $unitSticks);
+
+            return max(15, (int) round($sticks * 1.2 + 8));
+        }
+
+        $sticks = $this->resolveStickCount($text, $unitSticks);
+        $config = config('cigarette_weight_inference', []);
+
+        foreach ($config['product_rules'] ?? [] as $rule) {
+            if ($this->matchesCigaretteRule($text, $sticks, $rule)) {
+                return (int) $rule['grams'];
+            }
+        }
+
+        $isCan = $this->matchesPattern($text, $config['can_pattern'] ?? '');
+        $isMini = $this->matchesPattern($text, $config['mini_pattern'] ?? '') || $sticks === 10;
+        $isSoft = $this->matchesPattern($text, $config['soft_pattern'] ?? '');
+        $isBox = $this->matchesPattern($text, $config['box_pattern'] ?? '');
+        $isSlim = $this->matchesPattern($text, $config['slim_pattern'] ?? '');
+        $profiles = $config['stick_profiles'] ?? [];
+
+        if ($isCan && $sticks >= 50) {
+            return (int) ($profiles[50]['can'] ?? $profiles[50]['default'] ?? 140);
+        }
+
+        if ($sticks === 10 || $isMini) {
+            return (int) ($profiles[10]['mini'] ?? $profiles[10]['default'] ?? 12);
+        }
+
+        if (isset($profiles[$sticks]) && !is_array($profiles[$sticks])) {
+            return (int) $profiles[$sticks];
+        }
+
+        if ($sticks === 20) {
+            $profile = $profiles[20] ?? [];
+            $softGrams = (int) ($profile['soft'] ?? $config['default_soft_grams'] ?? 23);
+            $boxGrams = (int) ($profile['box'] ?? $config['default_box_grams'] ?? 26);
+
+            if ($isSoft && !$isBox) {
+                return $isSlim ? max(1, $softGrams - 1) : $softGrams;
+            }
+
+            return $isSlim ? max(1, $boxGrams - 3) : $boxGrams;
+        }
+
+        if ($sticks === 50) {
+            return (int) ($profiles[50]['can'] ?? $profiles[50]['default'] ?? 140);
+        }
+
+        return $this->weightBySticks($sticks, $isSlim ? -3 : 0);
+    }
+
     protected function inferStickPackWeight($text, $unitSticks)
     {
         $explicit = $this->parseExplicitGrams($text);
@@ -87,14 +159,7 @@ class ProductWeightInferenceService
             return $explicit;
         }
 
-        $sticks = (int) $unitSticks;
-        if ($sticks < 1) {
-            if (preg_match('/(\d+)\s*支/ui', $text, $m)) {
-                $sticks = (int) $m[1];
-            } else {
-                $sticks = 20;
-            }
-        }
+        $sticks = $this->resolveStickCount($text, $unitSticks);
 
         if (preg_match('/(罐装|缶入|铁盒|罐|听装)/ui', $text) && $sticks >= 40) {
             if (preg_match('/(\d+)\s*支/ui', $text, $m) && (int) $m[1] >= 40) {
@@ -193,5 +258,45 @@ class ProductWeightInferenceService
         }
 
         return false;
+    }
+
+    protected function resolveStickCount($text, $unitSticks)
+    {
+        $sticks = (int) $unitSticks;
+        if ($sticks < 1) {
+            if (preg_match('/(\d+)\s*(?:支|本)/ui', $text, $m)) {
+                $sticks = (int) $m[1];
+            } else {
+                $sticks = (int) config('cigarette_weight_inference.default_sticks', 20);
+            }
+        }
+
+        return $sticks;
+    }
+
+    protected function matchesCigaretteRule($text, $sticks, array $rule)
+    {
+        if (!$this->matchesBrand($text, $rule['needles'] ?? [])) {
+            return false;
+        }
+
+        if (isset($rule['sticks']) && (int) $rule['sticks'] !== $sticks) {
+            return false;
+        }
+
+        if (!empty($rule['require']) && !preg_match($rule['require'], $text)) {
+            return false;
+        }
+
+        if (!empty($rule['exclude']) && preg_match($rule['exclude'], $text)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function matchesPattern($text, $pattern)
+    {
+        return $pattern !== '' && (bool) preg_match($pattern, $text);
     }
 }
