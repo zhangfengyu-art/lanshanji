@@ -128,13 +128,9 @@
                  <span>{{ trans('frontend.cart.packaging_fee') }}</span>
                  <strong><span class="money-prefix">@if(is_site_mode_a())JPY ¥@else￥@endif</span><span id="settlement-packaging-fee">0.00</span></strong>
                </div>
-               <div class="summary-line" id="settlement-ems-fee-line">
-                 <span>{{ trans('frontend.cart.ems_shipping_fee') }}</span>
-                 <strong><span class="money-prefix">@if(is_site_mode_a())JPY ¥@else￥@endif</span><span id="settlement-ems-shipping-fee">0.00</span></strong>
-               </div>
-              <div class="summary-line" id="settlement-weight-line">
-                <span>计费重量（EMS）</span>
-                <strong><span id="settlement-weight-grams">0</span> g</strong>
+              <div class="summary-line" id="settlement-ems-fee-line">
+                <span>{{ trans('frontend.cart.ems_shipping_fee') }}</span>
+                <strong><span class="money-prefix">@if(is_site_mode_a())JPY ¥@else￥@endif</span><span id="settlement-ems-shipping-fee">0.00</span></strong>
               </div>
               <div class="summary-line text-muted" style="font-size:12px;" id="settlement-tobacco-hint">
                 单笔限：香烟 ≤ {{ $tobaccoLimits['max_boxes'] }} 盒/包、香烟+加热烟 ≤ {{ $tobaccoLimits['max_sticks'] }} 支，手卷烟丝 ≤ {{ round($tobaccoLimits['max_rolling_grams'] / 1000, 1) }}kg；EMS 计费上限 {{ round($tobaccoLimits['max_billable_grams'] / 1000, 1) }}kg
@@ -238,7 +234,6 @@
         $('#settlement-packaging-fee').text('0.00');
         $('#settlement-ems-shipping-fee').text('0.00');
         $('#settlement-payable').text('0.00');
-        $('#settlement-weight-grams').text('0');
         $('#settlement-error').hide().text('');
         $('.btn-create-order').prop('disabled', false);
         return;
