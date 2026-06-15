@@ -61,8 +61,8 @@ return [
 
     'soft_pattern' => '/(软包|ソフト|soft|軟包)/ui',
     'box_pattern' => '/(硬盒|硬包|ボックス|box|Box|ハード)/ui',
-    'mini_pattern' => '/(迷你|mini|ミニ|省税|异形)/ui',
+    'mini_pattern' => '/(迷你|ミニ|省税|异形)/ui',
     'can_pattern' => '/(罐装|缶入|铁罐|铁盒|缶|can|tin|听装|筒装)/ui',
     'slim_pattern' => '/(细支|スリム|slim|100\'?s|长支)/ui',
-    'cigarillo_pattern' => '/(小雪茄|シガー|cigarillo)/ui',
+    'cigarillo_pattern' => '/(小雪茄|シガー|cigarillo|Cigar|雪茄|ボヘム|Bohem|宝亨)/ui',
 ];

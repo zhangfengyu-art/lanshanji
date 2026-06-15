@@ -115,7 +115,8 @@ class ProductWeightInferenceService
         }
 
         $isCan = $this->matchesPattern($text, $config['can_pattern'] ?? '');
-        $isMini = $this->matchesPattern($text, $config['mini_pattern'] ?? '') || $sticks === 10;
+        $isCigarillo = $this->matchesPattern($text, $config['cigarillo_pattern'] ?? '');
+        $isMini = !$isCigarillo && ($this->matchesPattern($text, $config['mini_pattern'] ?? '') || $sticks === 10);
         $isSoft = $this->matchesPattern($text, $config['soft_pattern'] ?? '');
         $isBox = $this->matchesPattern($text, $config['box_pattern'] ?? '');
         $isSlim = $this->matchesPattern($text, $config['slim_pattern'] ?? '');
