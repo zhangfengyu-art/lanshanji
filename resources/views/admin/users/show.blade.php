@@ -68,6 +68,7 @@
           <tr>
             <th>收件人</th>
             <th>电话</th>
+            <th>身份证号</th>
             <th>地址</th>
             <th>默认</th>
             <th>最近使用</th>
@@ -78,6 +79,7 @@
             <tr>
               <td>{{ $address->contact_name }}</td>
               <td>{{ $address->contact_phone }}</td>
+              <td>{{ $address->id_card ?: '—' }}</td>
               <td>{{ $address->full_address }} @if($address->zip)（{{ $address->zip }}）@endif</td>
               <td>{{ $address->is_default ? '是' : '否' }}</td>
               <td>{{ $address->last_used_at ? $address->last_used_at->format('Y-m-d H:i') : '—' }}</td>
