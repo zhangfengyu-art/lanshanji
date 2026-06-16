@@ -12,7 +12,7 @@
       <tbody>
       <tr>
         <td>买家：</td>
-        <td>{{ optional($order->user)->name ?: optional($order->user)->email ?: ($order->user_id ? '用户#'.$order->user_id.'（已删除）' : '—') }}</td>
+        <td>{{ $order->buyer_label }}</td>
         <td>支付时间：</td>
         <td>{{ $order->paid_at ? $order->paid_at->format('Y-m-d H:i:s') : '—' }}</td>
       </tr>

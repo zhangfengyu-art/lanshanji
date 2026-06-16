@@ -276,6 +276,27 @@ class Order extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function getBuyerLabelAttribute()
+    {
+        $user = $this->relationLoaded('user') ? $this->getRelation('user') : $this->user;
+
+        if ($user instanceof User) {
+            $name = trim((string) $user->name);
+            if ($name !== '') {
+                return $name;
+            }
+
+            $email = trim((string) $user->email);
+            if ($email !== '') {
+                return $email;
+            }
+
+            return '用户#'.$this->user_id;
+        }
+
+        return $this->user_id ? '用户#'.$this->user_id.'（已删除）' : '—';
+    }
+
     public function items()
     {
         return $this->hasMany(OrderItem::class);
