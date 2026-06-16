@@ -24,9 +24,32 @@ class SiteAfterSaleGroupService
 
     public function qrImageUrl()
     {
-        $path = $this->qrImagePath();
+        if (!Schema::hasTable('site_settings')) {
+            return null;
+        }
 
-        return $path !== '' ? site_setting_image_url($path) : null;
+        $setting = SiteSetting::query()
+            ->where('key', self::KEY_QR_IMAGE)
+            ->first();
+
+        $path = trim((string) optional($setting)->value);
+        if ($path === '') {
+            return null;
+        }
+
+        $url = site_setting_image_url($path);
+        if (!$url) {
+            return null;
+        }
+
+        $version = optional($setting->updated_at)->timestamp ?: time();
+
+        return $url.(strpos($url, '?') !== false ? '&' : '?').'v='.$version;
+    }
+
+    public function shouldShowOnPaidOrder()
+    {
+        return $this->qrImagePath() !== '';
     }
 
     public function noticeText()

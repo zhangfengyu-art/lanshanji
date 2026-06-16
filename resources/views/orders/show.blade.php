@@ -45,8 +45,12 @@
     && $order->refund_status === \App\Models\Order::REFUND_STATUS_PENDING
     && !$canInstantRefund
     && !$useRefundFeedback;
-  $afterSaleGroupQrUrl = $isPaid ? after_sale_group_qr_url() : null;
-  $afterSaleGroupNotice = $isPaid ? after_sale_group_notice() : '';
+  $afterSaleGroupQrUrl = null;
+  $afterSaleGroupNotice = '';
+  if ($isPaid) {
+      $afterSaleGroupQrUrl = after_sale_group_qr_url();
+      $afterSaleGroupNotice = after_sale_group_notice();
+  }
 
   $refundPolicyHint = '';
   if ($isPaid && is_site_mode_a() && $useRefundFeedback) {
@@ -211,11 +215,7 @@
             <a class="pay-btn wechat js-pay-link" data-loading-text="跳转中..." href="{{ route('payment.wechat', ['order' => $order->id]) }}">微信支付</a>
           </div>
         @elseif($afterSaleGroupQrUrl)
-          <div class="after-sale-group-qr" role="region" aria-label="{{ $afterSaleGroupNotice }}">
-            <p class="after-sale-group-qr__title">{{ $afterSaleGroupNotice }}</p>
-            <p class="after-sale-group-qr__hint">{{ trans('frontend.order.after_sale_group_hint') }}</p>
-            <img class="after-sale-group-qr__image" src="{{ $afterSaleGroupQrUrl }}" alt="{{ $afterSaleGroupNotice }}">
-          </div>
+          @include('orders._after_sale_group_qr')
         @endif
       </section>
     </div>
@@ -354,6 +354,10 @@
 
             @if(isset($order->extra['refund_disagree_reason']))
               <div class="kv"><span class="k">拒绝退款理由：</span><span class="v">{{ $order->extra['refund_disagree_reason'] }}</span></div>
+            @endif
+
+            @if($afterSaleGroupQrUrl)
+              @include('orders._after_sale_group_qr', ['afterSaleGroupQrUrl' => $afterSaleGroupQrUrl, 'afterSaleGroupNotice' => $afterSaleGroupNotice])
             @endif
 
             <div class="side-actions">
