@@ -18,6 +18,8 @@
           </div>
         @endif
 
+        @include('user_addresses._identity_notice')
+
         @if (count($errors) > 0)
           <div class="alert alert-danger">
             <ul style="margin: 0; padding-left: 1.2em;">

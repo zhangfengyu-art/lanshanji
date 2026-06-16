@@ -28,6 +28,7 @@
       </div>
     @endif
     <!-- 输出后端报错结束 -->
+    @include('user_addresses._identity_notice')
     <!-- inline-template 代表通过内联方式引入组件 -->
     <user-addresses-create-and-edit inline-template>
       @if($address->id)
