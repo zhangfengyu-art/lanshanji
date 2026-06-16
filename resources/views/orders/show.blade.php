@@ -190,6 +190,12 @@
             <span class="payment-redirect-notice__text">{{ trans('frontend.order.payment_redirect_duration_notice') }}</span>
           </div>
         @endif
+        @if(!$isPaid && !$isClosed)
+          <div class="payment-wechat-scan-notice" role="status">
+            <span class="payment-wechat-scan-notice__icon" aria-hidden="true">i</span>
+            <span class="payment-wechat-scan-notice__text">{{ trans('frontend.order.payment_wechat_scan_notice') }}</span>
+          </div>
+        @endif
 
         @if(!$isPaid && !$isClosed)
           <div class="action-guide">{{ is_site_mode_a() ? trans('frontend.order.next_step_pay_gateway') : trans('frontend.order.next_step_pay') }}</div>
@@ -368,8 +374,11 @@
 @if((!$isPaid && !$isClosed) || $canChangeAddress || $order->ship_status === \App\Models\Order::SHIP_STATUS_DELIVERED || $canInstantRefund || ($useRefundFeedback && $refundFeedbackUrl) || $showLegacyRefundApply)
   <div class="mobile-sticky-actions" aria-label="移动端快捷操作">
     @if(!$isPaid && !$isClosed)
-      <a class="sticky-btn alipay js-pay-link" data-loading-text="跳转中..." href="{{ route('payment.alipay', ['order' => $order->id]) }}">支付宝支付</a>
-      <a class="sticky-btn wechat js-pay-link" data-loading-text="跳转中..." href="{{ route('payment.wechat', ['order' => $order->id]) }}">微信支付</a>
+      <p class="mobile-sticky-wechat-hint">{{ trans('frontend.order.payment_wechat_scan_notice_short') }}</p>
+      <div class="mobile-sticky-pay-row">
+        <a class="sticky-btn alipay js-pay-link" data-loading-text="跳转中..." href="{{ route('payment.alipay', ['order' => $order->id]) }}">支付宝支付</a>
+        <a class="sticky-btn wechat js-pay-link" data-loading-text="跳转中..." href="{{ route('payment.wechat', ['order' => $order->id]) }}">微信支付</a>
+      </div>
     @endif
 
     @if($canChangeAddress)

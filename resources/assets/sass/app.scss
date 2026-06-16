@@ -2566,6 +2566,39 @@ html {
     min-width: 0;
   }
 
+  .payment-wechat-scan-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #f4fbf2;
+    border: 1px solid #c8e6c4;
+    border-left: 3px solid #09bb07;
+    color: #3d5a3d;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .payment-wechat-scan-notice__icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #09bb07;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    font-style: normal;
+    line-height: 18px;
+    text-align: center;
+  }
+
+  .payment-wechat-scan-notice__text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
   .pay-actions {
     margin-top: 12px;
     display: inline-flex;
@@ -3110,7 +3143,7 @@ html {
 
 @media (max-width: 991px) {
   #app.orders-show-page {
-    padding-bottom: 88px;
+    padding-bottom: 112px;
 
     .top-strip,
     .main-grid {
@@ -3179,11 +3212,32 @@ html {
       bottom: 0;
       z-index: 1100;
       display: flex;
-      gap: 8px;
-      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      flex-direction: column;
+      gap: 0;
+      padding: 0 12px calc(10px + env(safe-area-inset-bottom));
       border-top: 1px solid #dfdacd;
       background: rgba(252, 250, 246, .97);
       backdrop-filter: blur(6px);
+    }
+
+    .mobile-sticky-wechat-hint {
+      margin: 0;
+      padding: 8px 4px 6px;
+      color: #3d5a3d;
+      font-size: 11px;
+      line-height: 1.45;
+      text-align: center;
+      border-bottom: 1px solid #e8e4da;
+    }
+
+    .mobile-sticky-pay-row {
+      display: flex;
+      gap: 8px;
+      padding-top: 10px;
+    }
+
+    .mobile-sticky-pay-row .sticky-btn {
+      flex: 1;
     }
 
     .mobile-sticky-actions .sticky-btn {

@@ -139,6 +139,8 @@ return [
         'next_step_pay_gateway' => '下一步：跳转支付页面',
         'payment_redirect_hint' => '支付时将跳转至收银台，按上述汇率以人民币完成支付宝/微信支付。',
         'payment_redirect_duration_notice' => '跳转收银台可能需要约 1 分钟，属正常现象，请耐心等待，勿重复点击支付按钮。',
+        'payment_wechat_scan_notice' => '微信支付建议使用电脑打开本网页扫一扫付款更省事。若使用手机，需两台设备：一台打开付款页面显示付款码，另一台打开微信扫一扫支付。',
+        'payment_wechat_scan_notice_short' => '微信建议电脑扫一扫；手机需双设备（一机显码、一机微信扫一扫）',
         'in_settlement' => '当前订单已进入结算流程',
         'items_list' => '商品清单',
         'shipping_section' => '收货与物流',
