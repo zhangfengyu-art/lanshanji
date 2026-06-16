@@ -33,6 +33,8 @@ class OrdersController extends Controller
 
     public function show(Order $order)
     {
+        $order->load(['user', 'items.product', 'items.productSku']);
+
         return Admin::content(function (Content $content) use ($order) {
             $content->header('查看订单');
             // body 方法可以接受 Laravel 的视图作为参数

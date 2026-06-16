@@ -32,7 +32,7 @@
       </tr>
       <tr>
         <td>{{ is_site_mode_b() ? '国内转寄地址' : '收货地址' }}</td>
-        <td colspan="3">{{ $order->address['address'] }} {{ $order->address['zip'] }} {{ $order->address['contact_name'] }} {{ $order->address['contact_phone'] }}</td>
+        <td colspan="3">{{ data_get($order->address, 'address', '') }} {{ data_get($order->address, 'zip', '') }} {{ data_get($order->address, 'contact_name', '') }} {{ data_get($order->address, 'contact_phone', '') }}</td>
       </tr>
       <tr>
         <td rowspan="{{ $order->items->count() + 1 }}">商品列表</td>
@@ -42,7 +42,12 @@
       </tr>
       @foreach($order->items as $item)
       <tr>
-        <td>{{ $item->product->title }} {{ $item->productSku->title }}</td>
+        <td>
+          {{ optional($item->product)->title ?: ($item->product_id ? '商品#'.$item->product_id.'（已下架）' : '—') }}
+          @if(optional($item->productSku)->title)
+            {{ optional($item->productSku)->title }}
+          @endif
+        </td>
         <td>￥{{ $item->price }}</td>
         <td>{{ $item->amount }}</td>
       </tr>
@@ -240,7 +245,7 @@
       @if($order->refund_status !== \App\Models\Order::REFUND_STATUS_PENDING)
       <tr>
         <td>退款状态：</td>
-        <td colspan="2">{{ \App\Models\Order::$refundStatusMap[$order->refund_status] }}，理由：{{ $order->extra['refund_reason'] }}</td>
+        <td colspan="2">{{ \App\Models\Order::$refundStatusMap[$order->refund_status] }}，理由：{{ data_get($order->extra, 'refund_reason', '—') }}</td>
         <td>
         @if($order->refund_status === \App\Models\Order::REFUND_STATUS_APPLIED)
           <button class="btn btn-sm btn-success" id="btn-refund-agree">同意</button>
