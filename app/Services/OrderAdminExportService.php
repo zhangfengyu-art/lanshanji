@@ -121,7 +121,7 @@ class OrderAdminExportService
             $product = $item->product;
             $title = $product ? $product->title : ($item->product_id ? '商品#'.$item->product_id : '—');
             $skuTitle = optional($item->productSku)->title;
-            $imageUrl = $product ? self::absoluteImageUrl($product->image_url) : '';
+            $imageUrl = $product ? self::imageEmbedForProduct($product) : '';
 
             $rows[] = array_merge($head, [
                 $title,
@@ -248,6 +248,112 @@ class OrderAdminExportService
         }));
 
         return implode('，', $parts);
+    }
+
+    public static function imageEmbedForProduct($product)
+    {
+        if (!$product) {
+            return '';
+        }
+
+        static $cache = [];
+        $cacheKey = (int) $product->id;
+        if (array_key_exists($cacheKey, $cache)) {
+            return $cache[$cacheKey];
+        }
+
+        $rawPath = trim((string) ($product->getAttributes()['image'] ?? ''));
+        $cache[$cacheKey] = self::resolveImageDataUri($rawPath);
+
+        return $cache[$cacheKey];
+    }
+
+    protected static function resolveImageDataUri($path)
+    {
+        $path = trim((string) $path);
+        if ($path === '') {
+            return '';
+        }
+
+        $localFile = self::resolveLocalImageFile($path);
+        if (!$localFile || !is_readable($localFile)) {
+            return '';
+        }
+
+        $data = @file_get_contents($localFile);
+        if ($data === false || $data === '') {
+            return '';
+        }
+
+        return 'data:'.self::mimeTypeForFile($localFile).';base64,'.base64_encode($data);
+    }
+
+    protected static function resolveLocalImageFile($path)
+    {
+        $path = trim((string) $path);
+        if ($path === '') {
+            return null;
+        }
+
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            $urlPath = (string) (parse_url($path, PHP_URL_PATH) ?: '');
+            if (preg_match('#/storage/(.+)$#', $urlPath, $matches)) {
+                return self::firstExistingFile([
+                    public_path('storage/'.$matches[1]),
+                    storage_path('app/public/'.$matches[1]),
+                ]);
+            }
+
+            return null;
+        }
+
+        if (Str::startsWith($path, '//')) {
+            return self::resolveLocalImageFile('https:'.$path);
+        }
+
+        $relative = ltrim($path, '/');
+
+        return self::firstExistingFile([
+            storage_path('app/public/'.$relative),
+            public_path('storage/'.$relative),
+            public_path($relative),
+        ]);
+    }
+
+    protected static function firstExistingFile(array $candidates)
+    {
+        foreach ($candidates as $file) {
+            if (is_file($file)) {
+                return $file;
+            }
+        }
+
+        return null;
+    }
+
+    protected static function mimeTypeForFile($file)
+    {
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {
+                $mime = finfo_file($finfo, $file);
+                finfo_close($finfo);
+                if (is_string($mime) && $mime !== '') {
+                    return $mime;
+                }
+            }
+        }
+
+        $ext = strtolower((string) pathinfo($file, PATHINFO_EXTENSION));
+        $map = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+        ];
+
+        return $map[$ext] ?? 'image/jpeg';
     }
 
     public static function absoluteImageUrl($url)

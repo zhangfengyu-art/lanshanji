@@ -37,7 +37,10 @@ class AdminHtmlExcelExport
         $disposition = 'attachment; filename="'.$asciiFallback.'"; filename*=UTF-8\'\''.rawurlencode($filename);
 
         $callback = function () use ($headers, $rows, $textColumns, $imageColumns) {
-            echo '<html><head><meta charset="UTF-8"></head><body>';
+            echo '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:v="urn:schemas-microsoft-com:vml">';
+            echo '<head><meta charset="UTF-8">';
+            echo '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>订单</x:Name></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+            echo '</head><body>';
             echo '<table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:13px;">';
             echo '<tr>';
             foreach ($headers as $header) {
@@ -56,13 +59,20 @@ class AdminHtmlExcelExport
                     }
 
                     if (in_array($index, $imageColumns, true)) {
-                        $url = trim((string) $cell);
-                        echo '<td style="'.$style.'text-align:center;">';
-                        if ($url !== '') {
-                            echo '<img src="'.htmlspecialchars($url, ENT_QUOTES, 'UTF-8').'" width="80" height="80" style="object-fit:contain;display:block;margin:auto;" />';
-                            echo '<div style="font-size:11px;color:#666;margin-top:4px;max-width:120px;word-break:break-all;">'
-                                .htmlspecialchars($url, ENT_QUOTES, 'UTF-8')
-                                .'</div>';
+                        $src = trim((string) $cell);
+                        echo '<td style="'.$style.'text-align:center;width:100px;height:90px;">';
+                        if ($src !== '' && Str::startsWith($src, 'data:')) {
+                            $safeSrc = str_replace('"', '&quot;', $src);
+                            echo '<!--[if gte vml 1]>';
+                            echo '<v:shape xmlns:v="urn:schemas-microsoft-com:vml" style="width:60pt;height:60pt;" stroked="f">';
+                            echo '<v:imagedata src="'.$safeSrc.'" o:title="product"/>';
+                            echo '</v:shape>';
+                            echo '<![endif]-->';
+                            echo '<!--[if !vml]>';
+                            echo '<img src="'.$safeSrc.'" width="80" height="80" style="object-fit:contain;display:block;margin:auto;" alt=""/>';
+                            echo '<![endif]-->';
+                        } elseif ($src !== '') {
+                            echo '<span style="color:#999;font-size:11px;">图片未找到</span>';
                         } else {
                             echo '—';
                         }
