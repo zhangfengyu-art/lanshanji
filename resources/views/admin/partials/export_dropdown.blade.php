@@ -10,7 +10,7 @@
   <ul class="dropdown-menu">
     @foreach($scopeOptions as $scope => $label)
       <li>
-        <a href="{{ $exportBaseUrl }}?scope={{ $scope }}" title="下载 ZIP，解压后用 Excel/WPS 打开「订单表.html」可查看商品图">
+        <a href="{{ $exportBaseUrl }}?scope={{ $scope }}" target="_blank" rel="noopener" title="下载 ZIP，解压后用 Excel/WPS 打开「订单表.html」可查看商品图">
           <i class="fa fa-file-archive-o"></i> {{ $label }}
         </a>
       </li>
