@@ -383,7 +383,14 @@ class OrdersController extends Controller
 
             $grid->no('订单流水号');
             $grid->column('buyer_label', '买家昵称')->display(function () {
-                return $this->buyer_label;
+                $label = e($this->buyer_label);
+                if (!$this->user_id) {
+                    return $label;
+                }
+
+                $url = route('admin.users.show', ['id' => $this->user_id]);
+
+                return '<a href="'.e($url).'">'.$label.'</a>';
             });
             $grid->total_amount('订单实付金额')->sortable();
             $grid->column('ems_summary', 'EMS/烟草')->display(function () {
