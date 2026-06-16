@@ -102,9 +102,8 @@ class OrderAdminExportService
     {
         $address = (array) $order->address;
         $fullAddress = self::formatFullAddress($address, $order);
-        $pasteAddress = self::formatAddressForPaste($address);
         $idCard = self::resolveOrderIdCard($order);
-        $pasteLine = self::buildPasteAddressLine($address, $pasteAddress, $idCard);
+        $pasteLine = self::buildPasteAddressLine($address, $fullAddress, $idCard);
 
         $fee = (array) data_get($order->extra, 'fee_details', []);
         $tobacco = (array) data_get($order->extra, 'tobacco_summary', []);
