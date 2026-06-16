@@ -374,9 +374,16 @@ class OrdersController extends Controller
 
     protected function grid()
     {
-        return Admin::grid(Order::class, function (Grid $grid) {
+        $controller = $this;
+
+        return Admin::grid(Order::class, function (Grid $grid) use ($controller) {
             // 只展示已支付的订单，并且默认按支付时间倒序排序
             $grid->model()->with('user')->whereNotNull('paid_at')->orderBy('paid_at', 'desc');
+
+            $orderNo = trim((string) request()->query('order_no', ''));
+            if ($orderNo !== '') {
+                $grid->model()->where('no', 'like', '%'.$orderNo.'%');
+            }
 
             $grid->no('订单流水号');
             $grid->column('buyer_label', '买家昵称')->display(function () {
@@ -440,7 +447,9 @@ class OrdersController extends Controller
                 );
             });
 
-            $grid->tools(function ($tools) {
+            $grid->tools(function ($tools) use ($controller) {
+                $orderNo = trim((string) request()->query('order_no', ''));
+                $tools->append($controller->renderOrderSearchTool($orderNo));
                 $tools->batch(function ($batch) {
                     $batch->disableDelete();
                 });
@@ -490,6 +499,21 @@ $(document).off('click', '.btn-batch-orders-start-processing').on('click', '.btn
 JS
             );
         });
+    }
+
+    protected function renderOrderSearchTool($orderNo = '')
+    {
+        $orderNo = trim((string) $orderNo);
+
+        return '<form method="GET" action="" class="form-inline" style="display:inline-block;margin-right:10px;">'
+            .'<div class="input-group input-group-sm" style="width:300px;">'
+            .'<input type="text" class="form-control" name="order_no" value="'.e($orderNo).'" placeholder="搜索订单流水号">'
+            .'<span class="input-group-btn">'
+            .'<button type="submit" class="btn btn-primary">搜索</button>'
+            .'</span>'
+            .'</div>'
+            .'</form>'
+            .'<a class="btn btn-sm btn-default" href="'.url()->current().'">重置</a>';
     }
 
     public function batchStartProcessing(Request $request, \App\Services\OrderBatchService $batch)
