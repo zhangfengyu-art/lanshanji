@@ -184,7 +184,7 @@ return [
         'id_card' => '身份证号',
         'id_card_placeholder' => '清关必填，请填写本人身份证号',
         'identity_notice_title' => '重要提示：请填写真实身份信息',
-        'identity_notice_text' => '请务必填写真实、准确的收件人姓名、手机号、身份证号和收货地址。信息不实或与本人不符将导致无法正常发货，敬请配合。',
+        'identity_notice_text' => '请务必填写真实的收件人姓名、手机号、身份证号和收货地址。信息不实将无法正常发货。',
         'default_address' => '默认地址',
         'set_default' => '设为默认地址',
     ],
