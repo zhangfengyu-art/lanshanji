@@ -95,17 +95,8 @@ class OrdersController extends Controller
         }
 
         $rows = [];
+
         $fulfillment = app(OrderFulfillmentService::class);
-        OrderAdminExportService::buildQuery($scope)->chunk(200, function ($orders) use (&$rows, $scope, $fulfillment) {
-            foreach ($orders as $order) {
-                if ($scope === 's1_pending' && $fulfillment->resolveStage($order) !== OrderFulfillmentService::STAGE_S1) {
-                    continue;
-                }
-                foreach (OrderAdminExportService::rowsForOrder($order) as $row) {
-                    $rows[] = $row;
-                }
-            }
-        });
 
         return AdminHtmlExcelExport::download(
             OrderAdminExportService::filename($scope),
@@ -114,6 +105,9 @@ class OrdersController extends Controller
             [
                 'text_columns' => OrderAdminExportService::TEXT_COLUMN_INDEXES,
                 'image_columns' => OrderAdminExportService::IMAGE_COLUMN_INDEXES,
+                'row_producer' => function ($emitRow) use ($scope, $fulfillment) {
+                    OrderAdminExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
+                },
             ]
         );
     }

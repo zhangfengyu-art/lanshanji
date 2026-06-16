@@ -101,9 +101,10 @@ class OrderAdminExportService
     public static function rowsForOrder(Order $order)
     {
         $address = (array) $order->address;
-        $fullAddress = self::formatFullAddress($address);
+        $fullAddress = self::formatFullAddress($address, $order);
+        $pasteAddress = self::formatAddressForPaste($address);
         $idCard = self::resolveOrderIdCard($order);
-        $pasteLine = self::buildPasteAddressLine($address, $fullAddress, $idCard);
+        $pasteLine = self::buildPasteAddressLine($address, $pasteAddress, $idCard);
 
         $fee = (array) data_get($order->extra, 'fee_details', []);
         $tobacco = (array) data_get($order->extra, 'tobacco_summary', []);
@@ -210,28 +211,119 @@ class OrderAdminExportService
         return $default ? trim((string) $default->id_card) : '';
     }
 
-    public static function formatFullAddress(array $address)
+    public static function resolveOrderZip(Order $order)
     {
-        $parts = array_filter([
-            trim((string) data_get($address, 'province', '')),
-            trim((string) data_get($address, 'city', '')),
-            trim((string) data_get($address, 'district', '')),
-            trim((string) data_get($address, 'address', '')),
-        ], function ($part) {
+        $fromOrder = self::normalizeZip(data_get($order->address, 'zip'));
+        if ($fromOrder !== '') {
+            return $fromOrder;
+        }
+
+        if (!$order->user_id) {
+            return '';
+        }
+
+        $phone = trim((string) data_get($order->address, 'contact_phone', ''));
+        $name = trim((string) data_get($order->address, 'contact_name', ''));
+
+        $query = UserAddress::query()->where('user_id', $order->user_id);
+
+        if ($phone !== '') {
+            $match = (clone $query)
+                ->where('contact_phone', $phone)
+                ->orderByDesc('is_default')
+                ->orderByDesc('last_used_at')
+                ->first();
+            if ($match) {
+                $zip = self::normalizeZip($match->zip);
+                if ($zip !== '') {
+                    return $zip;
+                }
+            }
+        }
+
+        if ($name !== '') {
+            $match = (clone $query)
+                ->where('contact_name', $name)
+                ->orderByDesc('is_default')
+                ->orderByDesc('last_used_at')
+                ->first();
+            if ($match) {
+                $zip = self::normalizeZip($match->zip);
+                if ($zip !== '') {
+                    return $zip;
+                }
+            }
+        }
+
+        $default = (clone $query)
+            ->where('is_default', 1)
+            ->orderByDesc('last_used_at')
+            ->first();
+
+        return $default ? self::normalizeZip($default->zip) : '';
+    }
+
+    public static function normalizeZip($zip)
+    {
+        $zip = trim((string) $zip);
+        if ($zip === '' || $zip === '0' || (int) $zip === 0) {
+            return '';
+        }
+
+        return $zip;
+    }
+
+    public static function formatStreetAddress(array $address)
+    {
+        $province = trim((string) data_get($address, 'province', ''));
+        $city = trim((string) data_get($address, 'city', ''));
+        $district = trim((string) data_get($address, 'district', ''));
+        $detail = trim((string) data_get($address, 'address', ''));
+        $storedFull = trim((string) data_get($address, 'full_address', ''));
+
+        if ($detail !== '' && $province !== '' && strpos($detail, $province) !== false) {
+            return $detail;
+        }
+
+        $built = implode('', array_filter([$province, $city, $district, $detail], function ($part) {
             return $part !== '';
-        });
+        }));
 
-        $full = implode('', $parts);
-        if ($full === '') {
-            $full = trim((string) data_get($address, 'full_address', ''));
+        if ($built !== '' && $storedFull !== '' && $storedFull === $built.$detail && $detail !== '') {
+            return $detail;
         }
 
-        $zip = trim((string) data_get($address, 'zip', ''));
-        if ($zip !== '' && $full !== '') {
-            $full .= '（邮编 '.$zip.'）';
+        if ($storedFull !== '' && $built !== '' && strpos($storedFull, $built) === 0 && mb_strlen($storedFull) > mb_strlen($built)) {
+            if ($detail !== '' && strpos($detail, $province) !== false) {
+                return $detail;
+            }
         }
 
-        return $full;
+        if ($built !== '') {
+            return $built;
+        }
+
+        return $storedFull;
+    }
+
+    public static function formatAddressForPaste(array $address)
+    {
+        return self::formatStreetAddress($address);
+    }
+
+    public static function formatFullAddress(array $address, Order $order = null)
+    {
+        $street = self::formatStreetAddress($address);
+        $zip = self::normalizeZip(data_get($address, 'zip'));
+        if ($zip === '' && $order instanceof Order) {
+            $zip = self::resolveOrderZip($order);
+        }
+
+        if ($zip !== '' && $street !== '') {
+            $street .= '（邮编 '.$zip.'）';
+        }
+
+        return $street;
     }
 
     public static function buildPasteAddressLine(array $address, $fullAddress, $idCard)
@@ -280,12 +372,52 @@ class OrderAdminExportService
             return '';
         }
 
-        $data = @file_get_contents($localFile);
-        if ($data === false || $data === '') {
+        return self::encodeImageThumbnail($localFile, 96);
+    }
+
+    protected static function encodeImageThumbnail($file, $maxSize)
+    {
+        $raw = @file_get_contents($file);
+        if ($raw === false || $raw === '') {
             return '';
         }
 
-        return 'data:'.self::mimeTypeForFile($localFile).';base64,'.base64_encode($data);
+        if (!function_exists('imagecreatefromstring')) {
+            return 'data:'.self::mimeTypeForFile($file).';base64,'.base64_encode($raw);
+        }
+
+        $img = @imagecreatefromstring($raw);
+        if (!$img) {
+            return 'data:'.self::mimeTypeForFile($file).';base64,'.base64_encode($raw);
+        }
+
+        $width = imagesx($img);
+        $height = imagesy($img);
+        $scale = min($maxSize / max($width, 1), $maxSize / max($height, 1), 1);
+
+        if ($scale < 1) {
+            $newWidth = max(1, (int) round($width * $scale));
+            $newHeight = max(1, (int) round($height * $scale));
+            $thumb = imagecreatetruecolor($newWidth, $newHeight);
+            imagealphablending($thumb, false);
+            imagesavealpha($thumb, true);
+            $transparent = imagecolorallocatealpha($thumb, 0, 0, 0, 127);
+            imagefill($thumb, 0, 0, $transparent);
+            imagecopyresampled($thumb, $img, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+            imagedestroy($img);
+            $img = $thumb;
+        }
+
+        ob_start();
+        imagejpeg($img, null, 80);
+        $jpeg = ob_get_clean();
+        imagedestroy($img);
+
+        if ($jpeg === false || $jpeg === '') {
+            return '';
+        }
+
+        return 'data:image/jpeg;base64,'.base64_encode($jpeg);
     }
 
     protected static function resolveLocalImageFile($path)
@@ -402,5 +534,19 @@ class OrderAdminExportService
         }
 
         return $safe.'_'.date('Ymd_His').'.xls';
+    }
+
+    public static function exportRowsWithProducer($scope, OrderFulfillmentService $fulfillment, callable $emitRow)
+    {
+        static::buildQuery($scope)->chunk(50, function ($orders) use ($scope, $fulfillment, $emitRow) {
+            foreach ($orders as $order) {
+                if ($scope === 's1_pending' && $fulfillment->resolveStage($order) !== OrderFulfillmentService::STAGE_S1) {
+                    continue;
+                }
+                foreach (self::rowsForOrder($order) as $row) {
+                    $emitRow($row);
+                }
+            }
+        });
     }
 }

@@ -44,7 +44,7 @@ class OrderService
                     'district'      => $address->district,
                     'address'       => $address->address,
                     'full_address'  => $address->full_address,
-                    'zip'           => $address->zip,
+                    'zip'           => (int) $address->zip > 0 ? (int) $address->zip : '',
                     'contact_name'  => $address->contact_name,
                     'contact_phone' => $address->contact_phone,
                     'id_card'       => $address->id_card,
