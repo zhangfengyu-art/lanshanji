@@ -278,23 +278,43 @@ class Order extends Model
 
     public function getBuyerLabelAttribute()
     {
-        $user = $this->relationLoaded('user') ? $this->getRelation('user') : $this->user;
+        if (is_array($rawUser = $this->getAttributes()['user'] ?? null)) {
+            return $this->formatBuyerLabelFromUserData($rawUser);
+        }
+
+        $user = $this->relationLoaded('user') ? $this->getRelation('user') : null;
+        if (!$user instanceof User && $this->user_id) {
+            $user = $this->user()->getResults();
+        }
 
         if ($user instanceof User) {
-            $name = trim((string) $user->name);
-            if ($name !== '') {
-                return $name;
-            }
-
-            $email = trim((string) $user->email);
-            if ($email !== '') {
-                return $email;
-            }
-
-            return '用户#'.$this->user_id;
+            return $this->formatBuyerLabelFromUser($user);
         }
 
         return $this->user_id ? '用户#'.$this->user_id.'（已删除）' : '—';
+    }
+
+    protected function formatBuyerLabelFromUser(User $user)
+    {
+        return $this->formatBuyerLabelFromUserData([
+            'name' => $user->name,
+            'email' => $user->email,
+        ]);
+    }
+
+    protected function formatBuyerLabelFromUserData(array $user)
+    {
+        $name = trim((string) ($user['name'] ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+
+        $email = trim((string) ($user['email'] ?? ''));
+        if ($email !== '') {
+            return $email;
+        }
+
+        return $this->user_id ? '用户#'.$this->user_id : '—';
     }
 
     public function items()
