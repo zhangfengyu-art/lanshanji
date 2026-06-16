@@ -94,7 +94,7 @@
             ]
           : \App\Models\Order::$shipStatusMap;
       @endphp
-      @if($order->paid_at && !is_site_mode_b())
+      @if($order->paid_at && !is_site_mode_b() && !$order->closed)
       @php
         $fulfillment = app(\App\Services\OrderFulfillmentService::class);
         $fulfillmentStage = $fulfillment->resolveStage($order);

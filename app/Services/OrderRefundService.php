@@ -324,8 +324,21 @@ class OrderRefundService
 
     protected function notifyRefundSuccess(Order $order)
     {
-        if ($order->user && $order->refund_status === Order::REFUND_STATUS_SUCCESS) {
+        if (!$order->user || $order->refund_status !== Order::REFUND_STATUS_SUCCESS) {
+            return;
+        }
+
+        if (data_get($order->extra, 'manual_offline_refund')) {
+            return;
+        }
+
+        try {
             $order->user->notify(new \App\Notifications\OrderRefundedNotification($order, true));
+        } catch (\Throwable $e) {
+            \Log::warning('退款通知邮件发送失败', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -411,7 +424,7 @@ class OrderRefundService
             $extra['refund_ratio_applied'] = 1.0;
             $extra['cancellation_fee_cny'] = 0.0;
 
-            $refundNo = 'MO'.date('YmdHis').str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+            $refundNo = Order::getAvailableRefundNo();
 
             $locked->update([
                 'refund_status' => Order::REFUND_STATUS_SUCCESS,
@@ -420,10 +433,7 @@ class OrderRefundService
                 'extra' => $extra,
             ]);
 
-            $locked = $locked->fresh();
-            $this->notifyRefundSuccess($locked);
-
-            return $locked;
+            return $locked->fresh();
         });
     }
 }

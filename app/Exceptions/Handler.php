@@ -64,6 +64,18 @@ class Handler extends ExceptionHandler
             return $exception->render($request);
         }
 
+        $adminPrefix = trim((string) config('admin.route.prefix', 'admin'), '/');
+        if ($adminPrefix !== '' && $request->is($adminPrefix.'/*') && !$request->expectsJson()) {
+            \Log::error('后台请求异常', [
+                'path' => $request->path(),
+                'message' => $exception->getMessage(),
+            ]);
+
+            return redirect()
+                ->back()
+                ->with('error', '操作失败：'.$exception->getMessage());
+        }
+
         return parent::render($request, $exception);
     }
 }

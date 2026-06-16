@@ -53,7 +53,15 @@ class ExchangeRateService
         $jpy = round((float) $order->total_amount, 2);
         $cny = $this->jpyToCny($jpy);
 
-        $extra = $order->extra ?: [];
+        $extra = $order->extra;
+        if (!is_array($extra)) {
+            if (is_string($extra) && $extra !== '') {
+                $decoded = json_decode($extra, true);
+                $extra = is_array($decoded) ? $decoded : [];
+            } else {
+                $extra = [];
+            }
+        }
         $extra['currency'] = 'JPY';
         $extra['amount_jpy'] = $jpy;
         $extra['payment_amount_cny'] = $cny;

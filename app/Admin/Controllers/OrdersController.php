@@ -9,6 +9,7 @@ use App\Services\OrderAdminExportService;
 use App\Services\OrderFulfillmentService;
 use Illuminate\Http\Request;
 use App\Exceptions\InvalidRequestException;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Encore\Admin\Form;
@@ -50,9 +51,10 @@ class OrdersController extends Controller
             \Log::error('订单履约操作失败', [
                 'order_id' => $order->id,
                 'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->redirectToOrderShow($order, null, '操作失败，请稍后重试或查看服务器日志。');
+            return $this->redirectToOrderShow($order, null, '操作失败：'.$e->getMessage());
         }
     }
 
@@ -190,17 +192,17 @@ class OrdersController extends Controller
 
     public function markManualOfflineRefund(Order $order, Request $request)
     {
-        if (!is_site_mode_a()) {
-            return $this->redirectToOrderShow($order, null, '当前站点不支持此操作。');
-        }
-
-        $this->validate($request, [
-            'note' => ['nullable', 'string', 'max:500'],
-        ], [], [
-            'note' => '备注',
-        ]);
-
         try {
+            if (!is_site_mode_a()) {
+                throw new InvalidRequestException('当前站点不支持此操作。');
+            }
+
+            $this->validate($request, [
+                'note' => ['nullable', 'string', 'max:500'],
+            ], [], [
+                'note' => '备注',
+            ]);
+
             $adminId = optional(Admin::user())->id;
             app(\App\Services\OrderRefundService::class)->markManualOfflineRefunded(
                 $order,
@@ -212,15 +214,25 @@ class OrdersController extends Controller
                 $order->fresh(),
                 '已标记为线下私退完结；未向支付渠道发起退款，订单已关闭。'
             );
+        } catch (ValidationException $e) {
+            return redirect()
+                ->route('admin.orders.show', ['order' => $order->id])
+                ->withInput()
+                ->withErrors($e->errors());
         } catch (InvalidRequestException $e) {
             return $this->redirectToOrderShow($order, null, $e->getMessage());
         } catch (\Throwable $e) {
             \Log::error('线下私退完结失败', [
                 'order_id' => $order->id,
                 'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->redirectToOrderShow($order, null, '操作失败，请稍后重试或查看服务器日志。');
+            return $this->redirectToOrderShow(
+                $order,
+                null,
+                '操作失败：'.$e->getMessage()
+            );
         }
     }
 
