@@ -8,6 +8,26 @@
     </div>
   </div>
   <div class="box-body">
+    @if(session('success'))
+      <div class="alert alert-success alert-dismissible" style="margin-bottom: 12px;">
+        <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+        {{ session('success') }}
+      </div>
+    @endif
+    @if(session('error'))
+      <div class="alert alert-danger alert-dismissible" style="margin-bottom: 12px;">
+        <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+        {{ session('error') }}
+      </div>
+    @endif
+    @if($errors->any())
+      <div class="alert alert-danger alert-dismissible" style="margin-bottom: 12px;">
+        <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+        @foreach($errors->all() as $msg)
+          <div>{{ $msg }}</div>
+        @endforeach
+      </div>
+    @endif
     <table class="table table-bordered">
       <tbody>
       <tr>
@@ -98,26 +118,26 @@
         <td>履约操作：</td>
         <td colspan="3" style="padding-bottom: 12px;">
           @if(!$processingStarted && $fulfillmentStage !== \App\Services\OrderFulfillmentService::STAGE_S4)
-            <form action="{{ route('admin.orders.start_processing', $order) }}" method="post" style="display:inline-block; margin-right: 8px;">
+            <form action="{{ route('admin.orders.start_processing', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('确认开始处理？用户将无法再自助改址。');">开始处理（S1→S2）</button>
             </form>
           @endif
           @if(!$lockedAt && !in_array($fulfillmentStage, [\App\Services\OrderFulfillmentService::STAGE_S4], true))
-            <form action="{{ route('admin.orders.lock', $order) }}" method="post" style="display:inline-block; margin-right: 8px;">
+            <form action="{{ route('admin.orders.lock', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-default btn-sm">锁定订单（→S3）</button>
             </form>
           @endif
           @if($lockedAt && !$order->hasFulfillmentPhoto())
-            <form action="{{ route('admin.orders.unlock', $order) }}" method="post" style="display:inline-block; margin-right: 8px;">
+            <form action="{{ route('admin.orders.unlock', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-default btn-sm">解除锁定</button>
             </form>
           @endif
           @php $atWarehouse = trim((string) data_get($order->extra, 'logistics_warehouse_at', '')) !== ''; @endphp
           @if(!$atWarehouse && in_array($fulfillmentStage, [\App\Services\OrderFulfillmentService::STAGE_S2, \App\Services\OrderFulfillmentService::STAGE_S3], true))
-            <form action="{{ route('admin.orders.mark_logistics_warehouse', $order) }}" method="post" style="display:inline-block; margin-right: 8px;">
+            <form action="{{ route('admin.orders.mark_logistics_warehouse', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-default btn-sm" onclick="return confirm('确认包裹已送往物流仓库？标记后用户将无法按规则取消订单。');">标记：已送往物流仓库</button>
             </form>
@@ -138,7 +158,7 @@
               {{ session('success') }}
             </div>
           @endif
-          <form action="{{ route('admin.orders.ship', [$order->id]) }}" method="post" class="form-inline" style="flex-wrap: wrap; gap: 8px 12px;">
+          <form action="{{ route('admin.orders.ship', [$order->id]) }}" method="post" data-pjax="false" class="form-inline" style="flex-wrap: wrap; gap: 8px 12px;">
             <input type="hidden" name="_token" value="{{ csrf_token() }}">
             <div class="form-group {{ $errors->has('ship_status') ? 'has-error' : '' }}">
               <label for="ship_status" class="control-label">{{ is_site_mode_b() ? '履行状态' : '发货状态' }}</label>
@@ -261,6 +281,9 @@
           <h4 style="margin-top: 8px;">退款操作</h4>
           @if($order->refund_status !== \App\Models\Order::REFUND_STATUS_PENDING)
             <p><strong>退款状态：</strong>{{ \App\Models\Order::$refundStatusMap[$order->refund_status] }}
+              @if(data_get($order->extra, 'manual_offline_refund'))
+                <span class="label label-warning">线下私退完结</span>
+              @endif
               @if(data_get($order->extra, 'refund_reason'))
                 · {{ data_get($order->extra, 'refund_reason') }}
               @endif
@@ -268,6 +291,39 @@
                 · 实退 ￥{{ number_format((float) data_get($order->extra, 'refund_amount_cny'), 2, '.', '') }}
               @endif
             </p>
+            @if(data_get($order->extra, 'manual_offline_refund'))
+              <p class="text-muted" style="margin-bottom: 12px;">
+                线下私退标记时间：{{ data_get($order->extra, 'manual_offline_refund_at') }}
+                @if(data_get($order->extra, 'manual_offline_refund_note'))
+                  · 备注：{{ data_get($order->extra, 'manual_offline_refund_note') }}
+                @endif
+              </p>
+            @endif
+          @endif
+
+          @if(
+            $order->refund_status !== \App\Models\Order::REFUND_STATUS_SUCCESS
+            && $order->refund_status !== \App\Models\Order::REFUND_STATUS_PROCESSING
+            && !data_get($order->extra, 'manual_offline_refund')
+          )
+            <div class="well well-sm" style="margin-bottom: 16px; background: #fff8e6; border-color: #f0d9a8;">
+              <strong>特殊情况：线下私退完结</strong>
+              <p class="help-block" style="margin: 6px 0 10px;">
+                适用于您已通过微信私聊等方式向客户转账退款、无法走平台「执行退款」或用户「全额秒退」的场景。
+                点击后仅在本站标记订单已退款并关闭，<strong>不会</strong>向微信/支付宝发起原路退回。
+              </p>
+              <form action="{{ route('admin.orders.manual_offline_refund', ['order' => $order->id]) }}" method="post" data-pjax="false">
+                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                <div class="form-group" style="max-width: 480px;">
+                  <label for="manual_offline_refund_note">备注（选填）</label>
+                  <input type="text" name="note" id="manual_offline_refund_note" class="form-control" maxlength="500" placeholder="例如：2026-05-20 微信私聊已退 ￥100">
+                </div>
+                <button type="submit" class="btn btn-warning"
+                  onclick="return confirm('确认标记为线下私退已完结？\n\n不会向支付渠道发起退款，仅用于您已私下完成退款的订单。');">
+                  标记线下私退已完结
+                </button>
+              </form>
+            </div>
           @endif
 
           @if($refundPreview['allowed'] || $order->refund_status === \App\Models\Order::REFUND_STATUS_APPLIED || $order->refund_status === \App\Models\Order::REFUND_STATUS_FAILED)
@@ -281,7 +337,7 @@
             </div>
 
             @if($order->refund_status !== \App\Models\Order::REFUND_STATUS_SUCCESS && $order->refund_status !== \App\Models\Order::REFUND_STATUS_PROCESSING)
-            <form action="{{ route('admin.orders.handle_refund', $order) }}" method="post" id="admin-refund-form">
+            <form action="{{ route('admin.orders.handle_refund', ['order' => $order->id]) }}" method="post" data-pjax="false" id="admin-refund-form">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
               <div class="form-group">
                 <label for="reason_code">退款原因</label>

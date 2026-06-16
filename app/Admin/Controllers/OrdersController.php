@@ -23,6 +23,39 @@ class OrdersController extends Controller
 {
     use ModelForm;
 
+    protected function redirectToOrderShow(Order $order, $successMessage = null, $errorMessage = null)
+    {
+        $redirect = redirect()->route('admin.orders.show', ['order' => $order->id]);
+
+        if ($successMessage !== null && $successMessage !== '') {
+            $redirect->with('success', $successMessage);
+        }
+
+        if ($errorMessage !== null && $errorMessage !== '') {
+            $redirect->with('error', $errorMessage);
+        }
+
+        return $redirect;
+    }
+
+    protected function handleFulfillmentAction(Order $order, callable $action, $successMessage)
+    {
+        try {
+            $action();
+
+            return $this->redirectToOrderShow($order->fresh(), $successMessage);
+        } catch (InvalidRequestException $e) {
+            return $this->redirectToOrderShow($order, null, $e->getMessage());
+        } catch (\Throwable $e) {
+            \Log::error('订单履约操作失败', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return $this->redirectToOrderShow($order, null, '操作失败，请稍后重试或查看服务器日志。');
+        }
+    }
+
     public function index()
     {
         return Admin::content(function (Content $content) {
@@ -132,33 +165,63 @@ class OrdersController extends Controller
 
     public function startProcessing(Order $order, OrderFulfillmentService $fulfillment)
     {
-        $fulfillment->startProcessing($order);
-
-        return redirect()
-            ->back()
-            ->with('success', '订单已开始处理（S2），用户不可再自助改址。');
+        return $this->handleFulfillmentAction($order, function () use ($order, $fulfillment) {
+            $fulfillment->startProcessing($order);
+        }, '订单已开始处理（S2），用户不可再自助改址。');
     }
 
     public function lockOrder(Order $order, OrderFulfillmentService $fulfillment)
     {
-        $fulfillment->lockOrder($order);
-
-        return redirect()
-            ->back()
-            ->with('success', '订单已锁定（S3），用户不可再自助改址。');
+        return $this->handleFulfillmentAction($order, function () use ($order, $fulfillment) {
+            $fulfillment->lockOrder($order);
+        }, '订单已锁定（S3），用户不可再自助改址。');
     }
 
     public function unlockOrder(Order $order, OrderFulfillmentService $fulfillment)
     {
-        if ($order->hasFulfillmentPhoto()) {
-            throw new InvalidRequestException('已上传履约照片，不可解除锁定。');
+        return $this->handleFulfillmentAction($order, function () use ($order, $fulfillment) {
+            if ($order->hasFulfillmentPhoto()) {
+                throw new InvalidRequestException('已上传履约照片，不可解除锁定。');
+            }
+
+            $fulfillment->unlockOrder($order);
+        }, '已解除锁定；若未开始处理则回到待处理（S1），否则为处理中（S2）。');
+    }
+
+    public function markManualOfflineRefund(Order $order, Request $request)
+    {
+        if (!is_site_mode_a()) {
+            return $this->redirectToOrderShow($order, null, '当前站点不支持此操作。');
         }
 
-        $fulfillment->unlockOrder($order);
+        $this->validate($request, [
+            'note' => ['nullable', 'string', 'max:500'],
+        ], [], [
+            'note' => '备注',
+        ]);
 
-        return redirect()
-            ->back()
-            ->with('success', '已解除锁定；若未开始处理则回到待处理（S1），否则为处理中（S2）。');
+        try {
+            $adminId = optional(Admin::user())->id;
+            app(\App\Services\OrderRefundService::class)->markManualOfflineRefunded(
+                $order,
+                (string) $request->input('note', ''),
+                $adminId
+            );
+
+            return $this->redirectToOrderShow(
+                $order->fresh(),
+                '已标记为线下私退完结；未向支付渠道发起退款，订单已关闭。'
+            );
+        } catch (InvalidRequestException $e) {
+            return $this->redirectToOrderShow($order, null, $e->getMessage());
+        } catch (\Throwable $e) {
+            \Log::error('线下私退完结失败', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return $this->redirectToOrderShow($order, null, '操作失败，请稍后重试或查看服务器日志。');
+        }
     }
 
     public function deleteFulfillmentPhoto(Order $order)
@@ -429,11 +492,9 @@ JS
 
     public function markLogisticsWarehouse(Order $order, OrderFulfillmentService $fulfillment)
     {
-        $fulfillment->markPackageAtLogisticsWarehouse($order);
-
-        return redirect()
-            ->back()
-            ->with('success', '已标记：包裹已送往物流仓库。此后原则上不可取消订单。');
+        return $this->handleFulfillmentAction($order, function () use ($order, $fulfillment) {
+            $fulfillment->markPackageAtLogisticsWarehouse($order);
+        }, '已标记：包裹已送往物流仓库。此后原则上不可取消订单。');
     }
 
     public function executeRefund(Order $order, ExecuteOrderRefundRequest $request)

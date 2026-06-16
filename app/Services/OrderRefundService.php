@@ -358,4 +358,72 @@ class OrderRefundService
                 }
             });
     }
+
+    /**
+     * 管理员标记：已通过私聊等方式线下退款，不走支付渠道原路退回。
+     */
+    public function markManualOfflineRefunded(Order $order, $note = '', $adminId = null)
+    {
+        return \DB::transaction(function () use ($order, $note, $adminId) {
+            /** @var Order|null $locked */
+            $locked = Order::query()->lockForUpdate()->find($order->id);
+            if (!$locked) {
+                throw new InvalidRequestException('订单不存在。');
+            }
+
+            if (!$locked->paid_at) {
+                throw new InvalidRequestException('仅已支付订单可标记线下私退完结。');
+            }
+
+            if (data_get($locked->extra, 'manual_offline_refund')) {
+                throw new InvalidRequestException('该订单已标记为线下私退完结。');
+            }
+
+            if ($locked->refund_status === Order::REFUND_STATUS_SUCCESS) {
+                throw new InvalidRequestException('订单已退款成功，无需重复操作。');
+            }
+
+            if ($locked->refund_status === Order::REFUND_STATUS_PROCESSING) {
+                throw new InvalidRequestException('订单正在平台退款处理中，请等待支付渠道结果后再标记，或联系技术处理。');
+            }
+
+            if ((float) $locked->getPaymentAmountCny() <= 0) {
+                app(ExchangeRateService::class)->snapshotQuoteOnOrder($locked->fresh());
+                $locked = $locked->fresh();
+            }
+
+            $payCny = round((float) $locked->getPaymentAmountCny(), 2);
+            if ($payCny <= 0) {
+                throw new InvalidRequestException('无法获取订单支付金额，请补充备注后仍无法处理时请通过客户反馈联系本站。');
+            }
+
+            $note = trim((string) $note);
+            $reason = $note !== '' ? $note : '管理员标记：已通过私聊等方式线下退款完结';
+
+            $extra = $this->fulfillment->normalizeExtraArray($locked);
+            $extra['manual_offline_refund'] = true;
+            $extra['manual_offline_refund_at'] = now()->toDateTimeString();
+            $extra['manual_offline_refund_note'] = $note;
+            $extra['manual_offline_refund_by'] = $adminId;
+            $extra['refund_reason'] = $reason;
+            $extra['refund_amount_cny'] = $payCny;
+            $extra['refund_pay_amount_cny'] = $payCny;
+            $extra['refund_ratio_applied'] = 1.0;
+            $extra['cancellation_fee_cny'] = 0.0;
+
+            $refundNo = 'MO'.date('YmdHis').str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+
+            $locked->update([
+                'refund_status' => Order::REFUND_STATUS_SUCCESS,
+                'refund_no' => $refundNo,
+                'closed' => true,
+                'extra' => $extra,
+            ]);
+
+            $locked = $locked->fresh();
+            $this->notifyRefundSuccess($locked);
+
+            return $locked;
+        });
+    }
 }

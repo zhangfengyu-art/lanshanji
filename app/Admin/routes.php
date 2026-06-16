@@ -104,6 +104,7 @@ Route::group([
     $router->post('orders/{order}/shopping-receipt', 'OrdersController@uploadShoppingReceipt')->name('admin.orders.shopping_receipt.upload');
     $router->delete('orders/{order}/shopping-receipt', 'OrdersController@deleteShoppingReceipt')->name('admin.orders.shopping_receipt.delete');
     $router->post('orders/{order}/refund', 'OrdersController@handleRefund')->name('admin.orders.handle_refund');
+    $router->post('orders/{order}/manual-offline-refund', 'OrdersController@markManualOfflineRefund')->name('admin.orders.manual_offline_refund');
     $router->post('orders/{order}/mark-logistics-warehouse', 'OrdersController@markLogisticsWarehouse')->name('admin.orders.mark_logistics_warehouse');
     $router->get('coupon_codes', 'CouponCodesController@index');
     $router->post('coupon_codes', 'CouponCodesController@store');

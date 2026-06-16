@@ -104,6 +104,30 @@ class OrderFulfillmentService
         ];
     }
 
+    public function normalizeExtraArray(Order $order)
+    {
+        $extra = $order->extra;
+        if (is_array($extra)) {
+            return $extra;
+        }
+
+        if (is_string($extra) && $extra !== '') {
+            $decoded = json_decode($extra, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
+    }
+
+    protected function persistExtra(Order $order, array $extra)
+    {
+        $order->update(['extra' => $extra]);
+
+        return $order->fresh();
+    }
+
     public function updateAddress(Order $order, array $input)
     {
         if (!$this->canSelfChangeAddress($order)) {
@@ -119,7 +143,7 @@ class OrderFulfillmentService
             }
 
             $before = $locked->address;
-            $extra = $locked->extra ?: [];
+            $extra = $this->normalizeExtraArray($locked);
             $log = (array) data_get($extra, 'address_change_log', []);
             $log[] = [
                 'at' => now()->toDateTimeString(),
@@ -148,15 +172,14 @@ class OrderFulfillmentService
             throw new InvalidRequestException('订单已发货，无法开始处理。');
         }
 
-        $extra = $order->extra ?: [];
+        $extra = $this->normalizeExtraArray($order);
         if ($this->processingStartedAt($order)) {
             throw new InvalidRequestException('订单已在处理中。');
         }
 
         $extra['processing_started_at'] = now()->toDateTimeString();
-        $order->update(['extra' => $extra]);
 
-        return $order->fresh();
+        return $this->persistExtra($order, $extra);
     }
 
     public function lockOrder(Order $order)
@@ -169,11 +192,10 @@ class OrderFulfillmentService
             throw new InvalidRequestException('订单已发货，无法锁定。');
         }
 
-        $extra = $order->extra ?: [];
+        $extra = $this->normalizeExtraArray($order);
         $extra['locked_at'] = now()->toDateTimeString();
-        $order->update(['extra' => $extra]);
 
-        return $order->fresh();
+        return $this->persistExtra($order, $extra);
     }
 
     public function unlockOrder(Order $order)
@@ -182,11 +204,10 @@ class OrderFulfillmentService
             throw new InvalidRequestException('订单已发货，无法解除锁定。');
         }
 
-        $extra = $order->extra ?: [];
+        $extra = $this->normalizeExtraArray($order);
         unset($extra['locked_at']);
-        $order->update(['extra' => $extra]);
 
-        return $order->fresh();
+        return $this->persistExtra($order, $extra);
     }
 
     protected function refundAllowsModification(Order $order)
@@ -219,15 +240,14 @@ class OrderFulfillmentService
             throw new InvalidRequestException('订单已发货，无法标记送往仓库。');
         }
 
-        $extra = $order->extra ?: [];
+        $extra = $this->normalizeExtraArray($order);
         if ($this->packageAtLogisticsWarehouse($order)) {
             throw new InvalidRequestException('订单已标记为送往物流仓库。');
         }
 
         $extra['logistics_warehouse_at'] = now()->toDateTimeString();
-        $order->update(['extra' => $extra]);
 
-        return $order->fresh();
+        return $this->persistExtra($order, $extra);
     }
 
     protected function addressChangeCount(Order $order)
