@@ -4,7 +4,7 @@ namespace App\Admin\Controllers;
 
 use App\Exceptions\InternalException;
 use App\Models\Order;
-use App\Services\AdminCsvExport;
+use App\Services\AdminHtmlExcelExport;
 use App\Services\OrderAdminExportService;
 use App\Services\OrderFulfillmentService;
 use Illuminate\Http\Request;
@@ -101,14 +101,20 @@ class OrdersController extends Controller
                 if ($scope === 's1_pending' && $fulfillment->resolveStage($order) !== OrderFulfillmentService::STAGE_S1) {
                     continue;
                 }
-                $rows[] = OrderAdminExportService::row($order);
+                foreach (OrderAdminExportService::rowsForOrder($order) as $row) {
+                    $rows[] = $row;
+                }
             }
         });
 
-        return AdminCsvExport::download(
+        return AdminHtmlExcelExport::download(
             OrderAdminExportService::filename($scope),
             OrderAdminExportService::headers(),
-            $rows
+            $rows,
+            [
+                'text_columns' => OrderAdminExportService::TEXT_COLUMN_INDEXES,
+                'image_columns' => OrderAdminExportService::IMAGE_COLUMN_INDEXES,
+            ]
         );
     }
 

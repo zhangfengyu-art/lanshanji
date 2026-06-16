@@ -47,6 +47,7 @@ class OrderService
                     'zip'           => $address->zip,
                     'contact_name'  => $address->contact_name,
                     'contact_phone' => $address->contact_phone,
+                    'id_card'       => $address->id_card,
                 ],
                 'remark'       => $remark,
                 'total_amount' => 0,

@@ -3,9 +3,18 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\UserAddress;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
+
 class OrderAdminExportService
 {
+    /** @var int[] */
+    const TEXT_COLUMN_INDEXES = [0, 4, 6, 21];
+
+    /** @var int[] */
+    const IMAGE_COLUMN_INDEXES = [11];
+
     public static function scopeOptions()
     {
         return [
@@ -60,69 +69,203 @@ class OrderAdminExportService
     {
         return [
             '订单流水号',
-            '买家昵称',
-            '买家邮箱',
-            '订单金额',
             '支付时间',
-            '支付方式',
-            '支付渠道单号',
-            '发货状态',
-            '物流公司',
-            '物流单号',
-            '退款状态',
+            '买家昵称',
             '收货人',
             '联系电话',
             '收货地址',
-            '订单备注',
-            '商品明细',
+            '身份证号',
+            '商品名称',
+            '规格',
+            '数量',
+            '单价(日元)',
+            '商品图片',
             '寄送模式',
-            '计费重量(g)',
+            'EMS计费重量(g)',
             '香烟支数',
             '烟丝重量(g)',
-            'EMS运费(日元)',
-            '是否有实拍图',
-            '是否有购物凭据',
+            '订单备注',
+            '发货状态',
+            '退款状态',
+            '支付方式',
+            '订单金额(日元)',
+            '一键粘贴地址',
         ];
     }
 
-    public static function row(Order $order)
+    /**
+     * 每个订单商品一行，便于代购对照图片与地址。
+     *
+     * @return array[]
+     */
+    public static function rowsForOrder(Order $order)
     {
         $address = (array) $order->address;
-        $itemsText = $order->items->map(function ($item) {
-            $title = optional($item->product)->title;
-            $sku = optional($item->productSku)->title;
-            return trim($title.' '.$sku).' x'.$item->amount.' @'.$item->price;
-        })->implode('；');
+        $fullAddress = self::formatFullAddress($address);
+        $idCard = self::resolveOrderIdCard($order);
+        $pasteLine = self::buildPasteAddressLine($address, $fullAddress, $idCard);
 
         $fee = (array) data_get($order->extra, 'fee_details', []);
         $tobacco = (array) data_get($order->extra, 'tobacco_summary', []);
         $mode = data_get($fee, 'shipping_mode', data_get($order->extra, 'shipping_mode', ''));
+        $head = self::sharedOrderCells($order, $fullAddress, $idCard);
+        $tail = self::tailOrderCells($order, $fee, $tobacco, $mode, $pasteLine);
 
+        $items = $order->items;
+        if ($items->isEmpty()) {
+            return [array_merge($head, ['—', '—', '', '', ''], $tail)];
+        }
+
+        $rows = [];
+        foreach ($items as $item) {
+            $product = $item->product;
+            $title = $product ? $product->title : ($item->product_id ? '商品#'.$item->product_id : '—');
+            $skuTitle = optional($item->productSku)->title;
+            $imageUrl = $product ? self::absoluteImageUrl($product->image_url) : '';
+
+            $rows[] = array_merge($head, [
+                $title,
+                $skuTitle ?: '—',
+                (int) $item->amount,
+                $item->price,
+                $imageUrl,
+            ], $tail);
+        }
+
+        return $rows;
+    }
+
+    protected static function sharedOrderCells(Order $order, $fullAddress, $idCard)
+    {
         return [
             $order->no,
-            optional($order->user)->name,
-            optional($order->user)->email,
-            $order->total_amount,
             optional($order->paid_at)->format('Y-m-d H:i:s'),
-            self::paymentMethodLabel($order->payment_method),
-            $order->payment_no,
-            self::shipStatusLabel($order),
-            data_get($order->ship_data, 'express_company', ''),
-            data_get($order->ship_data, 'express_no', ''),
-            Order::$refundStatusMap[$order->refund_status] ?? $order->refund_status,
-            data_get($address, 'contact_name', ''),
-            data_get($address, 'contact_phone', ''),
-            trim(data_get($address, 'address', '').' '.data_get($address, 'zip', '')),
-            $order->remark,
-            $itemsText,
-            \App\Services\ShippingModeService::options()[$mode] ?? $mode,
+            optional($order->user)->name ?: '—',
+            data_get($order->address, 'contact_name', ''),
+            data_get($order->address, 'contact_phone', ''),
+            $fullAddress,
+            $idCard,
+        ];
+    }
+
+    protected static function tailOrderCells(Order $order, $fee, $tobacco, $mode, $pasteLine)
+    {
+        return [
+            ShippingModeService::options()[$mode] ?? $mode,
             data_get($fee, 'ems_weight_grams', ''),
             data_get($tobacco, 'total_cigarette_sticks', ''),
             data_get($tobacco, 'total_rolling_tobacco_grams', ''),
-            data_get($fee, 'ems_shipping_fee', ''),
-            trim((string) $order->fulfillment_photo) !== '' ? '是' : '否',
-            $order->hasShoppingReceipt() ? '是' : '否',
+            $order->remark ?: '—',
+            self::shipStatusLabel($order),
+            Order::$refundStatusMap[$order->refund_status] ?? $order->refund_status,
+            self::paymentMethodLabel($order->payment_method),
+            $order->total_amount,
+            $pasteLine,
         ];
+    }
+
+    public static function resolveOrderIdCard(Order $order)
+    {
+        $fromOrder = trim((string) data_get($order->address, 'id_card', ''));
+        if ($fromOrder !== '') {
+            return $fromOrder;
+        }
+
+        if (!$order->user_id) {
+            return '';
+        }
+
+        $phone = trim((string) data_get($order->address, 'contact_phone', ''));
+        $name = trim((string) data_get($order->address, 'contact_name', ''));
+
+        $query = UserAddress::query()->where('user_id', $order->user_id);
+
+        if ($phone !== '') {
+            $match = (clone $query)
+                ->where('contact_phone', $phone)
+                ->orderByDesc('is_default')
+                ->orderByDesc('last_used_at')
+                ->first();
+            if ($match && trim((string) $match->id_card) !== '') {
+                return trim((string) $match->id_card);
+            }
+        }
+
+        if ($name !== '') {
+            $match = (clone $query)
+                ->where('contact_name', $name)
+                ->orderByDesc('is_default')
+                ->orderByDesc('last_used_at')
+                ->first();
+            if ($match && trim((string) $match->id_card) !== '') {
+                return trim((string) $match->id_card);
+            }
+        }
+
+        $default = (clone $query)
+            ->where('is_default', 1)
+            ->orderByDesc('last_used_at')
+            ->first();
+
+        return $default ? trim((string) $default->id_card) : '';
+    }
+
+    public static function formatFullAddress(array $address)
+    {
+        $parts = array_filter([
+            trim((string) data_get($address, 'province', '')),
+            trim((string) data_get($address, 'city', '')),
+            trim((string) data_get($address, 'district', '')),
+            trim((string) data_get($address, 'address', '')),
+        ], function ($part) {
+            return $part !== '';
+        });
+
+        $full = implode('', $parts);
+        if ($full === '') {
+            $full = trim((string) data_get($address, 'full_address', ''));
+        }
+
+        $zip = trim((string) data_get($address, 'zip', ''));
+        if ($zip !== '' && $full !== '') {
+            $full .= '（邮编 '.$zip.'）';
+        }
+
+        return $full;
+    }
+
+    public static function buildPasteAddressLine(array $address, $fullAddress, $idCard)
+    {
+        $parts = [
+            trim((string) data_get($address, 'contact_name', '')),
+            trim((string) data_get($address, 'contact_phone', '')),
+            trim((string) $fullAddress),
+            trim((string) $idCard),
+        ];
+
+        $parts = array_values(array_filter($parts, function ($part) {
+            return $part !== '';
+        }));
+
+        return implode('，', $parts);
+    }
+
+    public static function absoluteImageUrl($url)
+    {
+        $url = trim((string) $url);
+        if ($url === '') {
+            return '';
+        }
+
+        if (Str::startsWith($url, ['http://', 'https://'])) {
+            return $url;
+        }
+
+        if (Str::startsWith($url, '//')) {
+            return 'https:'.$url;
+        }
+
+        return url($url);
     }
 
     protected static function paymentMethodLabel($method)
@@ -152,6 +295,6 @@ class OrderAdminExportService
             $safe = 'orders';
         }
 
-        return $safe.'_'.date('Ymd_His').'.csv';
+        return $safe.'_'.date('Ymd_His').'.xls';
     }
 }
