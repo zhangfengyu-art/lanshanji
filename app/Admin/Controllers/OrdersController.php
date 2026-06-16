@@ -289,11 +289,17 @@ class OrdersController extends Controller
     {
         return Admin::grid(Order::class, function (Grid $grid) {
             // 只展示已支付的订单，并且默认按支付时间倒序排序
-            $grid->model()->whereNotNull('paid_at')->orderBy('paid_at', 'desc');
+            $grid->model()->with('user')->whereNotNull('paid_at')->orderBy('paid_at', 'desc');
 
             $grid->no('订单流水号');
-            // 展示关联关系的字段时，使用 column 方法
-            $grid->column('user.name', '买家昵称');
+            $grid->column('buyer_label', '买家昵称')->display(function () {
+                $user = $this->user;
+                if ($user) {
+                    return $user->name ?: $user->email ?: '用户#'.$this->user_id;
+                }
+
+                return $this->user_id ? '用户#'.$this->user_id.'（已删除）' : '—';
+            });
             $grid->total_amount('订单实付金额')->sortable();
             $grid->column('ems_summary', 'EMS/烟草')->display(function () {
                 $fee = (array) data_get($this->extra, 'fee_details', []);
