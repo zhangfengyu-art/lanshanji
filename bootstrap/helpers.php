@@ -387,6 +387,11 @@ function apply_list_sort_order($query, $table = null)
     return $query->orderBy($table.'.id', 'asc');
 }
 
+function site_express_carrier_options()
+{
+    return config('site.express_carriers_a', ['EMS自缴税', '顺丰']);
+}
+
 /**
  * 日元金额展示：420.00日元
  */

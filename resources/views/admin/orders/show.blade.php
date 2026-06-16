@@ -62,6 +62,10 @@
         $shipCompany = old('express_company', data_get($order->ship_data, 'express_company', ''));
         $shipNo = old('express_no', data_get($order->ship_data, 'express_no', ''));
         $shipStatusValue = old('ship_status', $order->ship_status);
+        $expressCarrierOptions = site_express_carrier_options();
+        if (is_site_mode_a() && $shipCompany !== '' && !in_array($shipCompany, $expressCarrierOptions, true)) {
+            $shipCompany = $expressCarrierOptions[0];
+        }
         $shipStatusOptions = is_site_mode_b()
           ? [
               \App\Models\Order::SHIP_STATUS_PENDING => '待履行/采购中',
@@ -141,16 +145,15 @@
             </div>
             <div class="form-group {{ $errors->has('express_company') ? 'has-error' : '' }}">
               <label for="express_company" class="control-label">{{ is_site_mode_b() ? '代购人' : '物流公司' }}</label>
-              <input type="text" id="express_company" name="express_company" value="{{ $shipCompany }}" class="form-control" placeholder="{{ is_site_mode_b() ? '请输入代购人姓名或标识' : '可手动输入，如 EMS、顺丰' }}" list="express-company-presets" style="min-width: 180px;">
-              @unless(is_site_mode_b())
-              <datalist id="express-company-presets">
-                <option value="EMS（日本邮政）"></option>
-                <option value="EMS"></option>
-                <option value="顺丰"></option>
-                <option value="佐川急便"></option>
-                <option value="黑猫宅急便"></option>
-              </datalist>
-              @endunless
+              @if(is_site_mode_a())
+              <select id="express_company" name="express_company" class="form-control" required style="min-width: 180px;">
+                @foreach($expressCarrierOptions as $carrier)
+                  <option value="{{ $carrier }}" {{ $shipCompany === $carrier ? 'selected' : '' }}>{{ $carrier }}</option>
+                @endforeach
+              </select>
+              @else
+              <input type="text" id="express_company" name="express_company" value="{{ $shipCompany }}" class="form-control" placeholder="请输入代购人姓名或标识" style="min-width: 180px;">
+              @endif
               @if($errors->has('express_company'))
                 @foreach($errors->get('express_company') as $msg)
                   <span class="help-block">{{ $msg }}</span>

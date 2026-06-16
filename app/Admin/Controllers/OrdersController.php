@@ -248,7 +248,11 @@ class OrdersController extends Controller
             ])],
         ];
         if (in_array($shipStatus, [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED], true)) {
-            $rules['express_company'] = ['required', 'string', 'max:255'];
+            if (is_site_mode_a()) {
+                $rules['express_company'] = ['required', 'string', 'in:'.implode(',', site_express_carrier_options())];
+            } else {
+                $rules['express_company'] = ['required', 'string', 'max:255'];
+            }
             $rules['express_no'] = ['required', 'string', 'max:255'];
         } else {
             $rules['express_company'] = ['nullable', 'string', 'max:255'];
