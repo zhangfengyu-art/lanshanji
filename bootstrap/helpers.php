@@ -161,7 +161,23 @@ function site_setting_image_url($storageRelativePath)
 
     $relative = ltrim(str_replace('\\', '/', $path), '/');
 
-    return asset('storage/'.$relative);
+        return asset('storage/'.$relative);
+}
+
+/**
+ * 海淘售后群二维码（后台站点设置上传）。
+ */
+function after_sale_group_qr_url()
+{
+    return app(\App\Services\SiteAfterSaleGroupService::class)->qrImageUrl();
+}
+
+/**
+ * 海淘售后群展示标题（可后台自定义）。
+ */
+function after_sale_group_notice()
+{
+    return app(\App\Services\SiteAfterSaleGroupService::class)->noticeText();
 }
 
 /**

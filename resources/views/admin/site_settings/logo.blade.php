@@ -130,6 +130,36 @@
                     <span class="help-block">{{ $errors->first('favicon_b') }}</span>
                 @endif
             </div>
+
+            <hr>
+            <h4>海淘售后群二维码</h4>
+            <p class="help-block">付款成功后的订单详情页会展示此二维码，便于客户扫码入群。上传新图将自动替换旧图，可随时更换微信群二维码。</p>
+
+            <div class="form-group {{ $errors->has('after_sale_group_notice') ? 'has-error' : '' }}">
+                <label for="after_sale_group_notice">展示标题</label>
+                <input id="after_sale_group_notice" type="text" name="after_sale_group_notice" class="form-control" value="{{ old('after_sale_group_notice', $afterSaleGroupNotice->value) }}" maxlength="120" placeholder="扫码加入海淘售后群">
+                <p class="help-block">显示在二维码上方的简短说明，例如「扫码加入海淘售后群」。</p>
+                @if($errors->has('after_sale_group_notice'))
+                    <span class="help-block">{{ $errors->first('after_sale_group_notice') }}</span>
+                @endif
+            </div>
+
+            @if($afterSaleGroupQr->value)
+                <div class="form-group">
+                    <label>当前售后群二维码</label>
+                    <div>
+                        <img src="{{ $preview($afterSaleGroupQr->value) }}" alt="海淘售后群二维码" style="max-width: 180px; border: 1px solid #eeeeee; padding: 6px; background: #ffffff;">
+                    </div>
+                </div>
+            @endif
+
+            <div class="form-group {{ $errors->has('after_sale_group_qr') ? 'has-error' : '' }}">
+                <label for="after_sale_group_qr">上传售后群二维码</label>
+                <input id="after_sale_group_qr" type="file" name="after_sale_group_qr" class="form-control" accept="image/*">
+                @if($errors->has('after_sale_group_qr'))
+                    <span class="help-block">{{ $errors->first('after_sale_group_qr') }}</span>
+                @endif
+            </div>
         </div>
         <div class="box-footer">
             <button type="submit" class="btn btn-primary">保存设置</button>

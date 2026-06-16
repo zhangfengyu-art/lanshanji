@@ -4,6 +4,7 @@ namespace App\Admin\Controllers;
 
 use App\Models\SiteSetting;
 use App\Services\ExchangeRateService;
+use App\Services\SiteAfterSaleGroupService;
 use App\Services\SiteFaviconService;
 use Encore\Admin\Facades\Admin;
 use Encore\Admin\Layout\Content;
@@ -36,6 +37,11 @@ class SiteSettingsController extends Controller
             ExchangeRateService::SETTING_KEY,
             (string) config('site.default_jpy_per_cny', 22)
         );
+        $afterSaleGroupQr = $this->firstOrCreateSetting(SiteAfterSaleGroupService::KEY_QR_IMAGE, '');
+        $afterSaleGroupNotice = $this->firstOrCreateSetting(
+            SiteAfterSaleGroupService::KEY_NOTICE,
+            '扫码加入海淘售后群'
+        );
 
         return Admin::content(function (Content $content) use (
             $setting,
@@ -45,7 +51,9 @@ class SiteSettingsController extends Controller
             $brandTextEn,
             $disableEmailVerificationForTesting,
             $activeSiteMode,
-            $jpyPerCny
+            $jpyPerCny,
+            $afterSaleGroupQr,
+            $afterSaleGroupNotice
         ) {
             $content->header('站点设置');
             $content->description('维护站点品牌信息与运行模式');
@@ -58,6 +66,8 @@ class SiteSettingsController extends Controller
                 'disableEmailVerificationForTesting' => $disableEmailVerificationForTesting,
                 'activeSiteMode' => $activeSiteMode,
                 'jpyPerCny' => $jpyPerCny,
+                'afterSaleGroupQr' => $afterSaleGroupQr,
+                'afterSaleGroupNotice' => $afterSaleGroupNotice,
             ]));
         });
     }
@@ -74,6 +84,8 @@ class SiteSettingsController extends Controller
                 'disable_email_verification_for_testing' => 'nullable|boolean',
                 'active_site_mode' => 'required|in:A,B',
                 'jpy_per_cny' => 'required|numeric|min:0.01',
+                'after_sale_group_qr' => 'nullable|file|max:4096',
+                'after_sale_group_notice' => 'nullable|string|max:120',
             ]);
 
             $setting = $this->firstOrCreateSetting(SiteFaviconService::KEY_HEADER_LOGO, '');
@@ -89,6 +101,11 @@ class SiteSettingsController extends Controller
             $jpyPerCny = $this->firstOrCreateSetting(
                 ExchangeRateService::SETTING_KEY,
                 (string) config('site.default_jpy_per_cny', 22)
+            );
+            $afterSaleGroupQr = $this->firstOrCreateSetting(SiteAfterSaleGroupService::KEY_QR_IMAGE, '');
+            $afterSaleGroupNotice = $this->firstOrCreateSetting(
+                SiteAfterSaleGroupService::KEY_NOTICE,
+                '扫码加入海淘售后群'
             );
 
             $faviconService = app(SiteFaviconService::class);
@@ -145,6 +162,20 @@ class SiteSettingsController extends Controller
             $jpyPerCny->update([
                 'value' => (string) round((float) $request->input('jpy_per_cny'), 6),
             ]);
+            $afterSaleGroupNotice->update([
+                'value' => trim((string) $request->input('after_sale_group_notice', '')) ?: '扫码加入海淘售后群',
+            ]);
+
+            $afterSaleGroupQrFile = $request->file('after_sale_group_qr');
+            if ($afterSaleGroupQrFile) {
+                if (!$this->isAllowedImageFile($afterSaleGroupQrFile)) {
+                    return $this->redirectWithImageError($request, 'after_sale_group_qr', '售后群二维码仅支持 JPG、PNG、GIF、WebP 格式。');
+                }
+
+                $path = $this->storeSiteSettingImage($afterSaleGroupQrFile, 'after-sale-group');
+                $this->replaceStoredImage($afterSaleGroupQr, $path);
+            }
+
             Cache::forget('site.active_mode');
             ExchangeRateService::forgetCache();
 
@@ -161,7 +192,7 @@ class SiteSettingsController extends Controller
 
             return redirect()
                 ->route('admin.site_settings.logo.edit')
-                ->withInput($request->except(['logo', 'favicon_a', 'favicon_b']))
+                ->withInput($request->except(['logo', 'favicon_a', 'favicon_b', 'after_sale_group_qr']))
                 ->withErrors([
                     'logo' => '保存失败：'.$e->getMessage(),
                 ]);
@@ -180,7 +211,7 @@ class SiteSettingsController extends Controller
     {
         return redirect()
             ->route('admin.site_settings.logo.edit')
-            ->withInput($request->except(['logo', 'favicon_a', 'favicon_b']))
+            ->withInput($request->except(['logo', 'favicon_a', 'favicon_b', 'after_sale_group_qr']))
             ->withErrors([$field => $message]);
     }
 
@@ -332,6 +363,25 @@ class SiteSettingsController extends Controller
         $path = $file->store('images/brand', 'public');
         if (!$path) {
             throw new \RuntimeException('无法保存 Logo 文件，请检查 storage/app/public 目录权限。');
+        }
+
+        return $path;
+    }
+
+    protected function storeSiteSettingImage(UploadedFile $file, $basenamePrefix)
+    {
+        app(SiteFaviconService::class)->ensureBrandDirectoryExists();
+
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+            $extension = 'png';
+        }
+
+        $filename = preg_replace('/[^a-z0-9\-]+/i', '-', (string) $basenamePrefix).'-'.time().'.'.$extension;
+        $path = 'images/brand/'.$filename;
+
+        if (!Storage::disk('public')->put($path, file_get_contents($file->getRealPath()))) {
+            throw new \RuntimeException('无法保存图片，请检查 storage/app/public 目录权限。');
         }
 
         return $path;

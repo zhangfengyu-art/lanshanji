@@ -2659,6 +2659,41 @@ html {
     background: #f7f7f7;
   }
 
+  .after-sale-group-qr {
+    margin-top: 14px;
+    padding: 14px 12px;
+    text-align: center;
+    background: #f8faf6;
+    border: 1px solid #e2e8df;
+    border-top: 3px solid #6b8f71;
+  }
+
+  .after-sale-group-qr__title {
+    margin: 0 0 4px;
+    color: #2f4a35;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .after-sale-group-qr__hint {
+    margin: 0 0 10px;
+    color: #5f6f62;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .after-sale-group-qr__image {
+    display: block;
+    width: 168px;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    padding: 6px;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+  }
+
   .status-pill.is-info {
     color: #1f5f8b;
     background: #e8f3fb;
