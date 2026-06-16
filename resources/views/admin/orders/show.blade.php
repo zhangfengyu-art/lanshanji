@@ -115,7 +115,17 @@
               <button type="submit" class="btn btn-default btn-sm">解除锁定</button>
             </form>
           @endif
-          <span class="help-block" style="margin: 6px 0 0;">上传履约实拍图也会进入 S3。已发货为 S4。</span>
+          @php $atWarehouse = trim((string) data_get($order->extra, 'logistics_warehouse_at', '')) !== ''; @endphp
+          @if(!$atWarehouse && in_array($fulfillmentStage, [\App\Services\OrderFulfillmentService::STAGE_S2, \App\Services\OrderFulfillmentService::STAGE_S3], true))
+            <form action="{{ route('admin.orders.mark_logistics_warehouse', $order) }}" method="post" style="display:inline-block; margin-right: 8px;">
+              <input type="hidden" name="_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-default btn-sm" onclick="return confirm('确认包裹已送往物流仓库？标记后用户将无法按规则取消订单。');">标记：已送往物流仓库</button>
+            </form>
+          @endif
+          @if($atWarehouse)
+            <span class="text-danger" style="margin-left: 8px;">已送往物流仓库：{{ data_get($order->extra, 'logistics_warehouse_at') }}</span>
+          @endif
+          <span class="help-block" style="margin: 6px 0 0;">上传履约实拍图也会进入 S3。已发货为 S4。送往物流仓库后原则上不可取消。</span>
         </td>
       </tr>
       @endif
@@ -245,15 +255,81 @@
         </td>
       </tr>
       @endif
-      @if($order->refund_status !== \App\Models\Order::REFUND_STATUS_PENDING)
+      @if(is_site_mode_a() && $order->paid_at && $refundPreview)
       <tr>
-        <td>退款状态：</td>
-        <td colspan="2">{{ \App\Models\Order::$refundStatusMap[$order->refund_status] }}，理由：{{ data_get($order->extra, 'refund_reason', '—') }}</td>
-        <td>
-        @if($order->refund_status === \App\Models\Order::REFUND_STATUS_APPLIED)
-          <button class="btn btn-sm btn-success" id="btn-refund-agree">同意</button>
-          <button class="btn btn-sm btn-danger" id="btn-refund-disagree">不同意</button>
-        @endif
+        <td colspan="4">
+          <h4 style="margin-top: 8px;">退款操作</h4>
+          @if($order->refund_status !== \App\Models\Order::REFUND_STATUS_PENDING)
+            <p><strong>退款状态：</strong>{{ \App\Models\Order::$refundStatusMap[$order->refund_status] }}
+              @if(data_get($order->extra, 'refund_reason'))
+                · {{ data_get($order->extra, 'refund_reason') }}
+              @endif
+              @if(data_get($order->extra, 'refund_amount_cny'))
+                · 实退 ￥{{ number_format((float) data_get($order->extra, 'refund_amount_cny'), 2, '.', '') }}
+              @endif
+            </p>
+          @endif
+
+          @if($refundPreview['allowed'] || $order->refund_status === \App\Models\Order::REFUND_STATUS_APPLIED || $order->refund_status === \App\Models\Order::REFUND_STATUS_FAILED)
+            <div class="alert alert-info" style="margin-bottom: 12px;">
+              <strong>当前规则：</strong>{{ $refundPreview['policy_hint'] ?: $refundPreview['message'] }}<br>
+              实付 ￥{{ number_format($refundPreview['pay_amount_cny'], 2, '.', '') }}
+              @if($refundPreview['allowed'])
+                → 预计退款 ￥{{ number_format($refundPreview['refund_amount_cny'], 2, '.', '') }}
+                （取消费 ￥{{ number_format($refundPreview['cancellation_fee_cny'], 2, '.', '') }}）
+              @endif
+            </div>
+
+            @if($order->refund_status !== \App\Models\Order::REFUND_STATUS_SUCCESS && $order->refund_status !== \App\Models\Order::REFUND_STATUS_PROCESSING)
+            <form action="{{ route('admin.orders.handle_refund', $order) }}" method="post" id="admin-refund-form">
+              <input type="hidden" name="_token" value="{{ csrf_token() }}">
+              <div class="form-group">
+                <label for="reason_code">退款原因</label>
+                <select name="reason_code" id="reason_code" class="form-control" required style="max-width: 420px;">
+                  <option value="">请选择</option>
+                  @foreach($refundReasons as $code => $label)
+                    <option value="{{ $code }}">{{ $label }}</option>
+                  @endforeach
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="reason_note">备注（选填）</label>
+                <input type="text" name="reason_note" id="reason_note" class="form-control" style="max-width: 420px;" placeholder="可补充说明">
+              </div>
+              @if($refundPreview['show_supplier_shortage'])
+              <div class="checkbox">
+                <label>
+                  <input type="checkbox" name="supplier_cannot_supply" value="1"> 确认供应商近期无法正常供货（全额退款）
+                </label>
+              </div>
+              @endif
+              @if($refundPreview['requires_s4_approval'])
+              <div class="checkbox">
+                <label>
+                  <input type="checkbox" name="s4_special_approval" value="1" id="s4_special_approval"> 已发货特批退款（需审批）
+                </label>
+              </div>
+              <div class="form-group" id="s4_ratio_group" style="display:none;">
+                <label for="s4_refund_ratio">特批退款比例</label>
+                <select name="s4_refund_ratio" id="s4_refund_ratio" class="form-control" style="max-width: 200px;">
+                  <option value="0.8">退款 80%（扣 20% 取消费）</option>
+                  <option value="1">退款 100%（全额）</option>
+                </select>
+              </div>
+              @endif
+              <button type="submit" class="btn btn-danger" id="btn-execute-refund"
+                @if(!$refundPreview['allowed']) disabled @endif
+                onclick="return confirm('确认按当前规则执行退款？款项将原路退回，不可撤销。');">
+                执行退款
+              </button>
+              @if(!$refundPreview['allowed'])
+                <p class="help-block text-danger">{{ $refundPreview['message'] }}</p>
+              @endif
+            </form>
+            @endif
+          @else
+            <p class="text-muted">{{ $refundPreview['message'] ?: '当前不可退款。' }}</p>
+          @endif
         </td>
       </tr>
       @endif
@@ -262,76 +338,13 @@
   </div>
 </div>
 
+@if(is_site_mode_a() && $refundPreview && $refundPreview['requires_s4_approval'])
 <script>
-$(document).ready(function() {
-  $('#btn-refund-disagree').click(function() {
-    swal({
-      title: '输入拒绝退款理由',
-      type: 'input',
-      showCancelButton: true,
-      closeOnConfirm: false,
-      confirmButtonText: "确认",
-      cancelButtonText: "取消",
-    }, function(inputValue){
-      if (inputValue === false) {
-        return;
-      }
-      if (!inputValue) {
-        swal('理由不能为空', '', 'error')
-        return;
-      }
-      $.ajax({
-        url: '{{ route('admin.orders.handle_refund', [$order->id]) }}',
-        type: 'POST',
-        data: JSON.stringify({
-          agree: false,
-          reason: inputValue,
-          _token: LA.token,
-        }),
-        contentType: 'application/json',
-        success: function (data) {
-          swal({
-            title: '操作成功',
-            type: 'success'
-          }, function() {
-            location.reload();
-          });
-        }
-      });
-    });
+$(document).ready(function () {
+  $('#s4_special_approval').on('change', function () {
+    $('#s4_ratio_group').toggle(this.checked);
+    $('#btn-execute-refund').prop('disabled', !this.checked);
   });
-
-  $('#btn-refund-agree').click(function() {
-    swal({
-      title: '确认要将款项退还给用户？',
-      type: 'warning',
-      showCancelButton: true,
-      closeOnConfirm: false,
-      confirmButtonText: "确认",
-      cancelButtonText: "取消",
-    }, function(ret){
-      if (!ret) {
-        return;
-      }
-      $.ajax({
-        url: '{{ route('admin.orders.handle_refund', [$order->id]) }}',
-        type: 'POST',
-        data: JSON.stringify({
-          agree: true,
-          _token: LA.token,
-        }),
-        contentType: 'application/json',
-        success: function (data) {
-          swal({
-            title: '操作成功',
-            type: 'success'
-          }, function() {
-            location.reload();
-          });
-        }
-      });
-    });
-  });
-
 });
 </script>
+@endif

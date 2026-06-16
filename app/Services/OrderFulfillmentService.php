@@ -204,6 +204,32 @@ class OrderFulfillmentService
         return trim((string) data_get($order->extra, 'locked_at', '')) !== '';
     }
 
+    public function packageAtLogisticsWarehouse(Order $order)
+    {
+        return trim((string) data_get($order->extra, 'logistics_warehouse_at', '')) !== '';
+    }
+
+    public function markPackageAtLogisticsWarehouse(Order $order)
+    {
+        if (!$order->paid_at) {
+            throw new InvalidRequestException('仅已支付订单可标记。');
+        }
+
+        if (in_array($order->ship_status, [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED], true)) {
+            throw new InvalidRequestException('订单已发货，无法标记送往仓库。');
+        }
+
+        $extra = $order->extra ?: [];
+        if ($this->packageAtLogisticsWarehouse($order)) {
+            throw new InvalidRequestException('订单已标记为送往物流仓库。');
+        }
+
+        $extra['logistics_warehouse_at'] = now()->toDateTimeString();
+        $order->update(['extra' => $extra]);
+
+        return $order->fresh();
+    }
+
     protected function addressChangeCount(Order $order)
     {
         return (int) data_get($order->extra, 'address_change_count', 0);

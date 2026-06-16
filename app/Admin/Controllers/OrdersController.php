@@ -17,7 +17,7 @@ use Encore\Admin\Facades\Admin;
 use Encore\Admin\Layout\Content;
 use App\Http\Controllers\Controller;
 use Encore\Admin\Controllers\ModelForm;
-use App\Http\Requests\Admin\HandleRefundRequest;
+use App\Http\Requests\Admin\ExecuteOrderRefundRequest;
 
 class OrdersController extends Controller
 {
@@ -35,10 +35,19 @@ class OrdersController extends Controller
     {
         $order->load(['user', 'items.product', 'items.productSku']);
 
-        return Admin::content(function (Content $content) use ($order) {
+        $refundPreview = is_site_mode_a()
+            ? app(\App\Services\OrderRefundPolicyService::class)->previewAdminRefund($order)
+            : null;
+        $refundReasons = config('order_refund.admin_reasons', []);
+
+        return Admin::content(function (Content $content) use ($order, $refundPreview, $refundReasons) {
             $content->header('查看订单');
             // body 方法可以接受 Laravel 的视图作为参数
-            $content->body(view('admin.orders.show', ['order' => $order]));
+            $content->body(view('admin.orders.show', [
+                'order' => $order,
+                'refundPreview' => $refundPreview,
+                'refundReasons' => $refundReasons,
+            ]));
         });
     }
 
@@ -408,36 +417,41 @@ JS
         }
     }
 
-    public function handleRefund(Order $order, HandleRefundRequest $request)
+    public function markLogisticsWarehouse(Order $order, OrderFulfillmentService $fulfillment)
     {
-        // 判断订单状态是否正确
-        if ($order->refund_status !== Order::REFUND_STATUS_APPLIED) {
-            throw new InvalidRequestException('订单状态不正确');
-        }
-        // 是否同意退款
-        if ($request->input('agree')) {
-            // 清空拒绝退款理
-            $extra = $order->extra ?: [];
-            unset($extra['refund_disagree_reason']);
-            $order->update([
-                'extra' => $extra,
-            ]);
-            // 调用退款逻辑
-            app(\App\Services\OrderRefundService::class)->executePaymentRefund($order);
-        } else {
-            // 将拒绝退款理由放到订单的 extra 字段中
-            $extra = $order->extra ?: [];
-            $extra['refund_disagree_reason'] = $request->input('reason');
-            // 将订单的退款状态改为未退款
-            $order->update([
-                'refund_status' => Order::REFUND_STATUS_PENDING,
-                'extra'         => $extra,
-            ]);
-            if ($order->user) {
-                $order->user->notify(new \App\Notifications\OrderRefundedNotification($order, false, $request->input('reason')));
-            }
+        $fulfillment->markPackageAtLogisticsWarehouse($order);
+
+        return redirect()
+            ->back()
+            ->with('success', '已标记：包裹已送往物流仓库。此后原则上不可取消订单。');
+    }
+
+    public function executeRefund(Order $order, ExecuteOrderRefundRequest $request)
+    {
+        if (!is_site_mode_a()) {
+            throw new InvalidRequestException('当前站点不支持此退款操作。');
         }
 
-        return $order;
+        $adminId = optional(\Encore\Admin\Facades\Admin::user())->id;
+        app(\App\Services\OrderRefundService::class)->executeAdminRefund(
+            $order,
+            $request->only([
+                'reason_code',
+                'reason_note',
+                'supplier_cannot_supply',
+                's4_special_approval',
+                's4_refund_ratio',
+            ]),
+            $adminId
+        );
+
+        return redirect()
+            ->back()
+            ->with('success', '退款请求已提交，请刷新查看退款状态。');
+    }
+
+    public function handleRefund(Order $order, ExecuteOrderRefundRequest $request)
+    {
+        return $this->executeRefund($order, $request);
     }
 }

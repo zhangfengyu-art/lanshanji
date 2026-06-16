@@ -13,9 +13,13 @@ class OrderRefundService
     /** @var OrderFulfillmentService */
     protected $fulfillment;
 
-    public function __construct(OrderFulfillmentService $fulfillment)
+    /** @var OrderRefundPolicyService */
+    protected $policy;
+
+    public function __construct(OrderFulfillmentService $fulfillment, OrderRefundPolicyService $policy)
     {
         $this->fulfillment = $fulfillment;
+        $this->policy = $policy;
     }
 
     public function canSelfInstantRefund(Order $order)
@@ -137,19 +141,91 @@ class OrderRefundService
 
             $locked->update(['extra' => $extra]);
 
-            return $this->executePaymentRefund($locked->fresh());
+            return $this->executePaymentRefund($locked->fresh(), 1.0);
         });
     }
 
-    public function executePaymentRefund(Order $order)
+    public function executeAdminRefund(Order $order, array $input, $adminId = null)
     {
+        return \DB::transaction(function () use ($order, $input, $adminId) {
+            /** @var Order $locked */
+            $locked = Order::query()->lockForUpdate()->find($order->id);
+            if (!$locked) {
+                throw new InvalidRequestException('订单不存在。');
+            }
+
+            if ($locked->refund_status === Order::REFUND_STATUS_APPLIED) {
+                $extra = $locked->extra ?: [];
+                unset($extra['refund_disagree_reason']);
+                $locked->update(['extra' => $extra]);
+            }
+
+            $evaluation = $this->policy->evaluateAdminRefund($locked, $input, true);
+            $ratio = (float) $evaluation['refund_ratio'];
+            $reasonCode = (string) data_get($input, 'reason_code', '');
+            $reasonNote = trim((string) data_get($input, 'reason_note', ''));
+            $reasonLabel = $this->policy->reasonLabel($reasonCode);
+            $reasonText = $reasonLabel;
+            if ($reasonNote !== '') {
+                $reasonText .= '：'.$reasonNote;
+            }
+
+            $extra = $locked->extra ?: [];
+            $extra['refund_reason'] = $reasonText;
+            $extra['refund_reason_code'] = $reasonCode;
+            $extra['refund_reason_note'] = $reasonNote;
+            $extra['admin_refund_at'] = now()->toDateTimeString();
+            $extra['admin_refund_by'] = $adminId;
+            $extra['admin_refund_ratio'] = $ratio;
+            $extra['admin_refund_policy_hint'] = $evaluation['policy_hint'];
+            if ((bool) data_get($input, 'supplier_cannot_supply', false)) {
+                $extra['supplier_cannot_supply'] = true;
+                $extra['supplier_cannot_supply_at'] = now()->toDateTimeString();
+            }
+            if ((bool) data_get($input, 's4_special_approval', false)) {
+                $extra['s4_special_refund_approval'] = true;
+                $extra['s4_special_refund_at'] = now()->toDateTimeString();
+            }
+
+            $locked->update(['extra' => $extra]);
+
+            return $this->executePaymentRefund($locked->fresh(), $ratio);
+        });
+    }
+
+    public function executePaymentRefund(Order $order, $refundRatio = 1.0)
+    {
+        $payCny = round((float) $order->getPaymentAmountCny(), 2);
+        $ratio = round((float) $refundRatio, 4);
+        if ($ratio <= 0) {
+            throw new InvalidRequestException('退款比例无效。');
+        }
+        if ($ratio > 1) {
+            $ratio = 1.0;
+        }
+
+        $refundCny = round($payCny * $ratio, 2);
+        if ($refundCny <= 0) {
+            throw new InvalidRequestException('退款金额无效。');
+        }
+        if ($refundCny > $payCny) {
+            $refundCny = $payCny;
+        }
+
+        $extra = $order->extra ?: [];
+        $extra['refund_amount_cny'] = $refundCny;
+        $extra['refund_pay_amount_cny'] = $payCny;
+        $extra['refund_ratio_applied'] = $ratio;
+        $extra['cancellation_fee_cny'] = round($payCny - $refundCny, 2);
+        $order->update(['extra' => $extra]);
+
         switch ($order->payment_method) {
             case 'wechat':
                 $refundNo = Order::getAvailableRefundNo();
                 app('wechat_pay')->refund([
                     'out_trade_no' => $order->no,
-                    'total_fee' => $order->getPaymentAmountCny() * 100,
-                    'refund_fee' => $order->getPaymentAmountCny() * 100,
+                    'total_fee' => (int) round($payCny * 100),
+                    'refund_fee' => (int) round($refundCny * 100),
                     'out_refund_no' => $refundNo,
                     'notify_url' => route('payment.wechat.refund_notify'),
                 ]);
@@ -164,7 +240,7 @@ class OrderRefundService
                 $refundNo = Order::getAvailableRefundNo();
                 $ret = app('alipay')->refund([
                     'out_trade_no' => $order->no,
-                    'refund_amount' => $order->getPaymentAmountCny(),
+                    'refund_amount' => $refundCny,
                     'out_request_no' => $refundNo,
                 ]);
                 if ($ret->sub_code) {
@@ -199,6 +275,11 @@ class OrderRefundService
         if ($order->user && $order->refund_status === Order::REFUND_STATUS_SUCCESS) {
             $order->user->notify(new \App\Notifications\OrderRefundedNotification($order, true));
         }
+    }
+
+    public function notifyRefundSuccessPublic(Order $order)
+    {
+        $this->notifyRefundSuccess($order);
     }
 
     protected function recentInstantRefunds($userId, Carbon $since)

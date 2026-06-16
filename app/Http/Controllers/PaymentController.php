@@ -190,6 +190,8 @@ class PaymentController extends Controller
             $order->update([
                 'refund_status' => Order::REFUND_STATUS_SUCCESS,
             ]);
+            $order->refresh();
+            app(\App\Services\OrderRefundService::class)->notifyRefundSuccessPublic($order);
         } else {
             $extra = $order->extra;
             $extra['refund_failed_code'] = $data['refund_status'];

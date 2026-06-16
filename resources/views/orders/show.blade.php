@@ -46,6 +46,12 @@
     && !$canInstantRefund
     && !$useRefundFeedback;
 
+  $refundPolicyHint = '';
+  if ($isPaid && is_site_mode_a() && $useRefundFeedback) {
+    $policyPreview = app(\App\Services\OrderRefundPolicyService::class)->previewAdminRefund($order);
+    $refundPolicyHint = $policyPreview['policy_hint'] ?: $policyPreview['message'];
+  }
+
   if (!$isPaid && !$isClosed) {
     $expiresInSeconds = $order->getAllocationExpiresIn();
   }
@@ -319,11 +325,17 @@
               @if($canInstantRefund && $remainingInstantRefunds > 0)
                 <div class="kv"><span class="k">自助秒退：</span><span class="v">最近 {{ (int) config('order_refund.instant.window_hours', 24) }} 小时内还可 {{ $remainingInstantRefunds }} 次</span></div>
               @endif
+              @if($useRefundFeedback && $refundPolicyHint)
+                <div class="warn-box" style="margin-top:8px;">取消/退款规则：{{ $refundPolicyHint }}。本阶段请通过「客户反馈」提交取消申请，由客服审核后处理。</div>
+              @endif
             @endif
 
             @if($order->paid_at && $order->refund_status !== \App\Models\Order::REFUND_STATUS_PENDING)
               <div class="kv"><span class="k">退款状态：</span><span class="v">{{ \App\Models\Order::$refundStatusMap[$order->refund_status] }}</span></div>
               <div class="kv"><span class="k">退款理由：</span><span class="v">{{ data_get($order->extra, 'refund_reason', trans('frontend.common.none')) }}</span></div>
+              @if(data_get($order->extra, 'refund_amount_cny'))
+                <div class="kv"><span class="k">实退金额：</span><span class="v">￥{{ number_format((float) data_get($order->extra, 'refund_amount_cny'), 2, '.', '') }}</span></div>
+              @endif
             @endif
 
             @if(isset($order->extra['refund_disagree_reason']))
