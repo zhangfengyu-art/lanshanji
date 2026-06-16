@@ -4,7 +4,7 @@ namespace App\Admin\Controllers;
 
 use App\Exceptions\InternalException;
 use App\Models\Order;
-use App\Services\AdminHtmlExcelExport;
+use App\Services\AdminOrderZipExport;
 use App\Services\OrderAdminExportService;
 use App\Services\OrderFulfillmentService;
 use Illuminate\Http\Request;
@@ -94,20 +94,17 @@ class OrdersController extends Controller
             $scope = 'all';
         }
 
-        $rows = [];
-
         $fulfillment = app(OrderFulfillmentService::class);
 
-        return AdminHtmlExcelExport::download(
+        return AdminOrderZipExport::download(
             OrderAdminExportService::filename($scope),
             OrderAdminExportService::headers(),
-            $rows,
+            function ($emitRow) use ($scope, $fulfillment) {
+                OrderAdminExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
+            },
             [
                 'text_columns' => OrderAdminExportService::TEXT_COLUMN_INDEXES,
                 'image_columns' => OrderAdminExportService::IMAGE_COLUMN_INDEXES,
-                'row_producer' => function ($emitRow) use ($scope, $fulfillment) {
-                    OrderAdminExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
-                },
             ]
         );
     }

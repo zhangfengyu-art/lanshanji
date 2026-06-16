@@ -32,6 +32,7 @@
           <form class="form-horizontal" method="post" action="{{ route('orders.update_address', $order) }}">
             {{ csrf_field() }}
             {{ method_field('PUT') }}
+            <input type="hidden" id="address_init_zip" value="{{ old('zip', \App\Services\ChinaAreaZipService::normalizeZip($addressForm['zip']) ?: \App\Services\ChinaAreaZipService::zipFromNames($addressForm['province'], $addressForm['city'], $addressForm['district'])) }}">
 
             <select-district
               :init-value="{{ json_encode([$addressForm['province'], $addressForm['city'], $addressForm['district']]) }}"
@@ -60,7 +61,7 @@
               </div>
             </select-district>
 
-            <input type="hidden" name="zip" value="{{ old('zip', $addressForm['zip']) }}">
+            <input type="hidden" name="zip" v-model="zip">
             <input type="hidden" name="province" v-model="province">
             <input type="hidden" name="city" v-model="city">
             <input type="hidden" name="district" v-model="district">

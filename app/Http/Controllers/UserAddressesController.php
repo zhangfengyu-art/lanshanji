@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\UserAddress;
 use App\Http\Requests\UserAddressRequest;
+use App\Services\ChinaAreaZipService;
 
 class UserAddressesController extends Controller
 {
@@ -45,7 +46,7 @@ class UserAddressesController extends Controller
             'contact_phone',
             'id_card',
         ]), [
-            'zip' => (int) $request->input('zip', 0),
+            'zip' => $this->resolveZipFromRequest($request),
             'is_default' => $isDefault ? 1 : 0,
         ]));
 
@@ -88,7 +89,7 @@ class UserAddressesController extends Controller
             'contact_phone',
             'id_card',
         ]), [
-            'zip' => (int) $request->input('zip', 0),
+            'zip' => $this->resolveZipFromRequest($request),
             'is_default' => $isDefault ? 1 : 0,
         ]));
 
@@ -128,5 +129,21 @@ class UserAddressesController extends Controller
         }
 
         return $redirectTo;
+    }
+
+    protected function resolveZipFromRequest(Request $request)
+    {
+        $zip = ChinaAreaZipService::normalizeZip($request->input('zip'));
+        if ($zip !== '') {
+            return (int) $zip;
+        }
+
+        $zip = ChinaAreaZipService::zipFromNames(
+            $request->input('province'),
+            $request->input('city'),
+            $request->input('district')
+        );
+
+        return $zip !== '' ? (int) $zip : 0;
     }
 }

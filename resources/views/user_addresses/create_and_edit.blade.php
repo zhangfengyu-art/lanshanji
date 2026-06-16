@@ -38,6 +38,7 @@
       @endif
         {{ csrf_field() }}
         <input type="hidden" name="redirect" value="{{ old('redirect', $redirectTo ?? request('redirect', '')) }}">
+        <input type="hidden" id="address_init_zip" value="{{ old('zip', \App\Services\ChinaAreaZipService::normalizeZip($address->zip) ?: \App\Services\ChinaAreaZipService::zipFromNames($address->province, $address->city, $address->district)) }}">
         <select-district :init-value="{{ json_encode([$address->province, $address->city, $address->district]) }}" @change="onDistrictChanged" inline-template>
           <div class="form-group">
             <label class="control-label col-sm-2">{{ trans('frontend.address.region') }}</label>
@@ -64,7 +65,7 @@
         <!-- 插入了 3 个隐藏的字段 -->
         <!-- 通过 v-model 与 user-addresses-create-and-edit 组件里的值关联起来 -->
         <!-- 当组件中的值变化时，这里的值也会跟着变 -->
-        <input type="hidden" name="zip" value="{{ old('zip', ($address->zip && (int) $address->zip > 0) ? $address->zip : '') }}">
+        <input type="hidden" name="zip" v-model="zip">
         <input type="hidden" name="province" v-model="province">
         <input type="hidden" name="city" v-model="city">
         <input type="hidden" name="district" v-model="district">

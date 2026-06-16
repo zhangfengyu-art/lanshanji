@@ -56,8 +56,8 @@ Vue.component('select-district', {
     },
     // 当选择的区发生改变时触发
     districtId() {
-      // 触发一个名为 change 的 Vue 事件，事件的值就是当前选中的省市区名称，格式为数组
-      this.$emit('change', [this.provinces[this.provinceId], this.cities[this.cityId], this.districts[this.districtId]]);
+      const zipCode = this.districtId ? String(this.districtId) : '';
+      this.$emit('change', [this.provinces[this.provinceId], this.cities[this.cityId], this.districts[this.districtId]], zipCode);
     },
   },
   // 组件初始化时会调用这个方法

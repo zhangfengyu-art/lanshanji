@@ -122,7 +122,7 @@ class OrderAdminExportService
             $product = $item->product;
             $title = $product ? $product->title : ($item->product_id ? '商品#'.$item->product_id : '—');
             $skuTitle = optional($item->productSku)->title;
-            $imageUrl = $product ? self::imageEmbedForProduct($product) : '';
+            $imageUrl = $product ? self::imageLocalPathForProduct($product) : '';
 
             $rows[] = array_merge($head, [
                 $title,
@@ -213,9 +213,18 @@ class OrderAdminExportService
 
     public static function resolveOrderZip(Order $order)
     {
-        $fromOrder = self::normalizeZip(data_get($order->address, 'zip'));
+        $fromOrder = ChinaAreaZipService::normalizeZip(data_get($order->address, 'zip'));
         if ($fromOrder !== '') {
             return $fromOrder;
+        }
+
+        $fromArea = ChinaAreaZipService::zipFromNames(
+            data_get($order->address, 'province'),
+            data_get($order->address, 'city'),
+            data_get($order->address, 'district')
+        );
+        if ($fromArea !== '') {
+            return $fromArea;
         }
 
         if (!$order->user_id) {
@@ -234,7 +243,7 @@ class OrderAdminExportService
                 ->orderByDesc('last_used_at')
                 ->first();
             if ($match) {
-                $zip = self::normalizeZip($match->zip);
+                $zip = ChinaAreaZipService::normalizeZip($match->zip);
                 if ($zip !== '') {
                     return $zip;
                 }
@@ -248,7 +257,7 @@ class OrderAdminExportService
                 ->orderByDesc('last_used_at')
                 ->first();
             if ($match) {
-                $zip = self::normalizeZip($match->zip);
+                $zip = ChinaAreaZipService::normalizeZip($match->zip);
                 if ($zip !== '') {
                     return $zip;
                 }
@@ -260,17 +269,21 @@ class OrderAdminExportService
             ->orderByDesc('last_used_at')
             ->first();
 
-        return $default ? self::normalizeZip($default->zip) : '';
+        if ($default) {
+            $zip = ChinaAreaZipService::normalizeZip($default->zip);
+            if ($zip !== '') {
+                return $zip;
+            }
+
+            return ChinaAreaZipService::zipFromNames($default->province, $default->city, $default->district);
+        }
+
+        return '';
     }
 
     public static function normalizeZip($zip)
     {
-        $zip = trim((string) $zip);
-        if ($zip === '' || $zip === '0' || (int) $zip === 0) {
-            return '';
-        }
-
-        return $zip;
+        return ChinaAreaZipService::normalizeZip($zip);
     }
 
     public static function formatStreetAddress(array $address)
@@ -319,6 +332,14 @@ class OrderAdminExportService
             $zip = self::resolveOrderZip($order);
         }
 
+        if ($zip === '' && $order === null) {
+            $zip = ChinaAreaZipService::zipFromNames(
+                data_get($address, 'province'),
+                data_get($address, 'city'),
+                data_get($address, 'district')
+            );
+        }
+
         if ($zip !== '' && $street !== '') {
             $street .= '（邮编 '.$zip.'）';
         }
@@ -340,6 +361,144 @@ class OrderAdminExportService
         }));
 
         return implode('，', $parts);
+    }
+
+    public static function imageLocalPathForProduct($product)
+    {
+        if (!$product) {
+            return '';
+        }
+
+        $rawPath = trim((string) ($product->getAttributes()['image'] ?? ''));
+        $local = self::resolveLocalImageFile($rawPath);
+        if ($local) {
+            return $local;
+        }
+
+        $imageUrl = trim((string) $product->image_url);
+        if ($imageUrl !== '' && $imageUrl !== $rawPath) {
+            $local = self::resolveLocalImageFile($imageUrl);
+            if ($local) {
+                return $local;
+            }
+        }
+
+        $remote = $imageUrl !== '' ? $imageUrl : $rawPath;
+
+        return self::downloadRemoteImageToCache($remote) ?: '';
+    }
+
+    protected static function downloadRemoteImageToCache($url)
+    {
+        $url = trim((string) $url);
+        if ($url === '' || !Str::startsWith($url, ['http://', 'https://'])) {
+            return '';
+        }
+
+        $cacheDir = storage_path('app/export_image_cache');
+        if (!is_dir($cacheDir) && !@mkdir($cacheDir, 0755, true) && !is_dir($cacheDir)) {
+            return '';
+        }
+
+        $hash = md5($url);
+        foreach (['jpg', 'jpeg', 'png', 'webp', 'gif'] as $ext) {
+            $cached = $cacheDir.DIRECTORY_SEPARATOR.$hash.'.'.$ext;
+            if (is_file($cached) && filesize($cached) > 0) {
+                return $cached;
+            }
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 20,
+                'user_agent' => 'myshop-order-export/1.0',
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+
+        $raw = @file_get_contents($url, false, $context);
+        if ($raw === false || $raw === '') {
+            return '';
+        }
+
+        $ext = 'jpg';
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {
+                $mime = finfo_buffer($finfo, $raw);
+                finfo_close($finfo);
+                $mimeMap = [
+                    'image/jpeg' => 'jpg',
+                    'image/png' => 'png',
+                    'image/webp' => 'webp',
+                    'image/gif' => 'gif',
+                ];
+                if (isset($mimeMap[$mime])) {
+                    $ext = $mimeMap[$mime];
+                }
+            }
+        }
+
+        $dest = $cacheDir.DIRECTORY_SEPARATOR.$hash.'.'.$ext;
+        if (@file_put_contents($dest, $raw) === false) {
+            return '';
+        }
+
+        return is_file($dest) ? $dest : '';
+    }
+
+    public static function writeThumbnailFile($sourcePath, $destDir, $basename)
+    {
+        $sourcePath = trim((string) $sourcePath);
+        if ($sourcePath === '' || !is_file($sourcePath)) {
+            return '';
+        }
+
+        $destPath = rtrim($destDir, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$basename.'.jpg';
+
+        if (!function_exists('imagecreatefromstring')) {
+            if (@copy($sourcePath, $destPath)) {
+                return $destPath;
+            }
+
+            return '';
+        }
+
+        $raw = @file_get_contents($sourcePath);
+        if ($raw === false || $raw === '') {
+            return '';
+        }
+
+        $img = @imagecreatefromstring($raw);
+        if (!$img) {
+            if (@copy($sourcePath, $destPath)) {
+                return $destPath;
+            }
+
+            return '';
+        }
+
+        $width = imagesx($img);
+        $height = imagesy($img);
+        $maxSize = 96;
+        $scale = min($maxSize / max($width, 1), $maxSize / max($height, 1), 1);
+
+        if ($scale < 1) {
+            $newWidth = max(1, (int) round($width * $scale));
+            $newHeight = max(1, (int) round($height * $scale));
+            $thumb = imagecreatetruecolor($newWidth, $newHeight);
+            imagecopyresampled($thumb, $img, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+            imagedestroy($img);
+            $img = $thumb;
+        }
+
+        imagejpeg($img, $destPath, 82);
+        imagedestroy($img);
+
+        return is_file($destPath) ? $destPath : '';
     }
 
     public static function imageEmbedForProduct($product)
@@ -533,7 +692,7 @@ class OrderAdminExportService
             $safe = 'orders';
         }
 
-        return $safe.'_'.date('Ymd_His').'.xls';
+        return $safe.'_'.date('Ymd_His').'.zip';
     }
 
     public static function exportRowsWithProducer($scope, OrderFulfillmentService $fulfillment, callable $emitRow)
