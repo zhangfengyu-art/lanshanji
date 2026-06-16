@@ -332,6 +332,16 @@ class OrdersController extends Controller
                 return $parts ? implode(' / ', $parts) : '—';
             });
             $grid->paid_at('支付时间')->sortable();
+            $grid->payment_method('支付方式')->display(function ($value) {
+                if ($value === 'wechat') {
+                    return '微信支付';
+                }
+                if ($value === 'alipay') {
+                    return '支付宝';
+                }
+
+                return $value ?: '—';
+            });
             $grid->ship_status('发货状态')->display(function($value) {
                 return Order::$shipStatusMap[$value];
             });
