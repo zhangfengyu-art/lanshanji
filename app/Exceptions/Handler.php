@@ -60,6 +60,10 @@ class Handler extends ExceptionHandler
                 ->withErrors(['message' => $exception->getMessage()]);
         }
 
+        if ($exception instanceof InternalException) {
+            return $exception->render($request);
+        }
+
         return parent::render($request, $exception);
     }
 }

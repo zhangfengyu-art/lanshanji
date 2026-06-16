@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\InvalidRequestException;
 use App\Models\Order;
 use Illuminate\Http\Request;
 
@@ -144,6 +145,7 @@ class CrossSitePaymentService
             'payment.alipay.notify',
             'payment.wechat.notify',
             'payment.wechat.refund_notify',
+            'payment.cross_refund',
         ];
 
         if ($routeName && in_array($routeName, $allowedNames, true)) {
@@ -168,6 +170,10 @@ class CrossSitePaymentService
             return true;
         }
 
+        if ($request->isMethod('POST') && preg_match('#^payment/cross-refund/\d+#', $path)) {
+            return true;
+        }
+
         return false;
     }
 
@@ -176,5 +182,99 @@ class CrossSitePaymentService
         $orderId = (int) ($orderId ?: $this->escrowOrderId());
 
         return $orderId > 0 ? site_a_url('orders/'.$orderId) : site_a_url();
+    }
+
+    /**
+     * A 站订单在 B 站收银台收款，退款也需由 B 站调支付渠道。
+     */
+    public function shouldDelegateRefundToSiteB()
+    {
+        return $this->shouldRedirectToSiteB();
+    }
+
+    public function signRefund(Order $order, $refundNo, $payCny, $refundCny, $expires)
+    {
+        $payload = implode('|', [
+            (int) $order->id,
+            (int) $order->user_id,
+            (string) $refundNo,
+            (int) round((float) $payCny * 100),
+            (int) round((float) $refundCny * 100),
+            (int) $expires,
+        ]);
+
+        return hash_hmac('sha256', $payload, (string) config('app.key'));
+    }
+
+    public function verifyRefundRequest(Request $request, Order $order)
+    {
+        $expires = (int) $request->input('expires');
+        $signature = (string) $request->input('signature');
+        $refundNo = trim((string) $request->input('refund_no'));
+
+        if ($expires < time() || $signature === '' || $refundNo === '') {
+            return false;
+        }
+
+        $payCny = (float) $request->input('pay_cny');
+        $refundCny = (float) $request->input('refund_cny');
+        $expected = $this->signRefund($order, $refundNo, $payCny, $refundCny, $expires);
+
+        return hash_equals($expected, $signature);
+    }
+
+    public function delegateRefundToSiteB(Order $order, $refundNo, $payCny, $refundCny)
+    {
+        $expires = now()->addMinutes(10)->timestamp;
+        $payload = [
+            'refund_no' => $refundNo,
+            'pay_cny' => $payCny,
+            'refund_cny' => $refundCny,
+            'expires' => $expires,
+            'signature' => $this->signRefund($order, $refundNo, $payCny, $refundCny, $expires),
+        ];
+
+        $url = site_b_url('payment/cross-refund/'.$order->id);
+
+        try {
+            $client = new \GuzzleHttp\Client([
+                'timeout' => 45,
+                'http_errors' => false,
+                'verify' => true,
+            ]);
+            $response = $client->post($url, [
+                'form_params' => $payload,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'X-Requested-With' => 'XMLHttpRequest',
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('跨站退款请求失败', [
+                'order_id' => $order->id,
+                'url' => $url,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw new InvalidRequestException('无法连接支付收银台发起退款，请稍后重试或通过客户反馈联系本站。');
+        }
+
+        $status = (int) $response->getStatusCode();
+        $body = (string) $response->getBody();
+        $data = json_decode($body, true);
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        if ($status >= 400) {
+            $message = trim((string) ($data['message'] ?? $data['msg'] ?? ''));
+            if ($message === '') {
+                $message = '支付收银台退款失败，请稍后重试或通过客户反馈联系本站。';
+            }
+
+            throw new InvalidRequestException($message);
+        }
+
+        return $data;
     }
 }

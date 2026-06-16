@@ -76,6 +76,7 @@ Route::group(['middleware' => 'auth'], function() {
 });
 
 Route::get('payment/cross/{order}', 'PaymentController@crossPay')->name('payment.cross');
+Route::post('payment/cross-refund/{order}', 'PaymentController@crossRefund')->name('payment.cross_refund');
 
 Route::get('pages/order-flow', 'PagesController@orderFlow')->name('pages.order_flow');
 Route::get('pages/order-flow.html', 'PagesController@orderFlow');

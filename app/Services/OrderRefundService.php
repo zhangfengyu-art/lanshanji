@@ -7,6 +7,7 @@ use App\Exceptions\InvalidRequestException;
 use App\Models\Order;
 use App\Models\User;
 use Carbon\Carbon;
+use App\Services\ExchangeRateService;
 
 class OrderRefundService
 {
@@ -16,10 +17,17 @@ class OrderRefundService
     /** @var OrderRefundPolicyService */
     protected $policy;
 
-    public function __construct(OrderFulfillmentService $fulfillment, OrderRefundPolicyService $policy)
-    {
+    /** @var CrossSitePaymentService */
+    protected $crossSitePayment;
+
+    public function __construct(
+        OrderFulfillmentService $fulfillment,
+        OrderRefundPolicyService $policy,
+        CrossSitePaymentService $crossSitePayment
+    ) {
         $this->fulfillment = $fulfillment;
         $this->policy = $policy;
+        $this->crossSitePayment = $crossSitePayment;
     }
 
     public function canSelfInstantRefund(Order $order)
@@ -195,7 +203,15 @@ class OrderRefundService
 
     public function executePaymentRefund(Order $order, $refundRatio = 1.0)
     {
+        if ((float) $order->getPaymentAmountCny() <= 0) {
+            app(ExchangeRateService::class)->snapshotQuoteOnOrder($order->fresh());
+            $order = $order->fresh();
+        }
+
         $payCny = round((float) $order->getPaymentAmountCny(), 2);
+        if ($payCny <= 0) {
+            throw new InvalidRequestException('无法获取订单支付金额，请通过客户反馈联系本站处理退款。');
+        }
         $ratio = round((float) $refundRatio, 4);
         if ($ratio <= 0) {
             throw new InvalidRequestException('退款比例无效。');
@@ -219,54 +235,90 @@ class OrderRefundService
         $extra['cancellation_fee_cny'] = round($payCny - $refundCny, 2);
         $order->update(['extra' => $extra]);
 
-        switch ($order->payment_method) {
-            case 'wechat':
-                $refundNo = Order::getAvailableRefundNo();
-                app('wechat_pay')->refund([
-                    'out_trade_no' => $order->no,
-                    'total_fee' => (int) round($payCny * 100),
-                    'refund_fee' => (int) round($refundCny * 100),
-                    'out_refund_no' => $refundNo,
-                    'notify_url' => route('payment.wechat.refund_notify'),
-                ]);
-                $order->update([
-                    'refund_no' => $refundNo,
-                    'refund_status' => Order::REFUND_STATUS_PROCESSING,
-                ]);
+        $refundNo = Order::getAvailableRefundNo();
 
-                return $order->fresh();
+        if ($this->crossSitePayment->shouldDelegateRefundToSiteB()) {
+            $remote = $this->crossSitePayment->delegateRefundToSiteB($order, $refundNo, $payCny, $refundCny);
+            $refundStatus = (string) ($remote['refund_status'] ?? Order::REFUND_STATUS_PROCESSING);
 
-            case 'alipay':
-                $refundNo = Order::getAvailableRefundNo();
-                $ret = app('alipay')->refund([
-                    'out_trade_no' => $order->no,
-                    'refund_amount' => $refundCny,
-                    'out_request_no' => $refundNo,
-                ]);
-                if ($ret->sub_code) {
-                    $extra = $order->extra ?: [];
-                    $extra['refund_failed_code'] = $ret->sub_code;
+            $order->update([
+                'refund_no' => (string) ($remote['refund_no'] ?? $refundNo),
+                'refund_status' => $refundStatus,
+            ]);
+
+            $order = $order->fresh();
+            if ($order->refund_status === Order::REFUND_STATUS_SUCCESS) {
+                $this->notifyRefundSuccess($order);
+            }
+
+            return $order;
+        }
+
+        return $this->executeGatewayRefund($order, $refundNo, $payCny, $refundCny);
+    }
+
+    public function executeGatewayRefund(Order $order, $refundNo, $payCny, $refundCny)
+    {
+        try {
+            switch ($order->payment_method) {
+                case 'wechat':
+                    app('wechat_pay')->refund([
+                        'out_trade_no' => $order->no,
+                        'total_fee' => (int) round($payCny * 100),
+                        'refund_fee' => (int) round($refundCny * 100),
+                        'out_refund_no' => $refundNo,
+                        'notify_url' => route('payment.wechat.refund_notify'),
+                    ]);
                     $order->update([
                         'refund_no' => $refundNo,
-                        'refund_status' => Order::REFUND_STATUS_FAILED,
-                        'extra' => $extra,
+                        'refund_status' => Order::REFUND_STATUS_PROCESSING,
                     ]);
 
-                    throw new InvalidRequestException('支付平台退款失败，请稍后重试或通过客户反馈联系本站。');
-                }
+                    return $order->fresh();
 
-                $order->update([
-                    'refund_no' => $refundNo,
-                    'refund_status' => Order::REFUND_STATUS_SUCCESS,
-                ]);
+                case 'alipay':
+                    $ret = app('alipay')->refund([
+                        'out_trade_no' => $order->no,
+                        'refund_amount' => $refundCny,
+                        'out_request_no' => $refundNo,
+                    ]);
+                    if ($ret->sub_code) {
+                        $extra = $order->extra ?: [];
+                        $extra['refund_failed_code'] = $ret->sub_code;
+                        $order->update([
+                            'refund_no' => $refundNo,
+                            'refund_status' => Order::REFUND_STATUS_FAILED,
+                            'extra' => $extra,
+                        ]);
 
-                $order = $order->fresh();
-                $this->notifyRefundSuccess($order);
+                        throw new InvalidRequestException('支付平台退款失败，请稍后重试或通过客户反馈联系本站。');
+                    }
 
-                return $order;
+                    $order->update([
+                        'refund_no' => $refundNo,
+                        'refund_status' => Order::REFUND_STATUS_SUCCESS,
+                    ]);
 
-            default:
-                throw new InternalException('未知订单支付方式：'.$order->payment_method);
+                    $order = $order->fresh();
+                    $this->notifyRefundSuccess($order);
+
+                    return $order;
+
+                default:
+                    throw new InternalException('未知订单支付方式：'.$order->payment_method);
+            }
+        } catch (InvalidRequestException $e) {
+            throw $e;
+        } catch (InternalException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            \Log::error('支付渠道退款异常', [
+                'order_id' => $order->id,
+                'payment_method' => $order->payment_method,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw new InvalidRequestException('支付平台退款失败，请稍后重试或通过客户反馈联系本站。');
         }
     }
 

@@ -18,7 +18,10 @@ class InternalException extends Exception
     public function render(Request $request)
     {
         if ($request->expectsJson()) {
-            return response()->json(['msg' => $this->msgForUser], $this->code);
+            return response()->json([
+                'message' => $this->msgForUser,
+                'msg' => $this->msgForUser,
+            ], $this->code);
         }
 
         return view('pages.error', ['msg' => $this->msgForUser]);

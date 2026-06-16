@@ -521,8 +521,9 @@
         })
         .catch(function (err) {
           setButtonsBusy($buttons, false);
-          var msg = (err.response && err.response.data && err.response.data.message)
-            ? err.response.data.message
+          var data = (err.response && err.response.data) ? err.response.data : {};
+          var msg = data.message || data.msg
+            ? (data.message || data.msg)
             : '{{ trans('frontend.js.operation_failed_retry') }}';
           swal(msg, '', 'error');
         });

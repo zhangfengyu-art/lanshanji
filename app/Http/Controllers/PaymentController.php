@@ -177,6 +177,49 @@ class PaymentController extends Controller
         return app('wechat_pay')->success();
     }
 
+    public function crossRefund(Order $order, Request $request)
+    {
+        if (!is_site_mode_b()) {
+            abort(404);
+        }
+
+        if (!$this->crossSitePayment->verifyRefundRequest($request, $order)) {
+            return response()->json(['message' => '退款请求无效或已过期'], 403);
+        }
+
+        if (!$order->paid_at) {
+            return response()->json(['message' => '订单未支付，无法退款'], 422);
+        }
+
+        $refundNo = trim((string) $request->input('refund_no'));
+        $payCny = round((float) $request->input('pay_cny'), 2);
+        $refundCny = round((float) $request->input('refund_cny'), 2);
+
+        try {
+            $order = app(\App\Services\OrderRefundService::class)->executeGatewayRefund(
+                $order->fresh(),
+                $refundNo,
+                $payCny,
+                $refundCny
+            );
+
+            return response()->json([
+                'message' => '退款请求已提交',
+                'refund_status' => $order->refund_status,
+                'refund_no' => $order->refund_no,
+            ]);
+        } catch (\App\Exceptions\InvalidRequestException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            \Log::error('跨站退款执行失败', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json(['message' => '支付平台退款失败，请稍后重试'], 500);
+        }
+    }
+
     public function wechatRefundNotify(Request $request)
     {
         $failXml = '<xml><return_code><![CDATA[FAIL]]></return_code><return_msg><![CDATA[FAIL]]></return_msg></xml>';
