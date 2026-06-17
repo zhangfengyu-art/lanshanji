@@ -250,6 +250,81 @@ class OrderFulfillmentService
         return $this->persistExtra($order, $extra);
     }
 
+    public static function stageFilterOptions()
+    {
+        return [
+            '' => '全部阶段',
+            self::STAGE_S1 => 'S1 待处理',
+            self::STAGE_S2 => 'S2 处理中',
+            self::STAGE_S3 => 'S3 备货/打包',
+            self::STAGE_S4 => 'S4 已发货',
+        ];
+    }
+
+    /**
+     * 按履约阶段筛选已支付订单（与 resolveStage 规则一致）。
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $stage
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function applyStageFilter($query, $stage)
+    {
+        $stage = strtoupper(trim((string) $stage));
+        $valid = [self::STAGE_S1, self::STAGE_S2, self::STAGE_S3, self::STAGE_S4];
+        if (!in_array($stage, $valid, true)) {
+            return $query;
+        }
+
+        if ($stage === self::STAGE_S4) {
+            return $query->whereIn('ship_status', [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED]);
+        }
+
+        $query = $query->whereNotIn('ship_status', [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED]);
+
+        if ($stage === self::STAGE_S3) {
+            return $query->where(function ($q) {
+                $q->where(function ($inner) {
+                    $this->whereExtraFieldPresent($inner, 'locked_at');
+                })->orWhere(function ($inner) {
+                    $this->whereExtraFieldPresent($inner, 'fulfillment_photo');
+                });
+            });
+        }
+
+        $query = $query->where(function ($q) {
+            $this->whereExtraFieldAbsent($q, 'locked_at');
+        })->where(function ($q) {
+            $this->whereExtraFieldAbsent($q, 'fulfillment_photo');
+        });
+
+        if ($stage === self::STAGE_S2) {
+            return $this->whereExtraFieldPresent($query, 'processing_started_at');
+        }
+
+        return $this->whereExtraFieldAbsent($query, 'processing_started_at');
+    }
+
+    protected function whereExtraFieldPresent($query, $field)
+    {
+        $jsonPath = '$.'.$field;
+
+        return $query->whereRaw(
+            'JSON_EXTRACT(extra, ?) IS NOT NULL AND JSON_UNQUOTE(JSON_EXTRACT(extra, ?)) <> ?',
+            [$jsonPath, $jsonPath, '']
+        );
+    }
+
+    protected function whereExtraFieldAbsent($query, $field)
+    {
+        $jsonPath = '$.'.$field;
+
+        return $query->where(function ($q) use ($jsonPath) {
+            $q->whereRaw('JSON_EXTRACT(extra, ?) IS NULL', [$jsonPath])
+                ->orWhereRaw('JSON_UNQUOTE(JSON_EXTRACT(extra, ?)) = ?', [$jsonPath, '']);
+        });
+    }
+
     protected function addressChangeCount(Order $order)
     {
         return (int) data_get($order->extra, 'address_change_count', 0);

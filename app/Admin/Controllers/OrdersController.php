@@ -343,6 +343,11 @@ class OrdersController extends Controller
                 $grid->model()->where('no', 'like', '%'.$orderNo.'%');
             }
 
+            $fulfillmentStage = strtoupper(trim((string) request()->query('fulfillment_stage', '')));
+            if (is_site_mode_a() && $fulfillmentStage !== '') {
+                app(OrderFulfillmentService::class)->applyStageFilter($grid->model(), $fulfillmentStage);
+            }
+
             $grid->no('订单流水号');
             $grid->column('buyer_label', '买家昵称')->display(function () {
                 $label = e($this->buyer_label);
@@ -428,7 +433,8 @@ class OrdersController extends Controller
 
             $grid->tools(function ($tools) use ($controller) {
                 $orderNo = trim((string) request()->query('order_no', ''));
-                $tools->append($controller->renderOrderSearchTool($orderNo));
+                $fulfillmentStage = strtoupper(trim((string) request()->query('fulfillment_stage', '')));
+                $tools->append($controller->renderOrderSearchTool($orderNo, $fulfillmentStage));
                 $tools->batch(function ($batch) {
                     $batch->disableDelete();
                 });
@@ -449,19 +455,34 @@ class OrdersController extends Controller
         });
     }
 
-    protected function renderOrderSearchTool($orderNo = '')
+    protected function renderOrderSearchTool($orderNo = '', $fulfillmentStage = '')
     {
         $orderNo = trim((string) $orderNo);
+        $fulfillmentStage = strtoupper(trim((string) $fulfillmentStage));
+
+        $stageSelect = '';
+        if (is_site_mode_a()) {
+            $options = OrderFulfillmentService::stageFilterOptions();
+            $stageSelect = '<select name="fulfillment_stage" class="form-control input-sm" style="width:132px;">';
+            foreach ($options as $value => $label) {
+                $selected = ((string) $value === $fulfillmentStage) ? ' selected' : '';
+                $stageSelect .= '<option value="'.e($value).'"'.$selected.'>'.e($label).'</option>';
+            }
+            $stageSelect .= '</select>';
+        }
+
+        $hasFilter = $orderNo !== '' || $fulfillmentStage !== '';
 
         return '<form method="GET" action="" class="form-inline" style="display:inline-block;margin-right:10px;">'
-            .'<div class="input-group input-group-sm" style="width:300px;">'
+            .$stageSelect
+            .'<div class="input-group input-group-sm" style="width:280px;margin-left:6px;">'
             .'<input type="text" class="form-control" name="order_no" value="'.e($orderNo).'" placeholder="搜索订单流水号">'
             .'<span class="input-group-btn">'
-            .'<button type="submit" class="btn btn-primary">搜索</button>'
+            .'<button type="submit" class="btn btn-primary">筛选</button>'
             .'</span>'
             .'</div>'
             .'</form>'
-            .'<a class="btn btn-sm btn-default" href="'.url()->current().'">重置</a>';
+            .($hasFilter ? '<a class="btn btn-sm btn-default" href="'.e(url()->current()).'">重置</a>' : '');
     }
 
     public function batchStartProcessing(Request $request, \App\Services\OrderBatchService $batch)
