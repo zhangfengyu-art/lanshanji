@@ -11,6 +11,7 @@ use App\Services\ProcurementService;
 use App\Events\OrderPaid;
 use Carbon\Carbon;
 use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -108,10 +109,10 @@ class PaymentController extends Controller
         $this->authorize('own', $order);
         $this->ensureOrderPayable($order);
 
-        $qrCode = $this->createWechatPayQrCode($order);
+        $result = $this->createWechatPayQrCode($order);
 
-        return response($qrCode->writeString(), 200, [
-            'Content-Type' => $qrCode->getContentType(),
+        return response($result->getString(), 200, [
+            'Content-Type' => $result->getMimeType(),
             'Referrer-Policy' => 'no-referrer',
         ]);
     }
@@ -263,15 +264,15 @@ class PaymentController extends Controller
     protected function renderWechatPage(Order $order)
     {
         $quote = $this->preparePaymentQuote($order);
-        $qrCode = $this->createWechatPayQrCode($order);
-        $qrBinary = $qrCode->writeString();
+        $result = $this->createWechatPayQrCode($order);
+        $qrBinary = $result->getString();
 
         return view('payment.wechat_qr_page', [
             'order' => $order,
             'payAmount' => $quote['payment_amount_cny'],
             'exchangeRate' => $quote['exchange_rate'],
             'amountJpy' => $quote['amount_jpy'],
-            'qrImageDataUri' => 'data:'.$qrCode->getContentType().';base64,'.base64_encode($qrBinary),
+            'qrImageDataUri' => 'data:'.$result->getMimeType().';base64,'.base64_encode($qrBinary),
             'qrImageUrl' => route('payment.wechat.qr', ['order' => $order->id]),
         ]);
     }
@@ -289,7 +290,9 @@ class PaymentController extends Controller
             'time_expire'  => $order->getAllocationExpiresAt()->format('YmdHis'),
         ]);
 
-        return new QrCode($wechatOrder->code_url);
+        return (new PngWriter())->write(
+            QrCode::create($wechatOrder->code_url)->setSize(300)->setMargin(10)
+        );
     }
 
     protected function preparePaymentQuote(Order $order)

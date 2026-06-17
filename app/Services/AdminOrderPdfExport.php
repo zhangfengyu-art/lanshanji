@@ -10,7 +10,7 @@ class AdminOrderPdfExport
     public static function download($filename, array $headers, callable $rowProducer, array $options = [])
     {
         if (!class_exists(\Mpdf\Mpdf::class)) {
-            throw new \RuntimeException('PDF 导出需要安装 mpdf/mpdf，请在服务器执行 composer require mpdf/mpdf:^7.1');
+            throw new \RuntimeException('PDF 导出需要安装 mpdf/mpdf，请在服务器执行 composer install --no-dev --no-plugins');
         }
 
         $pdfOptions = array_merge($options, [

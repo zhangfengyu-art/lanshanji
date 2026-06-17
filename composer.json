@@ -5,23 +5,22 @@
     "license": "MIT",
     "type": "project",
     "require": {
-        "php": ">=7.0.0",
+        "php": ">=7.4.0",
         "encore/laravel-admin": "1.5.*",
-        "endroid/qr-code": "^3.2",
+        "endroid/qr-code": "^4.3",
         "fideloper/proxy": "~3.3",
         "laravel/framework": "5.5.*",
         "laravel/tinker": "~1.0",
-        "mpdf/mpdf": "^7.1",
         "overtrue/laravel-lang": "^3.0",
         "predis/predis": "^1.1",
-        "yansongda/pay": "^2.4"
+        "yansongda/pay": "^2.4",
+        "mpdf/mpdf": "^8.0"
     },
     "require-dev": {
         "filp/whoops": "~2.0",
         "fzaninotto/faker": "~1.4",
         "mockery/mockery": "~1.0",
-        "phpunit/phpunit": "~6.0",
-        "symfony/thanks": "^1.0"
+        "phpunit/phpunit": "~6.0"
     },
     "autoload": {
         "classmap": [
@@ -62,10 +61,8 @@
         "preferred-install": "dist",
         "sort-packages": true,
         "optimize-autoloader": true,
-        "policy": {
-            "advisories": {
-                "block": false
-            }
+        "allow-plugins": {
+            "endroid/installer": false
         }
     }
 }
