@@ -70,11 +70,27 @@ class OrdersController extends Controller
     {
         $order->load(['user', 'items.product', 'items.productSku', 'couponCode']);
 
-        $feeBreakdown = \App\Services\OrderFeeBreakdownPresenter::forOrder($order);
+        try {
+            $feeBreakdown = \App\Services\OrderFeeBreakdownPresenter::forOrder($order);
+        } catch (\Throwable $e) {
+            \Log::error('订单金额明细生成失败', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+            ]);
+            $feeBreakdown = [];
+        }
 
-        $refundPreview = is_site_mode_a()
-            ? app(\App\Services\OrderRefundPolicyService::class)->previewAdminRefund($order)
-            : null;
+        $refundPreview = null;
+        if (is_site_mode_a()) {
+            try {
+                $refundPreview = app(\App\Services\OrderRefundPolicyService::class)->previewAdminRefund($order);
+            } catch (\Throwable $e) {
+                \Log::error('订单退款预览生成失败', [
+                    'order_id' => $order->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
         $refundReasons = config('order_refund.admin_reasons', []);
 
         return Admin::content(function (Content $content) use ($order, $refundPreview, $refundReasons, $feeBreakdown) {

@@ -45,7 +45,12 @@
         <td style="border-color: #e8edf2;">
           国际运费（EMS）
           @if(!empty($b['ems_weight_grams']))
-            <br><span class="text-muted" style="font-size: 12px;">计费重量 {{ (int) $b['ems_weight_grams'] }}g@if(!empty($b['ems_zone'])) · {{ $b['ems_zone'] }}@endif</span>
+            <br><span class="text-muted" style="font-size: 12px;">
+              计费重量 {{ (int) $b['ems_weight_grams'] }}g
+              @if(!empty($b['ems_zone']))
+                · {{ $b['ems_zone'] }}
+              @endif
+            </span>
           @endif
         </td>
         <td style="border-color: #e8edf2;">{{ $fmtJpy($b['ems_shipping_fee'] ?? 0) }}</td>

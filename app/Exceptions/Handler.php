@@ -54,10 +54,22 @@ class Handler extends ExceptionHandler
                 return response()->json(['message' => $exception->getMessage()], 422);
             }
 
+            $message = $exception->getMessage();
+            $adminPrefix = trim((string) config('admin.route.prefix', 'admin'), '/');
+            if ($adminPrefix !== '' && $request->is($adminPrefix, $adminPrefix.'/*')) {
+                $previous = url()->previous();
+                $current = $request->fullUrl();
+                if ($previous && $previous !== $current) {
+                    return redirect()->to($previous)->with('error', $message);
+                }
+
+                return redirect()->to(admin_url('/'))->with('error', $message);
+            }
+
             return redirect()
                 ->back()
                 ->withInput()
-                ->withErrors(['message' => $exception->getMessage()]);
+                ->withErrors(['message' => $message]);
         }
 
         if ($exception instanceof InternalException) {
@@ -65,15 +77,22 @@ class Handler extends ExceptionHandler
         }
 
         $adminPrefix = trim((string) config('admin.route.prefix', 'admin'), '/');
-        if ($adminPrefix !== '' && $request->is($adminPrefix.'/*') && !$request->expectsJson()) {
+        if ($adminPrefix !== '' && $request->is($adminPrefix, $adminPrefix.'/*') && !$request->expectsJson()) {
             \Log::error('后台请求异常', [
                 'path' => $request->path(),
                 'message' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
             ]);
 
-            return redirect()
-                ->back()
-                ->with('error', '操作失败：'.$exception->getMessage());
+            $message = '操作失败：'.$exception->getMessage();
+            $previous = url()->previous();
+            $current = $request->fullUrl();
+
+            if ($previous && $previous !== $current) {
+                return redirect()->to($previous)->with('error', $message);
+            }
+
+            return redirect()->to(admin_url('/'))->with('error', $message);
         }
 
         return parent::render($request, $exception);
