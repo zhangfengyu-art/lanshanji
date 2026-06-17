@@ -520,12 +520,15 @@ class OrderAdminExportService
         return is_file($dest) ? $dest : '';
     }
 
-    public static function writeThumbnailFile($sourcePath, $destDir, $basename)
+    public static function writeThumbnailFile($sourcePath, $destDir, $basename, $maxSize = 96, $jpegQuality = 82)
     {
         $sourcePath = trim((string) $sourcePath);
         if ($sourcePath === '' || !is_file($sourcePath)) {
             return '';
         }
+
+        $maxSize = max(32, (int) $maxSize);
+        $jpegQuality = min(100, max(50, (int) $jpegQuality));
 
         $destPath = rtrim($destDir, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$basename.'.jpg';
 
@@ -553,7 +556,6 @@ class OrderAdminExportService
 
         $width = imagesx($img);
         $height = imagesy($img);
-        $maxSize = 96;
         $scale = min($maxSize / max($width, 1), $maxSize / max($height, 1), 1);
 
         if ($scale < 1) {
@@ -565,7 +567,7 @@ class OrderAdminExportService
             $img = $thumb;
         }
 
-        imagejpeg($img, $destPath, 82);
+        imagejpeg($img, $destPath, $jpegQuality);
         imagedestroy($img);
 
         return is_file($destPath) ? $destPath : '';

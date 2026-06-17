@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Str;
 use ZipArchive;
 
 /**
@@ -14,8 +13,16 @@ class AdminOrderZipExport
     {
         $textColumns = (array) ($options['text_columns'] ?? []);
         $imageColumns = (array) ($options['image_columns'] ?? []);
+        $checkboxColumns = (array) ($options['checkbox_columns'] ?? []);
         $htmlBasename = (string) ($options['html_basename'] ?? '订单表.html');
         $footerNote = (string) ($options['footer_note'] ?? '请解压本 ZIP 后，用 Excel 或 WPS 打开「'.$htmlBasename.'」查看商品图片。');
+        $imageMaxSize = max(32, (int) ($options['image_max_size'] ?? 96));
+        $imageDisplaySize = max(32, (int) ($options['image_display_size'] ?? 72));
+        $imageJpegQuality = min(100, max(50, (int) ($options['image_jpeg_quality'] ?? 82)));
+        $tableFontSize = max(10, (int) ($options['table_font_size'] ?? 13));
+        $checkboxCellSize = max(24, (int) ($options['checkbox_cell_size'] ?? 40));
+        $enablePrintCss = (bool) ($options['enable_print_css'] ?? false);
+        $titleNote = trim((string) ($options['title_note'] ?? ''));
 
         $basename = pathinfo($filename, PATHINFO_FILENAME);
         if ($basename === '' || $basename === '.') {
@@ -41,8 +48,21 @@ class AdminOrderZipExport
             throw new \RuntimeException('无法写入导出文件');
         }
 
-        fwrite($fp, '<html><head><meta charset="UTF-8"></head><body>');
-        fwrite($fp, '<table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:13px;">');
+        fwrite($fp, '<html><head><meta charset="UTF-8">');
+        if ($enablePrintCss) {
+            fwrite($fp, '<style>'
+                .'@media print{body{margin:12px;} table{font-size:'.($tableFontSize - 1).'px;} '
+                .'img{max-width:'.($imageDisplaySize + 20).'px;max-height:'.($imageDisplaySize + 20).'px;} '
+                .'th,td{padding:8px!important;}}'
+                .'</style>');
+        }
+        fwrite($fp, '</head><body>');
+        if ($titleNote !== '') {
+            fwrite($fp, '<p style="font-size:'.($tableFontSize + 1).'px;font-weight:bold;margin:0 0 10px;">'
+                .htmlspecialchars($titleNote, ENT_QUOTES, 'UTF-8')
+                .'</p>');
+        }
+        fwrite($fp, '<table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:'.$tableFontSize.'px;">');
         fwrite($fp, '<tr>');
         foreach ($headers as $header) {
             fwrite($fp, '<th style="background:#4472C4;color:#fff;padding:8px 10px;">'
@@ -51,7 +71,19 @@ class AdminOrderZipExport
         }
         fwrite($fp, '</tr>');
 
-        $emitRow = function (array $row) use ($fp, $textColumns, $imageColumns, $imageDir, &$imageCache, &$zipFiles) {
+        $emitRow = function (array $row) use (
+            $fp,
+            $textColumns,
+            $imageColumns,
+            $checkboxColumns,
+            $imageDir,
+            $imageMaxSize,
+            $imageDisplaySize,
+            $imageJpegQuality,
+            $checkboxCellSize,
+            &$imageCache,
+            &$zipFiles
+        ) {
             fwrite($fp, '<tr>');
             foreach ($row as $index => $cell) {
                 $style = 'padding:6px 8px;vertical-align:middle;border:1px solid #d0d0d0;';
@@ -59,14 +91,24 @@ class AdminOrderZipExport
                     $style .= 'mso-number-format:\@;';
                 }
 
+                if (in_array($index, $checkboxColumns, true)) {
+                    $boxSize = max(16, $checkboxCellSize - 10);
+                    fwrite($fp, '<td style="'.$style.'text-align:center;width:'.$checkboxCellSize.'px;min-width:'.$checkboxCellSize.'px;">');
+                    fwrite($fp, '<div style="width:'.$boxSize.'px;height:'.$boxSize.'px;border:2px solid #333;margin:0 auto;"></div>');
+                    fwrite($fp, '</td>');
+
+                    continue;
+                }
+
                 if (in_array($index, $imageColumns, true)) {
                     $localPath = trim((string) $cell);
-                    fwrite($fp, '<td style="'.$style.'text-align:center;width:88px;">');
+                    $cellWidth = $imageDisplaySize + 16;
+                    fwrite($fp, '<td style="'.$style.'text-align:center;width:'.$cellWidth.'px;min-width:'.$cellWidth.'px;">');
                     if ($localPath !== '' && is_file($localPath)) {
-                        $rel = static::cacheImageForZip($localPath, $imageDir, $imageCache, $zipFiles);
+                        $rel = static::cacheImageForZip($localPath, $imageDir, $imageCache, $zipFiles, $imageMaxSize, $imageJpegQuality);
                         if ($rel !== '') {
                             fwrite($fp, '<img src="'.htmlspecialchars($rel, ENT_QUOTES, 'UTF-8')
-                                .'" width="72" height="72" style="object-fit:contain;" alt=""/>');
+                                .'" width="'.$imageDisplaySize.'" height="'.$imageDisplaySize.'" style="object-fit:contain;" alt=""/>');
                         } else {
                             fwrite($fp, '—');
                         }
@@ -119,14 +161,14 @@ class AdminOrderZipExport
         ])->deleteFileAfterSend(true);
     }
 
-    protected static function cacheImageForZip($sourcePath, $imageDir, array &$cache, array &$zipFiles)
+    protected static function cacheImageForZip($sourcePath, $imageDir, array &$cache, array &$zipFiles, $maxSize = 96, $jpegQuality = 82)
     {
-        $key = md5($sourcePath);
+        $key = md5($sourcePath.'|'.$maxSize.'|'.$jpegQuality);
         if (isset($cache[$key])) {
             return $cache[$key];
         }
 
-        $thumbPath = OrderAdminExportService::writeThumbnailFile($sourcePath, $imageDir, $key);
+        $thumbPath = OrderAdminExportService::writeThumbnailFile($sourcePath, $imageDir, $key, $maxSize, $jpegQuality);
         if ($thumbPath === '') {
             return '';
         }
