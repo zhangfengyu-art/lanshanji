@@ -4,6 +4,7 @@ namespace App\Admin\Controllers;
 
 use App\Exceptions\InternalException;
 use App\Models\Order;
+use App\Services\AdminOrderPdfExport;
 use App\Services\AdminOrderZipExport;
 use App\Services\OrderAdminExportService;
 use App\Services\OrderStockPrepExportService;
@@ -141,29 +142,28 @@ class OrdersController extends Controller
 
         $fulfillment = app(OrderFulfillmentService::class);
         $scopeLabel = $scopeOptions[$scope];
+        $format = strtolower(trim((string) $request->query('format', 'zip')));
+        $rowProducer = function ($emitRow) use ($scope, $fulfillment) {
+            OrderStockPrepExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
+        };
+
+        if ($format === 'pdf') {
+            $options = OrderStockPrepExportService::htmlExportOptions($scopeLabel);
+            $options['footer_note'] = OrderStockPrepExportService::pdfFooterNote();
+
+            return AdminOrderPdfExport::download(
+                OrderStockPrepExportService::pdfFilename($scope),
+                OrderStockPrepExportService::headers(),
+                $rowProducer,
+                $options
+            );
+        }
 
         return AdminOrderZipExport::download(
             OrderStockPrepExportService::filename($scope),
             OrderStockPrepExportService::headers(),
-            function ($emitRow) use ($scope, $fulfillment) {
-                OrderStockPrepExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
-            },
-            [
-                'text_columns' => OrderStockPrepExportService::TEXT_COLUMN_INDEXES,
-                'image_columns' => OrderStockPrepExportService::IMAGE_COLUMN_INDEXES,
-                'checkbox_columns' => OrderStockPrepExportService::CHECKBOX_COLUMN_INDEXES,
-                'html_basename' => '备货表.html',
-                'title_note' => '香烟/加热烟备货表 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
-                'image_max_size' => 200,
-                'image_display_size' => 140,
-                'image_jpeg_quality' => 92,
-                'table_font_size' => 14,
-                'checkbox_cell_size' => 44,
-                'enable_print_css' => true,
-                'footer_note' => '请解压本 ZIP 后，用 Excel 或 WPS 打开「备货表.html」，打印前可在浏览器中预览。'
-                    .'本表仅汇总香烟与加热烟按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。'
-                    .'「采购确认」列留空供现场打勾。',
-            ]
+            $rowProducer,
+            OrderStockPrepExportService::htmlExportOptions($scopeLabel)
         );
     }
 
@@ -495,11 +495,10 @@ class OrdersController extends Controller
                     'dropdownLabel' => '导出订单',
                 ]));
                 if (is_site_mode_a()) {
-                    $tools->append(view('admin.partials.export_dropdown', [
+                    $tools->append(view('admin.partials.stock_prep_export_dropdown', [
                         'exportBaseUrl' => route('admin.orders.export_stock_prep'),
                         'scopeOptions' => OrderStockPrepExportService::scopeOptions(),
                         'dropdownLabel' => '导出备货表',
-                        'downloadHint' => '下载 ZIP，解压后用 Excel/WPS 打开「备货表.html」',
                     ]));
                 }
                 if (is_site_mode_a()) {

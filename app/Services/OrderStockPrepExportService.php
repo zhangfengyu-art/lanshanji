@@ -58,6 +58,37 @@ class OrderStockPrepExportService
         return $safe.'_'.date('Ymd_His').'.zip';
     }
 
+    public static function pdfFilename($scope)
+    {
+        return preg_replace('/\.zip$/', '.pdf', self::filename($scope));
+    }
+
+    public static function htmlExportOptions($scopeLabel)
+    {
+        return [
+            'text_columns' => self::TEXT_COLUMN_INDEXES,
+            'image_columns' => self::IMAGE_COLUMN_INDEXES,
+            'checkbox_columns' => self::CHECKBOX_COLUMN_INDEXES,
+            'html_basename' => '备货表.html',
+            'title_note' => '香烟/加热烟备货表 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
+            'pdf_title' => '香烟/加热烟备货表',
+            'image_max_size' => 200,
+            'image_display_size' => 140,
+            'image_jpeg_quality' => 92,
+            'table_font_size' => 14,
+            'checkbox_cell_size' => 44,
+            'enable_print_css' => true,
+            'footer_note' => '请解压本 ZIP 后，用 Excel 或 WPS 打开「备货表.html」，打印前可在浏览器中预览。'
+                .'本表仅汇总香烟与加热烟按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。'
+                .'「采购确认」列留空供现场打勾。',
+        ];
+    }
+
+    public static function pdfFooterNote()
+    {
+        return '本表仅汇总香烟与加热烟按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。「采购确认」列留空供现场打勾。';
+    }
+
     public static function buildQuery($scope)
     {
         $query = Order::query()

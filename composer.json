@@ -11,6 +11,7 @@
         "fideloper/proxy": "~3.3",
         "laravel/framework": "5.5.*",
         "laravel/tinker": "~1.0",
+        "mpdf/mpdf": "^7.1",
         "overtrue/laravel-lang": "^3.0",
         "predis/predis": "^1.1",
         "yansongda/pay": "^2.4"
@@ -60,6 +61,11 @@
     "config": {
         "preferred-install": "dist",
         "sort-packages": true,
-        "optimize-autoloader": true
+        "optimize-autoloader": true,
+        "policy": {
+            "advisories": {
+                "block": false
+            }
+        }
     }
 }
