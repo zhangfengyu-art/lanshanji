@@ -6,7 +6,7 @@ use App\Models\Order;
 use Carbon\Carbon;
 
 /**
- * 按订单范围汇总香烟/加热烟采购数量，导出 ZIP+HTML 备货表。
+ * 按订单范围汇总香烟/加热烟/手卷烟丝采购数量，导出 ZIP+HTML/PDF 备货表。
  */
 class OrderStockPrepExportService
 {
@@ -14,10 +14,10 @@ class OrderStockPrepExportService
     const TEXT_COLUMN_INDEXES = [1];
 
     /** @var int[] */
-    const IMAGE_COLUMN_INDEXES = [7];
+    const IMAGE_COLUMN_INDEXES = [4];
 
     /** @var int[] */
-    const CHECKBOX_COLUMN_INDEXES = [8];
+    const CHECKBOX_COLUMN_INDEXES = [5];
 
     public static function scopeOptions()
     {
@@ -38,10 +38,7 @@ class OrderStockPrepExportService
             '序号',
             '商品名称',
             '类型',
-            '每包支数',
             '采购数量(包)',
-            '合计支数',
-            '涉及订单数',
             '商品图片',
             '采购确认',
         ];
@@ -69,18 +66,18 @@ class OrderStockPrepExportService
             'text_columns' => self::TEXT_COLUMN_INDEXES,
             'image_columns' => self::IMAGE_COLUMN_INDEXES,
             'checkbox_columns' => self::CHECKBOX_COLUMN_INDEXES,
-            'numeric_columns' => [0, 3, 4, 5, 6],
-            'center_columns' => [0, 2, 3, 4, 5, 6, 8],
-            'column_widths' => ['4%', '27%', '9%', '7%', '8%', '8%', '8%', '22%', '7%'],
-            'title_note' => '香烟/加热烟备货表 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
-            'pdf_title' => '香烟/加热烟备货表',
+            'numeric_columns' => [0, 3],
+            'center_columns' => [0, 2, 3, 5],
+            'column_widths' => ['6%', '36%', '12%', '12%', '28%', '6%'],
+            'title_note' => '烟草备货表（香烟/加热烟/烟丝） · '.$scopeLabel.' · '.date('Y-m-d H:i'),
+            'pdf_title' => '烟草备货表',
             'style_mode' => 'pdf',
             'image_max_size' => 520,
-            'image_display_width' => 118,
-            'image_display_height' => 188,
+            'image_display_width' => 128,
+            'image_display_height' => 196,
             'image_jpeg_quality' => 96,
-            'table_font_size' => 11,
-            'checkbox_cell_size' => 54,
+            'table_font_size' => 15,
+            'checkbox_cell_size' => 58,
             'footer_note' => self::pdfFooterNote(),
         ];
     }
@@ -92,25 +89,25 @@ class OrderStockPrepExportService
             'image_columns' => self::IMAGE_COLUMN_INDEXES,
             'checkbox_columns' => self::CHECKBOX_COLUMN_INDEXES,
             'html_basename' => '备货表.html',
-            'title_note' => '香烟/加热烟备货表 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
-            'pdf_title' => '香烟/加热烟备货表',
-            'image_max_size' => 200,
-            'image_display_size' => 140,
-            'image_display_width' => 140,
-            'image_display_height' => 140,
+            'title_note' => '烟草备货表（香烟/加热烟/烟丝） · '.$scopeLabel.' · '.date('Y-m-d H:i'),
+            'pdf_title' => '烟草备货表',
+            'image_max_size' => 240,
+            'image_display_size' => 160,
+            'image_display_width' => 160,
+            'image_display_height' => 160,
             'image_jpeg_quality' => 92,
-            'table_font_size' => 14,
-            'checkbox_cell_size' => 44,
+            'table_font_size' => 16,
+            'checkbox_cell_size' => 48,
             'enable_print_css' => true,
             'footer_note' => '请解压本 ZIP 后，用 Excel 或 WPS 打开「备货表.html」，打印前可在浏览器中预览。'
-                .'本表仅汇总香烟与加热烟按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。'
+                .'本表汇总香烟、加热烟、手卷烟丝按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。'
                 .'「采购确认」列留空供现场打勾。',
         ];
     }
 
     public static function pdfFooterNote()
     {
-        return '本表仅汇总香烟与加热烟按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。「采购确认」列留空供现场打勾。';
+        return '本表汇总香烟、加热烟、手卷烟丝按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。「采购确认」列留空供现场打勾。';
     }
 
     public static function buildQuery($scope)
@@ -158,10 +155,9 @@ class OrderStockPrepExportService
                     continue;
                 }
 
-                $productsInOrder = [];
                 foreach ($order->items as $item) {
                     $product = $item->product;
-                    if (!$product || !OrderTobaccoLimitService::countsTowardStickLimit((string) $product->tobacco_type)) {
+                    if (!$product || !self::productIncludedInStockPrep($product)) {
                         continue;
                     }
 
@@ -176,24 +172,17 @@ class OrderStockPrepExportService
                             'product' => $product,
                             'title' => (string) $product->title,
                             'tobacco_type_label' => (string) $product->tobacco_type_label,
-                            'unit_sticks' => (int) $product->unit_sticks,
                             'qty' => 0,
-                            'order_ids' => [],
                         ];
                     }
 
                     $aggregates[$productId]['qty'] += $qty;
-                    $productsInOrder[$productId] = true;
-                }
-
-                foreach (array_keys($productsInOrder) as $productId) {
-                    $aggregates[$productId]['order_ids'][(int) $order->id] = true;
                 }
             }
         });
 
         uasort($aggregates, function ($a, $b) {
-            $typeCmp = strcmp($a['tobacco_type_label'], $b['tobacco_type_label']);
+            $typeCmp = self::typeSortOrder($a['tobacco_type_label']) - self::typeSortOrder($b['tobacco_type_label']);
             if ($typeCmp !== 0) {
                 return $typeCmp;
             }
@@ -207,31 +196,24 @@ class OrderStockPrepExportService
 
         $index = 0;
         $totalPacks = 0;
-        $totalSticks = 0;
 
         foreach ($aggregates as $row) {
             $index++;
             $packs = (int) $row['qty'];
-            $unitSticks = (int) $row['unit_sticks'];
-            $sticks = $unitSticks > 0 ? $packs * $unitSticks : 0;
             $totalPacks += $packs;
-            $totalSticks += $sticks;
 
             $emitRow([
                 $index,
                 $row['title'],
                 $row['tobacco_type_label'],
-                $unitSticks > 0 ? $unitSticks : '—',
                 $packs,
-                $sticks > 0 ? $sticks : '—',
-                count($row['order_ids']),
                 OrderAdminExportService::imageLocalPathForProduct($row['product']),
                 '',
             ]);
         }
 
         if ($index === 0) {
-            $emitRow(['—', '（当前范围无香烟/加热烟采购项）', '—', '—', 0, '—', 0, '', '']);
+            $emitRow(['—', '（当前范围无香烟/加热烟/烟丝采购项）', '—', 0, '', '']);
 
             return;
         }
@@ -240,13 +222,32 @@ class OrderStockPrepExportService
             '合计',
             $index.' 种商品',
             '—',
-            '—',
             $totalPacks,
-            $totalSticks > 0 ? $totalSticks : '—',
-            '—',
             '',
             '',
         ]);
+    }
+
+    protected static function productIncludedInStockPrep($product)
+    {
+        $type = (string) $product->tobacco_type;
+
+        return in_array($type, [
+            OrderTobaccoLimitService::TYPE_CIGARETTE,
+            OrderTobaccoLimitService::TYPE_HEATED_TOBACCO,
+            OrderTobaccoLimitService::TYPE_ROLLING_TOBACCO,
+        ], true);
+    }
+
+    protected static function typeSortOrder($label)
+    {
+        $map = [
+            '香烟' => 1,
+            '加热烟' => 2,
+            '手卷烟丝' => 3,
+        ];
+
+        return $map[(string) $label] ?? 99;
     }
 
     protected static function orderIncludedInStockPrep(Order $order, $scope, OrderFulfillmentService $fulfillment)

@@ -234,6 +234,9 @@ class AdminOrderTableHtmlBuilder
         if ($text === '加热烟') {
             return '<span class="type-badge type-heated">加热烟</span>';
         }
+        if ($text === '手卷烟丝' || $text === '烟丝') {
+            return '<span class="type-badge type-rolling">手卷烟丝</span>';
+        }
 
         return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
@@ -243,12 +246,12 @@ class AdminOrderTableHtmlBuilder
         $css = '<style>';
         if ($isPdfStyle) {
             $css .= 'body.export-pdf{margin:0;padding:0;font-family:"sans-serif";color:#1a1a1a;font-size:'.$tableFontSize.'px;}'
-                .'.export-header{background:#2f5597;color:#fff;padding:10px 12px 9px;margin:0 0 10px;border-radius:4px;}'
-                .'.export-header-title{font-size:'.($tableFontSize + 5).'px;font-weight:bold;line-height:1.25;}'
-                .'.export-header-meta{font-size:'.($tableFontSize - 1).'px;margin-top:4px;opacity:0.92;}'
+                .'.export-header{background:#2f5597;color:#fff;padding:12px 14px 10px;margin:0 0 12px;border-radius:4px;}'
+                .'.export-header-title{font-size:'.($tableFontSize + 6).'px;font-weight:bold;line-height:1.25;}'
+                .'.export-header-meta{font-size:'.$tableFontSize.'px;margin-top:5px;opacity:0.92;}'
                 .'table.export-table{border-collapse:collapse;width:100%;table-layout:fixed;}'
-                .'table.export-table th{background:#2f5597;color:#fff;padding:7px 6px;font-weight:bold;text-align:center;border:1px solid #244a82;font-size:'.($tableFontSize).'px;line-height:1.3;}'
-                .'table.export-table td{border:1px solid #c8d2e0;padding:7px 6px;vertical-align:middle;line-height:1.35;word-wrap:break-word;}'
+                .'table.export-table th{background:#2f5597;color:#fff;padding:9px 7px;font-weight:bold;text-align:center;border:1px solid #244a82;font-size:'.($tableFontSize).'px;line-height:1.35;}'
+                .'table.export-table td{border:1px solid #c8d2e0;padding:9px 7px;vertical-align:middle;line-height:1.45;word-wrap:break-word;font-size:'.($tableFontSize).'px;}'
                 .'tr.row-even td{background:#ffffff;}'
                 .'tr.row-alt td{background:#f5f8fc;}'
                 .'tr.row-total td{background:#e8eef7;font-weight:bold;border-top:2px solid #2f5597;}'
@@ -259,10 +262,11 @@ class AdminOrderTableHtmlBuilder
                 .'td.cell-check{padding:8px 4px;}'
                 .'.check-box{border:2px solid #333;margin:0 auto;background:#fff;}'
                 .'.product-img{object-fit:contain;}'
-                .'.type-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:'.($tableFontSize - 1).'px;font-weight:bold;line-height:1.4;}'
+                .'.type-badge{display:inline-block;padding:3px 10px;border-radius:10px;font-size:'.($tableFontSize).'px;font-weight:bold;line-height:1.4;}'
                 .'.type-cigarette{background:#fff4e5;color:#9a5b00;border:1px solid #f0c987;}'
                 .'.type-heated{background:#e8f7f3;color:#0d6b52;border:1px solid #9fdccc;}'
-                .'.export-footer{font-size:'.($tableFontSize - 1).'px;color:#666;margin-top:10px;line-height:1.45;}';
+                .'.type-rolling{background:#f3ecff;color:#5b3d91;border:1px solid #d4bdf5;}'
+                .'.export-footer{font-size:'.$tableFontSize.'px;color:#666;margin-top:10px;line-height:1.45;}';
         } else {
             $css .= 'table.export-table th{background:#4472C4;color:#fff;padding:8px 10px;}'
                 .'table.export-table td{padding:6px 8px;vertical-align:middle;border:1px solid #d0d0d0;}'
