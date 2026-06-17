@@ -24,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app['router']->aliasMiddleware('super.admin', \App\Admin\Middleware\SuperAdminOnly::class);
         $this->app['router']->aliasMiddleware('admin.password_reminder', \App\Http\Middleware\AdminPasswordExpiryReminder::class);
+        $this->app['router']->aliasMiddleware('admin.normalize_flash', \App\Http\Middleware\NormalizeAdminFlashMessages::class);
 
         // 设置中文本地化
         config([

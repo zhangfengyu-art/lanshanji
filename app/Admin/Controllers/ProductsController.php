@@ -516,7 +516,7 @@ class ProductsController extends Controller
 
         return redirect()
             ->to(admin_base_path('products'))
-            ->with('success', 'CSV 导入完成：更新 '.$updated.' 条，跳过 '.$skipped.' 条。');
+            ->with('success', admin_flash_success('CSV 导入完成：更新 '.$updated.' 条，跳过 '.$skipped.' 条。'));
     }
 
     public function importZip(Request $request, ProductZipImportService $importService)
@@ -535,7 +535,7 @@ class ProductsController extends Controller
 
         return redirect()
             ->to(admin_base_path('products'))
-            ->with('success', $message);
+            ->with('success', admin_flash_success($message));
     }
 
 }
