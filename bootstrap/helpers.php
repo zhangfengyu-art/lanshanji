@@ -427,3 +427,24 @@ function format_shop_price($amount, $decimals = 2)
 
     return '￥'.number_format((float) $amount, $decimals, '.', '');
 }
+
+/**
+ * laravel-admin 布局的 success/error 闪存需为 MessageBag，不能传纯字符串。
+ */
+function admin_flash_bag($message, $title = '操作成功')
+{
+    return new \Illuminate\Support\MessageBag([
+        'title' => (string) $title,
+        'message' => (string) $message,
+    ]);
+}
+
+function admin_flash_success($message, $title = '操作成功')
+{
+    return admin_flash_bag($message, $title);
+}
+
+function admin_flash_error($message, $title = '操作失败')
+{
+    return admin_flash_bag($message, $title);
+}

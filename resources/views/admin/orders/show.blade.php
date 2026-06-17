@@ -8,18 +8,6 @@
     </div>
   </div>
   <div class="box-body">
-    @if(session('success'))
-      <div class="alert alert-success alert-dismissible" style="margin-bottom: 12px;">
-        <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-        {{ session('success') }}
-      </div>
-    @endif
-    @if(session('error'))
-      <div class="alert alert-danger alert-dismissible" style="margin-bottom: 12px;">
-        <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-        {{ session('error') }}
-      </div>
-    @endif
     @if($errors->any())
       <div class="alert alert-danger alert-dismissible" style="margin-bottom: 12px;">
         <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>

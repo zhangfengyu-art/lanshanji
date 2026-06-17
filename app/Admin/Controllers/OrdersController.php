@@ -29,11 +29,11 @@ class OrdersController extends Controller
         $redirect = redirect()->route('admin.orders.show', ['order' => $order->id]);
 
         if ($successMessage !== null && $successMessage !== '') {
-            $redirect->with('success', $successMessage);
+            $redirect->with('success', admin_flash_success($successMessage));
         }
 
         if ($errorMessage !== null && $errorMessage !== '') {
-            $redirect->with('error', $errorMessage);
+            $redirect->with('error', admin_flash_error($errorMessage));
         }
 
         return $redirect;
@@ -178,7 +178,7 @@ class OrdersController extends Controller
 
         return redirect()
             ->back()
-            ->with('success', '实拍照片已上传；订单已进入备货/打包阶段（S3），用户不可再自助改址。');
+            ->with('success', admin_flash_success('实拍照片已上传；订单已进入备货/打包阶段（S3），用户不可再自助改址。'));
     }
 
     public function startProcessing(Order $order, OrderFulfillmentService $fulfillment)
@@ -264,7 +264,7 @@ class OrdersController extends Controller
 
         return redirect()
             ->back()
-            ->with('success', '实拍照片已删除');
+            ->with('success', admin_flash_success('实拍照片已删除'));
     }
 
     public function showShoppingReceipt(Order $order)
@@ -312,7 +312,7 @@ class OrdersController extends Controller
 
         return redirect()
             ->back()
-            ->with('success', '购物凭据已上传，用户可在订单详情下载。');
+            ->with('success', admin_flash_success('购物凭据已上传，用户可在订单详情下载。'));
     }
 
     public function deleteShoppingReceipt(Order $order)
@@ -327,7 +327,7 @@ class OrdersController extends Controller
 
         return redirect()
             ->back()
-            ->with('success', '购物凭据已删除');
+            ->with('success', admin_flash_success('购物凭据已删除'));
     }
 
     public function ship(Order $order, Request $request)
@@ -388,7 +388,7 @@ class OrdersController extends Controller
 
         return redirect()
             ->back()
-            ->with('success', '物流信息已更新，用户端将同步显示最新状态');
+            ->with('success', admin_flash_success('物流信息已更新，用户端将同步显示最新状态'));
     }
 
     protected function grid()
@@ -577,7 +577,7 @@ JS
 
         return redirect()
             ->back()
-            ->with('success', '退款请求已提交，请刷新查看退款状态。');
+            ->with('success', admin_flash_success('退款请求已提交，请刷新查看退款状态。'));
     }
 
     public function handleRefund(Order $order, ExecuteOrderRefundRequest $request)
