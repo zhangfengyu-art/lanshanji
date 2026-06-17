@@ -75,7 +75,6 @@ class OrderStockPrepExportService
             'title_note' => '香烟/加热烟备货表 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
             'pdf_title' => '香烟/加热烟备货表',
             'style_mode' => 'pdf',
-            'image_embed_mode' => 'base64',
             'image_max_size' => 520,
             'image_display_width' => 118,
             'image_display_height' => 188,

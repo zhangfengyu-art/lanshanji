@@ -29,6 +29,8 @@ class AdminOrderTableHtmlBuilder
         $styleMode = (string) ($options['style_mode'] ?? 'default');
         $titleNote = trim((string) ($options['title_note'] ?? ''));
         $embedImages = (($options['image_embed_mode'] ?? 'file') === 'base64');
+        $useAbsoluteImagePaths = (bool) ($options['image_src_absolute'] ?? false);
+        $returnChunks = (bool) ($options['return_chunks'] ?? false);
         $isPdfStyle = $styleMode === 'pdf';
 
         $tempDir = null;
@@ -67,8 +69,10 @@ class AdminOrderTableHtmlBuilder
         $html .= '</tr></thead><tbody>';
 
         $rowIndex = 0;
+        $rowChunks = [];
         $emitRow = function (array $row) use (
             &$html,
+            &$rowChunks,
             &$rowIndex,
             $textColumns,
             $imageColumns,
@@ -82,13 +86,15 @@ class AdminOrderTableHtmlBuilder
             $imageJpegQuality,
             $checkboxCellSize,
             $embedImages,
+            $useAbsoluteImagePaths,
+            $returnChunks,
             $isPdfStyle,
             &$imageCache,
             &$zipFiles
         ) {
             $isTotalRow = isset($row[0]) && (string) $row[0] === '合计';
             $rowClass = $isTotalRow ? 'row-total' : ($rowIndex % 2 === 1 ? 'row-alt' : 'row-even');
-            $html .= '<tr class="'.$rowClass.'">';
+            $rowHtml = '<tr class="'.$rowClass.'">';
             $rowIndex++;
 
             foreach ($row as $index => $cell) {
@@ -114,16 +120,16 @@ class AdminOrderTableHtmlBuilder
 
                 if (in_array($index, $checkboxColumns, true)) {
                     $boxSize = max(18, $checkboxCellSize - 12);
-                    $html .= '<td'.$classAttr.' style="text-align:center;'.$style.'">';
-                    $html .= '<div class="check-box" style="width:'.$boxSize.'px;height:'.$boxSize.'px;"></div>';
-                    $html .= '</td>';
+                    $rowHtml .= '<td'.$classAttr.' style="text-align:center;'.$style.'">';
+                    $rowHtml .= '<div class="check-box" style="width:'.$boxSize.'px;height:'.$boxSize.'px;"></div>';
+                    $rowHtml .= '</td>';
 
                     continue;
                 }
 
                 if (in_array($index, $imageColumns, true)) {
                     $localPath = trim((string) $cell);
-                    $html .= '<td'.$classAttr.' style="text-align:center;'.$style.'">';
+                    $rowHtml .= '<td'.$classAttr.' style="text-align:center;'.$style.'">';
                     if ($localPath !== '' && is_file($localPath)) {
                         $src = static::imageSrcForExport(
                             $localPath,
@@ -132,19 +138,20 @@ class AdminOrderTableHtmlBuilder
                             $zipFiles,
                             $imageMaxSize,
                             $imageJpegQuality,
-                            $embedImages
+                            $embedImages,
+                            $useAbsoluteImagePaths
                         );
                         if ($src !== '') {
-                            $html .= '<img src="'.htmlspecialchars($src, ENT_QUOTES, 'UTF-8')
+                            $rowHtml .= '<img src="'.htmlspecialchars($src, ENT_QUOTES, 'UTF-8')
                                 .'" class="product-img" width="'.$imageDisplayWidth.'"'
                                 .' style="max-width:'.$imageDisplayWidth.'px;max-height:'.$imageDisplayHeight.'px;width:auto;height:auto;display:block;margin:0 auto;" alt=""/>';
                         } else {
-                            $html .= '—';
+                            $rowHtml .= '—';
                         }
                     } else {
-                        $html .= $isTotalRow ? '' : '—';
+                        $rowHtml .= $isTotalRow ? '' : '—';
                     }
-                    $html .= '</td>';
+                    $rowHtml .= '</td>';
 
                     continue;
                 }
@@ -152,24 +159,42 @@ class AdminOrderTableHtmlBuilder
                 $text = (string) $cell;
                 if ($isPdfStyle && $index === 2 && !$isTotalRow) {
                     $text = static::formatTypeBadge($text);
-                    $html .= '<td'.$classAttr.' style="'.$style.'">'.$text.'</td>';
+                    $rowHtml .= '<td'.$classAttr.' style="'.$style.'">'.$text.'</td>';
                 } else {
                     if (strpos($text, "\n") !== false) {
                         $style .= ' white-space:pre-wrap;';
                     }
-                    $html .= '<td'.$classAttr.' style="'.$style.'">'.htmlspecialchars($text, ENT_QUOTES, 'UTF-8').'</td>';
+                    $rowHtml .= '<td'.$classAttr.' style="'.$style.'">'.htmlspecialchars($text, ENT_QUOTES, 'UTF-8').'</td>';
                 }
             }
-            $html .= '</tr>';
+            $rowHtml .= '</tr>';
+            if ($returnChunks) {
+                $rowChunks[] = $rowHtml;
+            } else {
+                $html .= $rowHtml;
+            }
         };
 
         $rowProducer($emitRow);
 
-        $html .= '</tbody></table>';
+        $footerHtml = '</tbody></table>';
         if ($footerNote !== '') {
-            $html .= '<p class="export-footer">'.htmlspecialchars($footerNote, ENT_QUOTES, 'UTF-8').'</p>';
+            $footerHtml .= '<p class="export-footer">'.htmlspecialchars($footerNote, ENT_QUOTES, 'UTF-8').'</p>';
         }
-        $html .= '</body></html>';
+        $footerHtml .= '</body></html>';
+
+        if ($returnChunks) {
+            $result = [
+                'html' => $html.$footerHtml,
+                'html_chunks' => array_merge([$html], $rowChunks, [$footerHtml]),
+                'temp_dir' => $tempDir,
+                'zip_files' => $zipFiles,
+            ];
+
+            return $result;
+        }
+
+        $html .= $footerHtml;
 
         return [
             'html' => $html,
@@ -263,9 +288,10 @@ class AdminOrderTableHtmlBuilder
         array &$zipFiles,
         $maxSize,
         $jpegQuality,
-        $embedImages
+        $embedImages,
+        $useAbsoluteImagePaths = false
     ) {
-        $key = md5($localPath.'|'.$maxSize.'|'.$jpegQuality.'|'.($embedImages ? 'b64' : 'file'));
+        $key = md5($localPath.'|'.$maxSize.'|'.$jpegQuality.'|'.($embedImages ? 'b64' : 'file').'|'.($useAbsoluteImagePaths ? 'abs' : 'rel'));
         if (isset($cache[$key])) {
             return $cache[$key];
         }
@@ -297,6 +323,13 @@ class AdminOrderTableHtmlBuilder
         $thumbPath = OrderAdminExportService::writeThumbnailFile($localPath, $imageDir, $key, $maxSize, $jpegQuality);
         if ($thumbPath === '') {
             return '';
+        }
+
+        if ($useAbsoluteImagePaths) {
+            $src = str_replace('\\', '/', $thumbPath);
+            $cache[$key] = $src;
+
+            return $src;
         }
 
         $rel = 'images/'.basename($thumbPath);

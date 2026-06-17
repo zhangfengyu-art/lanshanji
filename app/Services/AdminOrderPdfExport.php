@@ -14,13 +14,16 @@ class AdminOrderPdfExport
         }
 
         $pdfOptions = array_merge($options, [
-            'image_embed_mode' => 'base64',
+            'image_embed_mode' => 'file',
+            'image_src_absolute' => true,
+            'return_chunks' => true,
             'enable_print_css' => false,
             'style_mode' => $options['style_mode'] ?? 'pdf',
         ]);
 
         $built = AdminOrderTableHtmlBuilder::build($headers, $rowProducer, $pdfOptions);
-        $html = $built['html'];
+        $chunks = $built['html_chunks'] ?? [$built['html']];
+        $exportTempDir = $built['temp_dir'] ?? null;
 
         $pdfFilename = pathinfo($filename, PATHINFO_EXTENSION) === 'pdf'
             ? $filename
@@ -32,24 +35,35 @@ class AdminOrderPdfExport
             $tempDir = sys_get_temp_dir();
         }
 
-        $mpdf = new \Mpdf\Mpdf([
-            'mode' => 'utf-8',
-            'format' => 'A4-L',
-            'margin_left' => 6,
-            'margin_right' => 6,
-            'margin_top' => 8,
-            'margin_bottom' => 10,
-            'tempDir' => $tempDir,
-            'dpi' => 150,
-            'img_dpi' => 150,
-            'autoScriptToLang' => true,
-            'autoLangToFont' => true,
-        ]);
+        try {
+            @ini_set('pcre.backtrack_limit', '10000000');
 
-        $mpdf->SetTitle((string) ($options['pdf_title'] ?? '导出'));
-        $mpdf->WriteHTML($html);
+            $mpdf = new \Mpdf\Mpdf([
+                'mode' => 'utf-8',
+                'format' => 'A4-L',
+                'margin_left' => 6,
+                'margin_right' => 6,
+                'margin_top' => 8,
+                'margin_bottom' => 10,
+                'tempDir' => $tempDir,
+                'dpi' => 150,
+                'img_dpi' => 150,
+                'autoScriptToLang' => true,
+                'autoLangToFont' => true,
+            ]);
 
-        $binary = $mpdf->Output('', 'S');
+            $mpdf->SetTitle((string) ($options['pdf_title'] ?? '导出'));
+            foreach ($chunks as $chunk) {
+                if ($chunk !== '') {
+                    $mpdf->WriteHTML($chunk);
+                }
+            }
+
+            $binary = $mpdf->Output('', 'S');
+        } finally {
+            static::removeDir($exportTempDir);
+        }
+
         $disposition = 'attachment; filename="'.$asciiFallback.'"; filename*=UTF-8\'\''.rawurlencode($pdfFilename);
 
         return response($binary, 200, [
@@ -57,5 +71,26 @@ class AdminOrderPdfExport
             'Content-Disposition' => $disposition,
             'Content-Length' => strlen($binary),
         ]);
+    }
+
+    protected static function removeDir($dir)
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        foreach (scandir($dir) as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+            $path = $dir.DIRECTORY_SEPARATOR.$item;
+            if (is_dir($path)) {
+                static::removeDir($path);
+            } else {
+                @unlink($path);
+            }
+        }
+
+        @rmdir($dir);
     }
 }
