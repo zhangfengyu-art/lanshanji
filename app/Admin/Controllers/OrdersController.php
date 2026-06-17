@@ -19,10 +19,12 @@ use Encore\Admin\Layout\Content;
 use App\Http\Controllers\Controller;
 use Encore\Admin\Controllers\ModelForm;
 use App\Http\Requests\Admin\ExecuteOrderRefundRequest;
+use App\Admin\Concerns\RespondsWithAdminBatchJson;
 
 class OrdersController extends Controller
 {
     use ModelForm;
+    use RespondsWithAdminBatchJson;
 
     protected function redirectToOrderShow(Order $order, $successMessage = null, $errorMessage = null)
     {
@@ -374,6 +376,27 @@ class OrdersController extends Controller
                 return $parts ? implode(' / ', $parts) : '—';
             });
             $grid->paid_at('支付时间')->sortable();
+            if (is_site_mode_a()) {
+                $grid->column('fulfillment_stage', '履约阶段')->display(function () {
+                    $fulfillment = app(OrderFulfillmentService::class);
+                    $stage = $fulfillment->resolveStage($this);
+                    $label = $fulfillment->stageLabel($this);
+                    $colors = [
+                        OrderFulfillmentService::STAGE_S0 => 'default',
+                        OrderFulfillmentService::STAGE_S1 => 'default',
+                        OrderFulfillmentService::STAGE_S2 => 'warning',
+                        OrderFulfillmentService::STAGE_S3 => 'info',
+                        OrderFulfillmentService::STAGE_S4 => 'success',
+                    ];
+                    $color = $colors[$stage] ?? 'default';
+
+                    return '<span class="label label-'.$color.'" style="font-size:12px;min-width:34px;display:inline-block;">'
+                        .e($stage)
+                        .'</span> <span style="font-size:12px;color:#475569;">'
+                        .e($label)
+                        .'</span>';
+                });
+            }
             $grid->payment_method('支付方式')->display(function ($value) {
                 if ($value === 'wechat') {
                     return '微信支付';
@@ -414,46 +437,15 @@ class OrdersController extends Controller
                     'scopeOptions' => OrderAdminExportService::scopeOptions(),
                     'dropdownLabel' => '导出订单',
                 ]));
-                $tools->append(
-                    '<button type="button" class="btn btn-sm btn-warning btn-batch-orders-start-processing" style="margin-left:6px;">'
-                    .'<i class="fa fa-play"></i> 批量开始处理</button>'
-                );
+                if (is_site_mode_a()) {
+                    $tools->append(view('admin.orders._batch_tools'));
+                }
             });
 
-            Admin::script(<<<'JS'
-$(document).off('click', '.btn-batch-orders-start-processing').on('click', '.btn-batch-orders-start-processing', function () {
-    var ids = [];
-    $('.grid-row-checkbox').each(function () {
-        var $cb = $(this);
-        if (!$cb.prop('checked') && !$cb.parent().hasClass('checked')) {
-            return;
-        }
-        var id = $cb.data('id');
-        if (id) {
-            ids.push(id);
-        }
-    });
-    if (!ids.length) {
-        alert('请先勾选订单');
-        return;
-    }
-    if (!confirm('将选中且处于「待处理 S1」的订单批量标记为开始处理（S2），继续？')) {
-        return;
-    }
-    $.post('{{ admin_url('orders/batch/start-processing') }}', {
-        _token: LA.token,
-        ids: ids
-    }, function (ret) {
-        if (ret.status) {
-            $.pjax.reload('#pjax-container');
-            alert(ret.message || '已完成');
-            return;
-        }
-        alert(ret.message || '操作失败');
-    });
-});
-JS
-            );
+            if (is_site_mode_a()) {
+                Admin::script(view('admin.partials._batch_helper_script')->render());
+                Admin::script(view('admin.orders._batch_tools_script')->render());
+            }
         });
     }
 
@@ -474,16 +466,42 @@ JS
 
     public function batchStartProcessing(Request $request, \App\Services\OrderBatchService $batch)
     {
-        try {
-            $result = $batch->batchStartProcessing(
-                (array) $request->input('ids', []),
+        return $this->batchTry(function () use ($request, $batch) {
+            return $batch->batchStartProcessing(
+                $this->batchIds($request, '请先勾选订单'),
                 app(OrderFulfillmentService::class)
             );
+        });
+    }
 
-            return response()->json(array_merge(['status' => true], $result));
-        } catch (InvalidRequestException $e) {
-            return response()->json(['status' => false, 'message' => $e->getMessage()], 422);
-        }
+    public function batchLockOrders(Request $request, \App\Services\OrderBatchService $batch)
+    {
+        return $this->batchTry(function () use ($request, $batch) {
+            return $batch->batchLockOrders(
+                $this->batchIds($request, '请先勾选订单'),
+                app(OrderFulfillmentService::class)
+            );
+        });
+    }
+
+    public function batchUnlockOrders(Request $request, \App\Services\OrderBatchService $batch)
+    {
+        return $this->batchTry(function () use ($request, $batch) {
+            return $batch->batchUnlockOrders(
+                $this->batchIds($request, '请先勾选订单'),
+                app(OrderFulfillmentService::class)
+            );
+        });
+    }
+
+    public function batchMarkLogisticsWarehouse(Request $request, \App\Services\OrderBatchService $batch)
+    {
+        return $this->batchTry(function () use ($request, $batch) {
+            return $batch->batchMarkLogisticsWarehouse(
+                $this->batchIds($request, '请先勾选订单'),
+                app(OrderFulfillmentService::class)
+            );
+        });
     }
 
     public function markLogisticsWarehouse(Order $order, OrderFulfillmentService $fulfillment)

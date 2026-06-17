@@ -92,6 +92,9 @@ Route::group([
     $router->get('orders', 'OrdersController@index')->name('admin.orders.index');
     $router->get('orders/export', 'OrdersController@export')->name('admin.orders.export');
     $router->post('orders/batch/start-processing', 'OrdersController@batchStartProcessing');
+    $router->post('orders/batch/lock', 'OrdersController@batchLockOrders');
+    $router->post('orders/batch/unlock', 'OrdersController@batchUnlockOrders');
+    $router->post('orders/batch/logistics-warehouse', 'OrdersController@batchMarkLogisticsWarehouse');
     $router->get('orders/{order}', 'OrdersController@show')->name('admin.orders.show');
     $router->get('orders/{order}/fulfillment-photo', 'OrdersController@showFulfillmentPhoto')->name('admin.orders.fulfillment_photo');
     $router->post('orders/{order}/start-processing', 'OrdersController@startProcessing')->name('admin.orders.start_processing');
