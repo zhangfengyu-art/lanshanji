@@ -73,10 +73,13 @@
       </tr>
       @endforeach
       <tr>
-        <td>订单金额：</td>
-        <td>￥{{ $order->total_amount }}</td>
+        <td colspan="4" style="padding-top: 16px;">
+          @include('admin.orders._fee_breakdown', ['breakdown' => $feeBreakdown ?? [], 'order' => $order])
+        </td>
+      </tr>
+      <tr>
         <td>{{ is_site_mode_b() ? '履行状态：' : '发货状态：' }}</td>
-        <td>{{ is_site_mode_b() ? $order->display_status : \App\Models\Order::$shipStatusMap[$order->ship_status] }}</td>
+        <td colspan="3">{{ is_site_mode_b() ? $order->display_status : \App\Models\Order::$shipStatusMap[$order->ship_status] }}</td>
       </tr>
       @php
         $shipCompany = old('express_company', data_get($order->ship_data, 'express_company', ''));

@@ -68,20 +68,23 @@ class OrdersController extends Controller
 
     public function show(Order $order)
     {
-        $order->load(['user', 'items.product', 'items.productSku']);
+        $order->load(['user', 'items.product', 'items.productSku', 'couponCode']);
+
+        $feeBreakdown = \App\Services\OrderFeeBreakdownPresenter::forOrder($order);
 
         $refundPreview = is_site_mode_a()
             ? app(\App\Services\OrderRefundPolicyService::class)->previewAdminRefund($order)
             : null;
         $refundReasons = config('order_refund.admin_reasons', []);
 
-        return Admin::content(function (Content $content) use ($order, $refundPreview, $refundReasons) {
+        return Admin::content(function (Content $content) use ($order, $refundPreview, $refundReasons, $feeBreakdown) {
             $content->header('查看订单');
             // body 方法可以接受 Laravel 的视图作为参数
             $content->body(view('admin.orders.show', [
                 'order' => $order,
                 'refundPreview' => $refundPreview,
                 'refundReasons' => $refundReasons,
+                'feeBreakdown' => $feeBreakdown,
             ]));
         });
     }
