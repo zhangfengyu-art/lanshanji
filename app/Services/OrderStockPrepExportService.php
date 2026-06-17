@@ -13,7 +13,7 @@ class OrderStockPrepExportService
     const TEXT_COLUMN_INDEXES = [1];
 
     /** @var int[] */
-    const IMAGE_COLUMN_INDEXES = [6];
+    const IMAGE_COLUMN_INDEXES = [7];
 
     public static function scopeOptions()
     {
