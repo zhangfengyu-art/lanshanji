@@ -10,10 +10,10 @@ use Illuminate\Support\Str;
 class OrderAdminExportService
 {
     /** @var int[] */
-    const TEXT_COLUMN_INDEXES = [0, 4, 6, 27];
+    const TEXT_COLUMN_INDEXES = [0, 22];
 
     /** @var int[] */
-    const IMAGE_COLUMN_INDEXES = [11];
+    const IMAGE_COLUMN_INDEXES = [6];
 
     public static function scopeOptions()
     {
@@ -71,12 +71,7 @@ class OrderAdminExportService
             '订单流水号',
             '支付时间',
             '买家昵称',
-            '收货人',
-            '联系电话',
-            '收货地址',
-            '身份证号',
             '商品名称',
-            '规格',
             '数量',
             '单价(日元)',
             '商品图片',
@@ -114,25 +109,23 @@ class OrderAdminExportService
         $fee = (array) data_get($order->extra, 'fee_details', []);
         $tobacco = (array) data_get($order->extra, 'tobacco_summary', []);
         $mode = data_get($fee, 'shipping_mode', data_get($order->extra, 'shipping_mode', ''));
-        $head = self::sharedOrderCells($order, $fullAddress, $idCard);
+        $head = self::sharedOrderCells($order);
         $tobaccoStats = self::tobaccoPurchaseStats($order);
         $tail = self::tailOrderCells($order, $fee, $tobacco, $mode, $pasteLine, $tobaccoStats);
 
         $items = $order->items;
         if ($items->isEmpty()) {
-            return [array_merge($head, ['—', '—', '', '', ''], $tail)];
+            return [array_merge($head, ['—', '', '', ''], $tail)];
         }
 
         $rows = [];
         foreach ($items as $item) {
             $product = $item->product;
             $title = $product ? $product->title : ($item->product_id ? '商品#'.$item->product_id : '—');
-            $skuTitle = optional($item->productSku)->title;
             $imageUrl = $product ? self::imageLocalPathForProduct($product) : '';
 
             $rows[] = array_merge($head, [
                 $title,
-                $skuTitle ?: '—',
                 (int) $item->amount,
                 $item->price,
                 $imageUrl,
