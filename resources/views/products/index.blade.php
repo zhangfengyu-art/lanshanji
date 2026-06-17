@@ -76,7 +76,7 @@
                 <div class="product-card-commerce">
                 <div class="product-price {{ $isDepleted ? 'is-depleted' : '' }}">{{ format_shop_price($product->price) }}</div>
                 @if($isLimited && $limitQty > 0)
-                  <p class="limit-note">{{ trans('frontend.product.limit_per_order', ['count' => $limitQty]) }}</p>
+                  <p class="limit-note">{!! trans('frontend.product.limit_per_order_html', ['count' => $limitQty]) !!}</p>
                 @else
                   <p class="limit-note is-placeholder">&nbsp;</p>
                 @endif

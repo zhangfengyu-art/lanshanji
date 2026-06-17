@@ -50,6 +50,7 @@ return [
         'quota_suffix' => '件/单',
         'limited_badge' => '限量',
         'limit_per_order' => '每单限购 :count 件',
+        'limit_per_order_html' => '每单<span class="limit-keyword">限购</span> :count 件',
         'qty_label' => '数量',
         'favor' => '♡ 加入收藏',
         'disfavor' => '♡ 取消收藏',
