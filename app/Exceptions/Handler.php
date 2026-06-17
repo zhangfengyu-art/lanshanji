@@ -4,6 +4,7 @@ namespace App\Exceptions;
 
 use Exception;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\Request;
 
 class Handler extends ExceptionHandler
 {
@@ -30,8 +31,6 @@ class Handler extends ExceptionHandler
     /**
      * Report or log an exception.
      *
-     * This is a great spot to send exceptions to Sentry, Bugsnag, etc.
-     *
      * @param  \Exception  $exception
      * @return void
      */
@@ -54,47 +53,59 @@ class Handler extends ExceptionHandler
                 return response()->json(['message' => $exception->getMessage()], 422);
             }
 
-            $message = $exception->getMessage();
-            $adminPrefix = trim((string) config('admin.route.prefix', 'admin'), '/');
-            if ($adminPrefix !== '' && $request->is($adminPrefix, $adminPrefix.'/*')) {
-                $previous = url()->previous();
-                $current = $request->fullUrl();
-                if ($previous && $previous !== $current) {
-                    return redirect()->to($previous)->with('error', $message);
-                }
-
-                return redirect()->to(admin_url('/'))->with('error', $message);
+            if ($this->isAdminRequest($request)) {
+                return $this->adminErrorResponse($request, $exception->getMessage());
             }
 
             return redirect()
                 ->back()
                 ->withInput()
-                ->withErrors(['message' => $message]);
+                ->withErrors(['message' => $exception->getMessage()]);
         }
 
         if ($exception instanceof InternalException) {
             return $exception->render($request);
         }
 
-        $adminPrefix = trim((string) config('admin.route.prefix', 'admin'), '/');
-        if ($adminPrefix !== '' && $request->is($adminPrefix, $adminPrefix.'/*') && !$request->expectsJson()) {
+        if ($this->isAdminRequest($request) && !$request->expectsJson()) {
             \Log::error('后台请求异常', [
                 'path' => $request->path(),
                 'message' => $exception->getMessage(),
                 'trace' => $exception->getTraceAsString(),
             ]);
 
-            $message = '操作失败：'.$exception->getMessage();
-            $previous = url()->previous();
-            $current = $request->fullUrl();
-
-            if ($previous && $previous !== $current) {
-                return redirect()->to($previous)->with('error', $message);
-            }
-
-            return redirect()->to(admin_url('/'))->with('error', $message);
+            return $this->adminErrorResponse($request, '操作失败：'.$exception->getMessage());
         }
 
         return parent::render($request, $exception);
+    }
+
+    protected function isAdminRequest(Request $request)
+    {
+        $adminPrefix = trim((string) config('admin.route.prefix', 'admin'), '/');
+
+        return $adminPrefix !== '' && $request->is($adminPrefix, $adminPrefix.'/*');
+    }
+
+    protected function adminErrorResponse(Request $request, $message)
+    {
+        $message = trim((string) $message);
+        if ($message === '') {
+            $message = '未知错误';
+        }
+
+        if ($request->header('X-PJAX') || $request->pjax()) {
+            return response(
+                '<div class="alert alert-danger" style="margin:16px;">'
+                .e($message)
+                .' <a href="'.e(admin_url('/')).'">返回首页</a></div>',
+                500
+            );
+        }
+
+        return response()->view('admin.errors.request_failed', [
+            'message' => $message,
+            'homeUrl' => admin_url('/'),
+        ], 500);
     }
 }

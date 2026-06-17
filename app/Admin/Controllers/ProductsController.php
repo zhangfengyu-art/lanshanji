@@ -91,10 +91,10 @@ class ProductsController extends Controller
             $keyword = trim((string) request()->query('keyword', ''));
             if ($keyword !== '') {
                 $grid->model()->where(function ($query) use ($keyword) {
+                    $query->where('title', 'like', '%'.$keyword.'%');
                     if (is_numeric($keyword)) {
                         $query->orWhere('id', (int) $keyword);
                     }
-                    $query->orWhere('title', 'like', '%'.$keyword.'%');
                 });
             }
 

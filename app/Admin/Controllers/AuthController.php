@@ -25,7 +25,10 @@ class AuthController extends \Encore\Admin\Controllers\AuthController
     public function getLogin()
     {
         if ($this->guard()->check()) {
-            return redirect($this->redirectPath());
+            // 避免 url.intended 指向异常页面后与登录页来回重定向
+            session()->forget('url.intended');
+
+            return redirect(admin_url('/'));
         }
 
         $username = (string) old('username', '');
