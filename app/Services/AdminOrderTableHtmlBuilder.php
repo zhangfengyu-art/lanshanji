@@ -15,15 +15,21 @@ class AdminOrderTableHtmlBuilder
         $textColumns = (array) ($options['text_columns'] ?? []);
         $imageColumns = (array) ($options['image_columns'] ?? []);
         $checkboxColumns = (array) ($options['checkbox_columns'] ?? []);
+        $numericColumns = (array) ($options['numeric_columns'] ?? []);
+        $centerColumns = (array) ($options['center_columns'] ?? []);
+        $columnWidths = (array) ($options['column_widths'] ?? []);
         $footerNote = (string) ($options['footer_note'] ?? '');
         $imageMaxSize = max(32, (int) ($options['image_max_size'] ?? 96));
-        $imageDisplaySize = max(32, (int) ($options['image_display_size'] ?? 72));
+        $imageDisplayWidth = max(32, (int) ($options['image_display_width'] ?? ($options['image_display_size'] ?? 72)));
+        $imageDisplayHeight = max(32, (int) ($options['image_display_height'] ?? $imageDisplayWidth));
         $imageJpegQuality = min(100, max(50, (int) ($options['image_jpeg_quality'] ?? 82)));
-        $tableFontSize = max(10, (int) ($options['table_font_size'] ?? 13));
+        $tableFontSize = max(9, (int) ($options['table_font_size'] ?? 13));
         $checkboxCellSize = max(24, (int) ($options['checkbox_cell_size'] ?? 40));
         $enablePrintCss = (bool) ($options['enable_print_css'] ?? false);
+        $styleMode = (string) ($options['style_mode'] ?? 'default');
         $titleNote = trim((string) ($options['title_note'] ?? ''));
         $embedImages = (($options['image_embed_mode'] ?? 'file') === 'base64');
+        $isPdfStyle = $styleMode === 'pdf';
 
         $tempDir = null;
         $imageDir = null;
@@ -39,61 +45,77 @@ class AdminOrderTableHtmlBuilder
         }
 
         $html = '<html><head><meta charset="UTF-8">';
-        if ($enablePrintCss) {
-            $html .= '<style>'
-                .'@media print{body{margin:12px;} table{font-size:'.($tableFontSize - 1).'px;} '
-                .'img{max-width:'.($imageDisplaySize + 20).'px;max-height:'.($imageDisplaySize + 20).'px;} '
-                .'th,td{padding:8px!important;}}'
-                .'</style>';
-        }
-        if ($embedImages) {
-            $html .= '<style>'
-                .'body{font-family:sans-serif;} '
-                .'table{border-collapse:collapse;width:100%;} '
-                .'th,td{border:1px solid #d0d0d0;padding:6px 8px;vertical-align:middle;} '
-                .'th{background:#4472C4;color:#fff;}'
-                .'</style>';
-        }
-        $html .= '</head><body>';
-        if ($titleNote !== '') {
-            $html .= '<p style="font-size:'.($tableFontSize + 1).'px;font-weight:bold;margin:0 0 10px;">'
-                .htmlspecialchars($titleNote, ENT_QUOTES, 'UTF-8')
-                .'</p>';
-        }
-        $html .= '<table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:'.$tableFontSize.'px;">';
-        $html .= '<tr>';
-        foreach ($headers as $header) {
-            $html .= '<th style="background:#4472C4;color:#fff;padding:8px 10px;">'
-                .htmlspecialchars((string) $header, ENT_QUOTES, 'UTF-8')
-                .'</th>';
-        }
-        $html .= '</tr>';
+        $html .= static::buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight);
+        $html .= '</head><body class="'.($isPdfStyle ? 'export-pdf' : 'export-default').'">';
 
+        if ($titleNote !== '') {
+            $html .= static::buildTitleBlock($titleNote, $tableFontSize, $isPdfStyle);
+        }
+
+        $html .= '<table class="export-table" border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:'.$tableFontSize.'px;width:100%;">';
+        if ($columnWidths !== []) {
+            $html .= '<colgroup>';
+            foreach ($columnWidths as $width) {
+                $html .= '<col style="width:'.htmlspecialchars((string) $width, ENT_QUOTES, 'UTF-8').'"/>';
+            }
+            $html .= '</colgroup>';
+        }
+        $html .= '<thead><tr>';
+        foreach ($headers as $header) {
+            $html .= '<th>'.htmlspecialchars((string) $header, ENT_QUOTES, 'UTF-8').'</th>';
+        }
+        $html .= '</tr></thead><tbody>';
+
+        $rowIndex = 0;
         $emitRow = function (array $row) use (
             &$html,
+            &$rowIndex,
             $textColumns,
             $imageColumns,
             $checkboxColumns,
+            $numericColumns,
+            $centerColumns,
             $imageDir,
             $imageMaxSize,
-            $imageDisplaySize,
+            $imageDisplayWidth,
+            $imageDisplayHeight,
             $imageJpegQuality,
             $checkboxCellSize,
             $embedImages,
+            $isPdfStyle,
             &$imageCache,
             &$zipFiles
         ) {
-            $html .= '<tr>';
+            $isTotalRow = isset($row[0]) && (string) $row[0] === '合计';
+            $rowClass = $isTotalRow ? 'row-total' : ($rowIndex % 2 === 1 ? 'row-alt' : 'row-even');
+            $html .= '<tr class="'.$rowClass.'">';
+            $rowIndex++;
+
             foreach ($row as $index => $cell) {
-                $style = 'padding:6px 8px;vertical-align:middle;border:1px solid #d0d0d0;';
+                $classes = [];
+                if (in_array($index, $numericColumns, true)) {
+                    $classes[] = 'cell-num';
+                }
+                if (in_array($index, $centerColumns, true)) {
+                    $classes[] = 'cell-center';
+                }
                 if (in_array($index, $textColumns, true)) {
-                    $style .= 'mso-number-format:\@;';
+                    $classes[] = 'cell-text';
+                }
+                if (in_array($index, $imageColumns, true)) {
+                    $classes[] = 'cell-image';
+                }
+                if (in_array($index, $checkboxColumns, true)) {
+                    $classes[] = 'cell-check';
                 }
 
+                $classAttr = $classes !== [] ? ' class="'.implode(' ', $classes).'"' : '';
+                $style = in_array($index, $textColumns, true) ? ' mso-number-format:\@;' : '';
+
                 if (in_array($index, $checkboxColumns, true)) {
-                    $boxSize = max(16, $checkboxCellSize - 10);
-                    $html .= '<td style="'.$style.'text-align:center;width:'.$checkboxCellSize.'px;min-width:'.$checkboxCellSize.'px;">';
-                    $html .= '<div style="width:'.$boxSize.'px;height:'.$boxSize.'px;border:2px solid #333;margin:0 auto;"></div>';
+                    $boxSize = max(18, $checkboxCellSize - 12);
+                    $html .= '<td'.$classAttr.' style="text-align:center;'.$style.'">';
+                    $html .= '<div class="check-box" style="width:'.$boxSize.'px;height:'.$boxSize.'px;"></div>';
                     $html .= '</td>';
 
                     continue;
@@ -101,8 +123,7 @@ class AdminOrderTableHtmlBuilder
 
                 if (in_array($index, $imageColumns, true)) {
                     $localPath = trim((string) $cell);
-                    $cellWidth = $imageDisplaySize + 16;
-                    $html .= '<td style="'.$style.'text-align:center;width:'.$cellWidth.'px;min-width:'.$cellWidth.'px;">';
+                    $html .= '<td'.$classAttr.' style="text-align:center;'.$style.'">';
                     if ($localPath !== '' && is_file($localPath)) {
                         $src = static::imageSrcForExport(
                             $localPath,
@@ -115,20 +136,28 @@ class AdminOrderTableHtmlBuilder
                         );
                         if ($src !== '') {
                             $html .= '<img src="'.htmlspecialchars($src, ENT_QUOTES, 'UTF-8')
-                                .'" width="'.$imageDisplaySize.'" height="'.$imageDisplaySize.'" style="object-fit:contain;" alt=""/>';
+                                .'" class="product-img" width="'.$imageDisplayWidth.'"'
+                                .' style="max-width:'.$imageDisplayWidth.'px;max-height:'.$imageDisplayHeight.'px;width:auto;height:auto;display:block;margin:0 auto;" alt=""/>';
                         } else {
                             $html .= '—';
                         }
                     } else {
-                        $html .= '—';
+                        $html .= $isTotalRow ? '' : '—';
                     }
                     $html .= '</td>';
+
+                    continue;
+                }
+
+                $text = (string) $cell;
+                if ($isPdfStyle && $index === 2 && !$isTotalRow) {
+                    $text = static::formatTypeBadge($text);
+                    $html .= '<td'.$classAttr.' style="'.$style.'">'.$text.'</td>';
                 } else {
-                    $text = (string) $cell;
                     if (strpos($text, "\n") !== false) {
-                        $style .= 'white-space:pre-wrap;';
+                        $style .= ' white-space:pre-wrap;';
                     }
-                    $html .= '<td style="'.$style.'">'.htmlspecialchars($text, ENT_QUOTES, 'UTF-8').'</td>';
+                    $html .= '<td'.$classAttr.' style="'.$style.'">'.htmlspecialchars($text, ENT_QUOTES, 'UTF-8').'</td>';
                 }
             }
             $html .= '</tr>';
@@ -136,11 +165,9 @@ class AdminOrderTableHtmlBuilder
 
         $rowProducer($emitRow);
 
-        $html .= '</table>';
+        $html .= '</tbody></table>';
         if ($footerNote !== '') {
-            $html .= '<p style="font-size:12px;color:#666;margin-top:12px;">'
-                .htmlspecialchars($footerNote, ENT_QUOTES, 'UTF-8')
-                .'</p>';
+            $html .= '<p class="export-footer">'.htmlspecialchars($footerNote, ENT_QUOTES, 'UTF-8').'</p>';
         }
         $html .= '</body></html>';
 
@@ -149,6 +176,84 @@ class AdminOrderTableHtmlBuilder
             'temp_dir' => $tempDir,
             'zip_files' => $zipFiles,
         ];
+    }
+
+    protected static function buildTitleBlock($titleNote, $tableFontSize, $isPdfStyle)
+    {
+        if (!$isPdfStyle) {
+            return '<p style="font-size:'.($tableFontSize + 1).'px;font-weight:bold;margin:0 0 10px;">'
+                .htmlspecialchars($titleNote, ENT_QUOTES, 'UTF-8')
+                .'</p>';
+        }
+
+        $parts = explode(' · ', $titleNote, 3);
+        $mainTitle = $parts[0] ?? $titleNote;
+        $meta = isset($parts[1]) ? implode(' · ', array_slice($parts, 1)) : '';
+
+        $html = '<div class="export-header">';
+        $html .= '<div class="export-header-title">'.htmlspecialchars($mainTitle, ENT_QUOTES, 'UTF-8').'</div>';
+        if ($meta !== '') {
+            $html .= '<div class="export-header-meta">'.htmlspecialchars($meta, ENT_QUOTES, 'UTF-8').'</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    protected static function formatTypeBadge($text)
+    {
+        $text = trim($text);
+        if ($text === '香烟') {
+            return '<span class="type-badge type-cigarette">香烟</span>';
+        }
+        if ($text === '加热烟') {
+            return '<span class="type-badge type-heated">加热烟</span>';
+        }
+
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+
+    protected static function buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight)
+    {
+        $css = '<style>';
+        if ($isPdfStyle) {
+            $css .= 'body.export-pdf{margin:0;padding:0;font-family:"sans-serif";color:#1a1a1a;font-size:'.$tableFontSize.'px;}'
+                .'.export-header{background:#2f5597;color:#fff;padding:10px 12px 9px;margin:0 0 10px;border-radius:4px;}'
+                .'.export-header-title{font-size:'.($tableFontSize + 5).'px;font-weight:bold;line-height:1.25;}'
+                .'.export-header-meta{font-size:'.($tableFontSize - 1).'px;margin-top:4px;opacity:0.92;}'
+                .'table.export-table{border-collapse:collapse;width:100%;table-layout:fixed;}'
+                .'table.export-table th{background:#2f5597;color:#fff;padding:7px 6px;font-weight:bold;text-align:center;border:1px solid #244a82;font-size:'.($tableFontSize).'px;line-height:1.3;}'
+                .'table.export-table td{border:1px solid #c8d2e0;padding:7px 6px;vertical-align:middle;line-height:1.35;word-wrap:break-word;}'
+                .'tr.row-even td{background:#ffffff;}'
+                .'tr.row-alt td{background:#f5f8fc;}'
+                .'tr.row-total td{background:#e8eef7;font-weight:bold;border-top:2px solid #2f5597;}'
+                .'td.cell-num{text-align:right;font-variant-numeric:tabular-nums;}'
+                .'td.cell-center{text-align:center;}'
+                .'td.cell-text{text-align:left;}'
+                .'td.cell-image{padding:8px 4px;text-align:center;}'
+                .'td.cell-check{padding:8px 4px;}'
+                .'.check-box{border:2px solid #333;margin:0 auto;background:#fff;}'
+                .'.product-img{object-fit:contain;}'
+                .'.type-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:'.($tableFontSize - 1).'px;font-weight:bold;line-height:1.4;}'
+                .'.type-cigarette{background:#fff4e5;color:#9a5b00;border:1px solid #f0c987;}'
+                .'.type-heated{background:#e8f7f3;color:#0d6b52;border:1px solid #9fdccc;}'
+                .'.export-footer{font-size:'.($tableFontSize - 1).'px;color:#666;margin-top:10px;line-height:1.45;}';
+        } else {
+            $css .= 'table.export-table th{background:#4472C4;color:#fff;padding:8px 10px;}'
+                .'table.export-table td{padding:6px 8px;vertical-align:middle;border:1px solid #d0d0d0;}'
+                .'.check-box{border:2px solid #333;margin:0 auto;}';
+        }
+
+        if ($enablePrintCss) {
+            $css .= '@media print{body{margin:12px;}'
+                .'table.export-table{font-size:'.($tableFontSize - 1).'px;}'
+                .'img.product-img{max-width:'.($imageDisplayWidth + 16).'px;max-height:'.($imageDisplayHeight + 16).'px;}'
+                .'th,td{padding:8px!important;}}';
+        }
+
+        $css .= '</style>';
+
+        return $css;
     }
 
     protected static function imageSrcForExport(

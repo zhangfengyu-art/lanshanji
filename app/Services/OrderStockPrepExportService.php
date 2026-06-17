@@ -63,6 +63,29 @@ class OrderStockPrepExportService
         return preg_replace('/\.zip$/', '.pdf', self::filename($scope));
     }
 
+    public static function pdfExportOptions($scopeLabel)
+    {
+        return [
+            'text_columns' => self::TEXT_COLUMN_INDEXES,
+            'image_columns' => self::IMAGE_COLUMN_INDEXES,
+            'checkbox_columns' => self::CHECKBOX_COLUMN_INDEXES,
+            'numeric_columns' => [0, 3, 4, 5, 6],
+            'center_columns' => [0, 2, 3, 4, 5, 6, 8],
+            'column_widths' => ['4%', '27%', '9%', '7%', '8%', '8%', '8%', '22%', '7%'],
+            'title_note' => '香烟/加热烟备货表 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
+            'pdf_title' => '香烟/加热烟备货表',
+            'style_mode' => 'pdf',
+            'image_embed_mode' => 'base64',
+            'image_max_size' => 520,
+            'image_display_width' => 118,
+            'image_display_height' => 188,
+            'image_jpeg_quality' => 96,
+            'table_font_size' => 11,
+            'checkbox_cell_size' => 54,
+            'footer_note' => self::pdfFooterNote(),
+        ];
+    }
+
     public static function htmlExportOptions($scopeLabel)
     {
         return [
@@ -74,6 +97,8 @@ class OrderStockPrepExportService
             'pdf_title' => '香烟/加热烟备货表',
             'image_max_size' => 200,
             'image_display_size' => 140,
+            'image_display_width' => 140,
+            'image_display_height' => 140,
             'image_jpeg_quality' => 92,
             'table_font_size' => 14,
             'checkbox_cell_size' => 44,

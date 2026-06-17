@@ -148,14 +148,11 @@ class OrdersController extends Controller
         };
 
         if ($format === 'pdf') {
-            $options = OrderStockPrepExportService::htmlExportOptions($scopeLabel);
-            $options['footer_note'] = OrderStockPrepExportService::pdfFooterNote();
-
             return AdminOrderPdfExport::download(
                 OrderStockPrepExportService::pdfFilename($scope),
                 OrderStockPrepExportService::headers(),
                 $rowProducer,
-                $options
+                OrderStockPrepExportService::pdfExportOptions($scopeLabel)
             );
         }
 

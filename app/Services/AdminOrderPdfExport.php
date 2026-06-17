@@ -16,6 +16,7 @@ class AdminOrderPdfExport
         $pdfOptions = array_merge($options, [
             'image_embed_mode' => 'base64',
             'enable_print_css' => false,
+            'style_mode' => $options['style_mode'] ?? 'pdf',
         ]);
 
         $built = AdminOrderTableHtmlBuilder::build($headers, $rowProducer, $pdfOptions);
@@ -34,11 +35,13 @@ class AdminOrderPdfExport
         $mpdf = new \Mpdf\Mpdf([
             'mode' => 'utf-8',
             'format' => 'A4-L',
-            'margin_left' => 8,
-            'margin_right' => 8,
-            'margin_top' => 10,
-            'margin_bottom' => 12,
+            'margin_left' => 6,
+            'margin_right' => 6,
+            'margin_top' => 8,
+            'margin_bottom' => 10,
             'tempDir' => $tempDir,
+            'dpi' => 150,
+            'img_dpi' => 150,
             'autoScriptToLang' => true,
             'autoLangToFont' => true,
         ]);
