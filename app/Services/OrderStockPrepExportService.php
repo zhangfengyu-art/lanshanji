@@ -38,9 +38,9 @@ class OrderStockPrepExportService
             '序号',
             '商品名称',
             '类型',
-            '采购数量(包)',
-            '商品图片',
-            '采购确认',
+            '采购(包)',
+            '商品图',
+            '确认',
         ];
     }
 
@@ -66,18 +66,19 @@ class OrderStockPrepExportService
             'text_columns' => self::TEXT_COLUMN_INDEXES,
             'image_columns' => self::IMAGE_COLUMN_INDEXES,
             'checkbox_columns' => self::CHECKBOX_COLUMN_INDEXES,
+            'qty_columns' => [3],
             'numeric_columns' => [0, 3],
             'center_columns' => [0, 2, 3, 5],
-            'column_widths' => ['6%', '36%', '12%', '12%', '28%', '6%'],
-            'title_note' => '烟草备货表（香烟/加热烟/烟丝） · '.$scopeLabel.' · '.date('Y-m-d H:i'),
+            'column_widths_mm' => ['10mm', '108mm', '24mm', '22mm', '48mm', '14mm'],
+            'title_note' => '烟草备货表 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
             'pdf_title' => '烟草备货表',
             'style_mode' => 'pdf',
-            'image_max_size' => 520,
-            'image_display_width' => 128,
-            'image_display_height' => 196,
+            'image_max_size' => 480,
+            'image_display_width' => 108,
+            'image_display_height' => 150,
             'image_jpeg_quality' => 96,
-            'table_font_size' => 15,
-            'checkbox_cell_size' => 58,
+            'table_font_size' => 16,
+            'checkbox_cell_size' => 36,
             'footer_note' => self::pdfFooterNote(),
         ];
     }
@@ -98,16 +99,17 @@ class OrderStockPrepExportService
             'image_jpeg_quality' => 92,
             'table_font_size' => 16,
             'checkbox_cell_size' => 48,
-            'enable_print_css' => true,
+            'column_widths' => ['5%', '42%', '10%', '10%', '28%', '5%'],
+            'qty_columns' => [3],
             'footer_note' => '请解压本 ZIP 后，用 Excel 或 WPS 打开「备货表.html」，打印前可在浏览器中预览。'
                 .'本表汇总香烟、加热烟、手卷烟丝按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。'
-                .'「采购确认」列留空供现场打勾。',
+                .'「确认」列留空供现场打勾。',
         ];
     }
 
     public static function pdfFooterNote()
     {
-        return '本表汇总香烟、加热烟、手卷烟丝按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。「采购确认」列留空供现场打勾。';
+        return '本表汇总香烟、加热烟、手卷烟丝按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。「确认」列留空供现场打勾。';
     }
 
     public static function buildQuery($scope)

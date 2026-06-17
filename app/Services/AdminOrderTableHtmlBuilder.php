@@ -17,7 +17,9 @@ class AdminOrderTableHtmlBuilder
         $checkboxColumns = (array) ($options['checkbox_columns'] ?? []);
         $numericColumns = (array) ($options['numeric_columns'] ?? []);
         $centerColumns = (array) ($options['center_columns'] ?? []);
+        $qtyColumns = (array) ($options['qty_columns'] ?? []);
         $columnWidths = (array) ($options['column_widths'] ?? []);
+        $columnWidthsMm = (array) ($options['column_widths_mm'] ?? []);
         $footerNote = (string) ($options['footer_note'] ?? '');
         $imageMaxSize = max(32, (int) ($options['image_max_size'] ?? 96));
         $imageDisplayWidth = max(32, (int) ($options['image_display_width'] ?? ($options['image_display_size'] ?? 72)));
@@ -47,24 +49,30 @@ class AdminOrderTableHtmlBuilder
         }
 
         $html = '<html><head><meta charset="UTF-8">';
-        $html .= static::buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight);
+        $html .= static::buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight, $columnWidthsMm);
         $html .= '</head><body class="'.($isPdfStyle ? 'export-pdf' : 'export-default').'">';
 
         if ($titleNote !== '') {
             $html .= static::buildTitleBlock($titleNote, $tableFontSize, $isPdfStyle);
         }
 
-        $html .= '<table class="export-table" border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:'.$tableFontSize.'px;width:100%;">';
-        if ($columnWidths !== []) {
+        $html .= '<table class="export-table" border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:'.$tableFontSize.'px;width:100%;table-layout:fixed;">';
+        $widthsForColgroup = $columnWidthsMm !== [] ? $columnWidthsMm : $columnWidths;
+        if ($widthsForColgroup !== []) {
             $html .= '<colgroup>';
-            foreach ($columnWidths as $width) {
-                $html .= '<col style="width:'.htmlspecialchars((string) $width, ENT_QUOTES, 'UTF-8').'"/>';
+            foreach ($widthsForColgroup as $width) {
+                $html .= '<col width="'.htmlspecialchars((string) $width, ENT_QUOTES, 'UTF-8').'"/>';
             }
             $html .= '</colgroup>';
         }
         $html .= '<thead><tr>';
-        foreach ($headers as $header) {
-            $html .= '<th>'.htmlspecialchars((string) $header, ENT_QUOTES, 'UTF-8').'</th>';
+        foreach ($headers as $index => $header) {
+            $widthStyle = '';
+            if (isset($columnWidthsMm[$index])) {
+                $w = $columnWidthsMm[$index];
+                $widthStyle = ' style="width:'.$w.';max-width:'.$w.';"';
+            }
+            $html .= '<th'.$widthStyle.'>'.htmlspecialchars((string) $header, ENT_QUOTES, 'UTF-8').'</th>';
         }
         $html .= '</tr></thead><tbody>';
 
@@ -79,6 +87,8 @@ class AdminOrderTableHtmlBuilder
             $checkboxColumns,
             $numericColumns,
             $centerColumns,
+            $qtyColumns,
+            $columnWidthsMm,
             $imageDir,
             $imageMaxSize,
             $imageDisplayWidth,
@@ -114,12 +124,19 @@ class AdminOrderTableHtmlBuilder
                 if (in_array($index, $checkboxColumns, true)) {
                     $classes[] = 'cell-check';
                 }
+                if (in_array($index, $qtyColumns, true)) {
+                    $classes[] = 'cell-qty';
+                }
 
                 $classAttr = $classes !== [] ? ' class="'.implode(' ', $classes).'"' : '';
                 $style = in_array($index, $textColumns, true) ? ' mso-number-format:\@;' : '';
+                if (isset($columnWidthsMm[$index])) {
+                    $w = $columnWidthsMm[$index];
+                    $style .= ' width:'.$w.';max-width:'.$w.';';
+                }
 
                 if (in_array($index, $checkboxColumns, true)) {
-                    $boxSize = max(18, $checkboxCellSize - 12);
+                    $boxSize = max(14, $checkboxCellSize - 8);
                     $rowHtml .= '<td'.$classAttr.' style="text-align:center;'.$style.'">';
                     $rowHtml .= '<div class="check-box" style="width:'.$boxSize.'px;height:'.$boxSize.'px;"></div>';
                     $rowHtml .= '</td>';
@@ -142,9 +159,11 @@ class AdminOrderTableHtmlBuilder
                             $useAbsoluteImagePaths
                         );
                         if ($src !== '') {
+                            $rowHtml .= '<div class="img-frame">';
                             $rowHtml .= '<img src="'.htmlspecialchars($src, ENT_QUOTES, 'UTF-8')
                                 .'" class="product-img" width="'.$imageDisplayWidth.'"'
                                 .' style="max-width:'.$imageDisplayWidth.'px;max-height:'.$imageDisplayHeight.'px;width:auto;height:auto;display:block;margin:0 auto;" alt=""/>';
+                            $rowHtml .= '</div>';
                         } else {
                             $rowHtml .= '—';
                         }
@@ -241,32 +260,40 @@ class AdminOrderTableHtmlBuilder
         return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
 
-    protected static function buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight)
+    protected static function buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight, array $columnWidthsMm = [])
     {
         $css = '<style>';
         if ($isPdfStyle) {
             $css .= 'body.export-pdf{margin:0;padding:0;font-family:"sans-serif";color:#1a1a1a;font-size:'.$tableFontSize.'px;}'
-                .'.export-header{background:#2f5597;color:#fff;padding:12px 14px 10px;margin:0 0 12px;border-radius:4px;}'
-                .'.export-header-title{font-size:'.($tableFontSize + 6).'px;font-weight:bold;line-height:1.25;}'
-                .'.export-header-meta{font-size:'.$tableFontSize.'px;margin-top:5px;opacity:0.92;}'
+                .'.export-header{background:#2f5597;color:#fff;padding:10px 12px;margin:0 0 10px;}'
+                .'.export-header-title{font-size:'.($tableFontSize + 5).'px;font-weight:bold;line-height:1.3;}'
+                .'.export-header-meta{font-size:'.($tableFontSize - 1).'px;margin-top:4px;opacity:0.9;}'
                 .'table.export-table{border-collapse:collapse;width:100%;table-layout:fixed;}'
-                .'table.export-table th{background:#2f5597;color:#fff;padding:9px 7px;font-weight:bold;text-align:center;border:1px solid #244a82;font-size:'.($tableFontSize).'px;line-height:1.35;}'
-                .'table.export-table td{border:1px solid #c8d2e0;padding:9px 7px;vertical-align:middle;line-height:1.45;word-wrap:break-word;font-size:'.($tableFontSize).'px;}'
+                .'table.export-table th{background:#2f5597;color:#fff;padding:8px 6px;font-weight:bold;text-align:center;border:1px solid #244a82;font-size:'.($tableFontSize - 1).'px;line-height:1.3;}'
+                .'table.export-table td{border:1px solid #c5ced8;padding:8px 6px;vertical-align:middle;line-height:1.4;word-wrap:break-word;font-size:'.$tableFontSize.'px;}'
                 .'tr.row-even td{background:#ffffff;}'
-                .'tr.row-alt td{background:#f5f8fc;}'
-                .'tr.row-total td{background:#e8eef7;font-weight:bold;border-top:2px solid #2f5597;}'
-                .'td.cell-num{text-align:right;font-variant-numeric:tabular-nums;}'
+                .'tr.row-alt td{background:#f7f9fc;}'
+                .'tr.row-total td{background:#e8eef7;font-weight:bold;border-top:2px solid #2f5597;font-size:'.($tableFontSize + 1).'px;}'
+                .'td.cell-num{text-align:center;font-variant-numeric:tabular-nums;}'
+                .'td.cell-qty{text-align:center;font-size:'.($tableFontSize + 4).'px;font-weight:bold;color:#1f3f72;}'
                 .'td.cell-center{text-align:center;}'
-                .'td.cell-text{text-align:left;}'
-                .'td.cell-image{padding:8px 4px;text-align:center;}'
-                .'td.cell-check{padding:8px 4px;}'
-                .'.check-box{border:2px solid #333;margin:0 auto;background:#fff;}'
-                .'.product-img{object-fit:contain;}'
-                .'.type-badge{display:inline-block;padding:3px 10px;border-radius:10px;font-size:'.($tableFontSize).'px;font-weight:bold;line-height:1.4;}'
+                .'td.cell-text{text-align:left;font-weight:500;}'
+                .'td.cell-image{padding:6px 4px;text-align:center;}'
+                .'td.cell-check{padding:6px 2px;text-align:center;width:14mm;max-width:14mm;}'
+                .'.img-frame{display:inline-block;background:#f3f6fa;border:1px solid #d5dde8;border-radius:3px;padding:3px;line-height:0;}'
+                .'.check-box{border:2px solid #222;margin:0 auto;background:#fff;}'
+                .'.product-img{object-fit:contain;display:block;}'
+                .'.type-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:'.($tableFontSize - 1).'px;font-weight:bold;line-height:1.35;white-space:nowrap;}'
                 .'.type-cigarette{background:#fff4e5;color:#9a5b00;border:1px solid #f0c987;}'
                 .'.type-heated{background:#e8f7f3;color:#0d6b52;border:1px solid #9fdccc;}'
                 .'.type-rolling{background:#f3ecff;color:#5b3d91;border:1px solid #d4bdf5;}'
-                .'.export-footer{font-size:'.$tableFontSize.'px;color:#666;margin-top:10px;line-height:1.45;}';
+                .'.export-footer{font-size:'.($tableFontSize - 1).'px;color:#666;margin-top:8px;line-height:1.4;}';
+
+            foreach ($columnWidthsMm as $i => $width) {
+                $n = (int) $i + 1;
+                $css .= 'table.export-table col:nth-child('.$n.'){width:'.$width.';}';
+                $css .= 'table.export-table th:nth-child('.$n.'),table.export-table td:nth-child('.$n.'){width:'.$width.';max-width:'.$width.';}';
+            }
         } else {
             $css .= 'table.export-table th{background:#4472C4;color:#fff;padding:8px 10px;}'
                 .'table.export-table td{padding:6px 8px;vertical-align:middle;border:1px solid #d0d0d0;}'
