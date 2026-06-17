@@ -91,6 +91,7 @@ Route::group([
     $router->post('products/import-zip', 'ProductsController@importZip')->name('admin.products.import_zip');
     $router->get('orders', 'OrdersController@index')->name('admin.orders.index');
     $router->get('orders/export', 'OrdersController@export')->name('admin.orders.export');
+    $router->get('orders/export-stock-prep', 'OrdersController@exportStockPrep')->name('admin.orders.export_stock_prep');
     $router->post('orders/batch/start-processing', 'OrdersController@batchStartProcessing');
     $router->post('orders/batch/lock', 'OrdersController@batchLockOrders');
     $router->post('orders/batch/unlock', 'OrdersController@batchUnlockOrders');

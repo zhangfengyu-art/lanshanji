@@ -14,6 +14,8 @@ class AdminOrderZipExport
     {
         $textColumns = (array) ($options['text_columns'] ?? []);
         $imageColumns = (array) ($options['image_columns'] ?? []);
+        $htmlBasename = (string) ($options['html_basename'] ?? '订单表.html');
+        $footerNote = (string) ($options['footer_note'] ?? '请解压本 ZIP 后，用 Excel 或 WPS 打开「'.$htmlBasename.'」查看商品图片。');
 
         $basename = pathinfo($filename, PATHINFO_FILENAME);
         if ($basename === '' || $basename === '.') {
@@ -31,7 +33,7 @@ class AdminOrderZipExport
 
         $imageCache = [];
         $zipFiles = [];
-        $htmlPath = $tmpdir.DIRECTORY_SEPARATOR.'订单表.html';
+        $htmlPath = $tmpdir.DIRECTORY_SEPARATOR.$htmlBasename;
         $fp = fopen($htmlPath, 'wb');
         if (!$fp) {
             static::removeDir($tmpdir);
@@ -86,7 +88,7 @@ class AdminOrderZipExport
         $rowProducer($emitRow);
 
         fwrite($fp, '</table>');
-        fwrite($fp, '<p style="font-size:12px;color:#666;margin-top:12px;">请解压本 ZIP 后，用 Excel 或 WPS 打开「订单表.html」查看商品图片。</p>');
+        fwrite($fp, '<p style="font-size:12px;color:#666;margin-top:12px;">'.htmlspecialchars($footerNote, ENT_QUOTES, 'UTF-8').'</p>');
         fwrite($fp, '</body></html>');
         fclose($fp);
 
@@ -102,7 +104,7 @@ class AdminOrderZipExport
             throw new \RuntimeException('无法创建 ZIP 文件');
         }
 
-        $zip->addFile($htmlPath, '订单表.html');
+        $zip->addFile($htmlPath, $htmlBasename);
         foreach ($zipFiles as $rel => $abs) {
             $zip->addFile($abs, $rel);
         }

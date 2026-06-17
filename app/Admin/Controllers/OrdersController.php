@@ -6,6 +6,7 @@ use App\Exceptions\InternalException;
 use App\Models\Order;
 use App\Services\AdminOrderZipExport;
 use App\Services\OrderAdminExportService;
+use App\Services\OrderStockPrepExportService;
 use App\Services\OrderFulfillmentService;
 use Illuminate\Http\Request;
 use App\Exceptions\InvalidRequestException;
@@ -126,6 +127,31 @@ class OrdersController extends Controller
             [
                 'text_columns' => OrderAdminExportService::TEXT_COLUMN_INDEXES,
                 'image_columns' => OrderAdminExportService::IMAGE_COLUMN_INDEXES,
+            ]
+        );
+    }
+
+    public function exportStockPrep(Request $request)
+    {
+        $scope = (string) $request->query('scope', 'all');
+        $options = OrderStockPrepExportService::scopeOptions();
+        if (!array_key_exists($scope, $options)) {
+            $scope = 'all';
+        }
+
+        $fulfillment = app(OrderFulfillmentService::class);
+
+        return AdminOrderZipExport::download(
+            OrderStockPrepExportService::filename($scope),
+            OrderStockPrepExportService::headers(),
+            function ($emitRow) use ($scope, $fulfillment) {
+                OrderStockPrepExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
+            },
+            [
+                'text_columns' => OrderStockPrepExportService::TEXT_COLUMN_INDEXES,
+                'image_columns' => OrderStockPrepExportService::IMAGE_COLUMN_INDEXES,
+                'html_basename' => '备货表.html',
+                'footer_note' => '请解压本 ZIP 后，用 Excel 或 WPS 打开「备货表.html」。本表仅汇总香烟与加热烟按包采购数量，不含用户地址与身份信息；已退款成功订单不计入。',
             ]
         );
     }
@@ -443,6 +469,14 @@ class OrdersController extends Controller
                     'scopeOptions' => OrderAdminExportService::scopeOptions(),
                     'dropdownLabel' => '导出订单',
                 ]));
+                if (is_site_mode_a()) {
+                    $tools->append(view('admin.partials.export_dropdown', [
+                        'exportBaseUrl' => route('admin.orders.export_stock_prep'),
+                        'scopeOptions' => OrderStockPrepExportService::scopeOptions(),
+                        'dropdownLabel' => '导出备货表',
+                        'downloadHint' => '下载 ZIP，解压后用 Excel/WPS 打开「备货表.html」',
+                    ]));
+                }
                 if (is_site_mode_a()) {
                     $tools->append(view('admin.orders._batch_tools'));
                 }
