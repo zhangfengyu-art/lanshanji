@@ -187,6 +187,7 @@ class ProductsController extends Controller
                 $tools->append(view('admin.products._import_zip'));
             });
 
+            Admin::script(view('admin.partials._batch_helper_script')->render());
             Admin::script(view('admin.products._batch_tools_script')->render());
         });
     }

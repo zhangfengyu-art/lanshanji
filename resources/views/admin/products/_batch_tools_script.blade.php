@@ -1,60 +1,17 @@
 (function () {
-  function selectedIds() {
-    var ids = [];
-    $('.grid-row-checkbox').each(function () {
-      var $cb = $(this);
-      if (!$cb.prop('checked') && !$cb.parent().hasClass('checked')) {
-        return;
-      }
-      var id = $cb.data('id');
-      if (id !== undefined && id !== null && id !== '') {
-        ids.push(id);
-      }
-    });
-    return ids;
-  }
-
-  function postBatch(url, data, confirmText) {
-    var ids = selectedIds();
-    if (!ids.length) {
-      alert('请先勾选商品');
-      return;
-    }
-    if (confirmText && !confirm(confirmText)) {
-      return;
-    }
-    data = data || {};
-    data._token = typeof LA !== 'undefined' && LA.token ? LA.token : $('meta[name="csrf-token"]').attr('content');
-    data.ids = ids;
-    $.ajax({
-      url: url,
-      type: 'POST',
-      data: data,
-      dataType: 'json'
-    }).done(function (ret) {
-      if (ret && ret.status) {
-        if (ret.message) {
-          alert(ret.message);
-        }
-        $.pjax.reload('#pjax-container');
-        return;
-      }
-      alert((ret && ret.message) ? ret.message : '操作失败');
-    }).fail(function (xhr) {
-      var ret = xhr.responseJSON || {};
-      alert(ret.message || ('请求失败（HTTP ' + xhr.status + '）'));
-    });
-  }
-
-  var ADMIN_BASE = '{{ admin_base_path() }}';
   var routes = {
-    logistics: ADMIN_BASE + '/products/batch/logistics',
-    'purchase-limit': ADMIN_BASE + '/products/batch/purchase-limit',
-    'adjust-price': ADMIN_BASE + '/products/batch/adjust-price'
+    logistics: '{{ admin_url('products/batch/logistics') }}',
+    'purchase-limit': '{{ admin_url('products/batch/purchase-limit') }}',
+    'adjust-price': '{{ admin_url('products/batch/adjust-price') }}'
   };
 
   $(document).on('click', '[data-batch-action]', function (e) {
     e.preventDefault();
+    if (!window.AdminBatch) {
+      alert('页面脚本未加载完成，请刷新后重试');
+      return;
+    }
+
     var action = $(this).data('batch-action');
     var url = routes[action];
     if (!url) {
@@ -67,10 +24,10 @@
         alert('请填写单位重量（克）');
         return;
       }
-      postBatch(url, {
+      window.AdminBatch.post(url, {
         unit_weight_grams: weight,
         only_empty: 0
-      });
+      }, { emptyMsg: '请先勾选商品' });
       return;
     }
 
@@ -80,7 +37,7 @@
         alert('请填写限购数量');
         return;
       }
-      postBatch(url, { purchase_limit: limit });
+      window.AdminBatch.post(url, { purchase_limit: limit }, { emptyMsg: '请先勾选商品' });
       return;
     }
 
@@ -92,7 +49,10 @@
       }
       var priceMode = $('.batch-price-mode').val();
       var hint = priceMode === 'percent' ? val + '%' : val + ' 日元';
-      postBatch(url, { mode: priceMode, value: val }, '确认对选中商品所有 SKU 调价：' + hint + '？');
+      window.AdminBatch.post(url, { mode: priceMode, value: val }, {
+        emptyMsg: '请先勾选商品',
+        confirm: '确认对选中商品所有 SKU 调价：' + hint + '？'
+      });
     }
   });
 })();

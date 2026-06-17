@@ -81,10 +81,10 @@ Route::group([
     $router->post('products/batch/tobacco-type', 'ProductBatchController@setTobaccoType');
     $router->post('products/batch/sale-status', 'ProductBatchController@setSaleStatus');
     $router->post('products/batch/on-sale', 'ProductBatchController@setOnSale');
-    $router->post('products/batch/logistics', 'ProductBatchController@setLogistics');
-    $router->post('products/batch/purchase-limit', 'ProductBatchController@setPurchaseLimit');
+    $router->post('products/batch/logistics', 'ProductBatchController@setLogistics')->name('admin.products.batch.logistics');
+    $router->post('products/batch/purchase-limit', 'ProductBatchController@setPurchaseLimit')->name('admin.products.batch.purchase_limit');
     $router->post('products/batch/inherit-category', 'ProductBatchController@inheritCategoryDefaults');
-    $router->post('products/batch/adjust-price', 'ProductBatchController@adjustPrice');
+    $router->post('products/batch/adjust-price', 'ProductBatchController@adjustPrice')->name('admin.products.batch.adjust_price');
     $router->get('products/export-incomplete-logistics', 'ProductBatchController@exportIncompleteLogistics')->name('admin.products.export_incomplete_logistics');
     $router->get('products/import-template', 'ProductsController@downloadImportTemplate')->name('admin.products.import_template');
     $router->post('products/import-csv', 'ProductsController@importCsv')->name('admin.products.import_csv');
