@@ -135,16 +135,12 @@ class OrderAdminExportService
         return $rows;
     }
 
-    protected static function sharedOrderCells(Order $order, $fullAddress, $idCard)
+    protected static function sharedOrderCells(Order $order)
     {
         return [
             $order->no,
             optional($order->paid_at)->format('Y-m-d H:i:s'),
             optional($order->user)->name ?: '—',
-            data_get($order->address, 'contact_name', ''),
-            data_get($order->address, 'contact_phone', ''),
-            $fullAddress,
-            $idCard,
         ];
     }
 
