@@ -7,12 +7,12 @@ use App\Models\Order;
 use App\Services\AdminOrderPdfExport;
 use App\Services\OrderAdminExportService;
 use App\Services\OrderStockPrepExportService;
+use App\Services\OrderFulfillmentPhotoService;
 use App\Services\OrderFulfillmentService;
 use Illuminate\Http\Request;
 use App\Exceptions\InvalidRequestException;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Encore\Admin\Form;
 use Encore\Admin\Grid;
 use Encore\Admin\Facades\Admin;
@@ -164,46 +164,63 @@ class OrdersController extends Controller
         ]);
     }
 
-    public function uploadFulfillmentPhoto(Order $order, Request $request)
+    public function uploadFulfillmentPhoto(Order $order, Request $request, OrderFulfillmentPhotoService $photos)
     {
-        if (!$order->paid_at) {
-            throw new InvalidRequestException('仅已支付订单可上传实拍图');
-        }
-
         $this->validate($request, [
             'photo' => ['required', 'image', 'max:10240'],
         ], [], [
             'photo' => '实拍照片',
         ]);
 
-        $file = $request->file('photo');
-        $extension = strtolower((string) $file->getClientOriginalExtension());
-        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) {
-            $extension = 'jpg';
-        }
-        $filename = Str::random(32).'.'.$extension;
-        $path = $file->storeAs('orders/fulfillment/'.$order->id, $filename, 'private');
-
-        $extra = $order->extra ?: [];
-        $oldPath = trim((string) data_get($extra, 'fulfillment_photo', ''));
-        if ($oldPath !== '' && $oldPath !== $path && Storage::disk('private')->exists($oldPath)) {
-            Storage::disk('private')->delete($oldPath);
-        }
-        $extra['fulfillment_photo'] = $path;
-        $extra['fulfillment_photo_uploaded_at'] = now()->toDateTimeString();
-
-        $order->update(['extra' => $extra]);
-        $order->refresh();
-
-        $fulfillment = app(OrderFulfillmentService::class);
-        $stage = $fulfillment->resolveStage($order);
-        if (in_array($stage, [OrderFulfillmentService::STAGE_S1, OrderFulfillmentService::STAGE_S2], true)) {
-            $fulfillment->enterStockPrep($order);
+        try {
+            $photos->store($order, $request->file('photo'));
+        } catch (InvalidRequestException $e) {
+            return redirect()->back()->with('error', admin_flash_error($e->getMessage()));
         }
 
         return redirect()
             ->back()
             ->with('success', admin_flash_success('实拍照片已上传；订单已进入备货/打包阶段（S3），用户不可再自助改址。'));
+    }
+
+    public function batchUploadFulfillmentPhotos(Request $request, OrderFulfillmentPhotoService $photos)
+    {
+        $this->validate($request, [
+            'photos' => ['required', 'array', 'min:1'],
+            'photos.*' => ['image', 'max:10240'],
+        ], [], [
+            'photos' => '实拍照片',
+            'photos.*' => '实拍照片',
+        ]);
+
+        $result = $photos->batchImport((array) $request->file('photos', []));
+
+        $parts = [];
+        if ($result['success'] > 0) {
+            $parts[] = '成功导入 '.$result['success'].' 张';
+        }
+        if (count($result['skipped']) > 0) {
+            $parts[] = '跳过 '.count($result['skipped']).' 张';
+        }
+        if (count($result['failed']) > 0) {
+            $parts[] = '失败 '.count($result['failed']).' 张';
+        }
+
+        $detail = array_merge($result['failed'], $result['skipped']);
+        $message = $parts ? implode('，', $parts) : '未处理任何图片';
+        if (count($detail) > 0) {
+            $message .= '：'.implode('；', array_slice($detail, 0, 5));
+            if (count($detail) > 5) {
+                $message .= '…';
+            }
+        }
+
+        $flashKey = ($result['success'] > 0 || count($result['skipped']) > 0) ? 'success' : 'error';
+        $flashFn = $flashKey === 'success' ? 'admin_flash_success' : 'admin_flash_error';
+
+        return redirect()
+            ->back()
+            ->with($flashKey, $flashFn($message));
     }
 
     public function startProcessing(Order $order, OrderFulfillmentService $fulfillment)
@@ -435,6 +452,9 @@ class OrdersController extends Controller
                         .e($label)
                         .'</span>';
                 });
+                $grid->column('fulfillment_photo_cell', '实拍图')->display(function () {
+                    return view('admin.orders._fulfillment_photo_cell', ['order' => $this])->render();
+                });
             }
             $grid->payment_method('支付方式')->display(function ($value) {
                 if ($value === 'wechat') {
@@ -485,6 +505,7 @@ class OrdersController extends Controller
                     ]));
                 }
                 if (is_site_mode_a()) {
+                    $tools->append(view('admin.orders._fulfillment_photo_batch_import'));
                     $tools->append(view('admin.orders._batch_tools'));
                 }
             });
@@ -492,6 +513,7 @@ class OrdersController extends Controller
             if (is_site_mode_a()) {
                 Admin::script(view('admin.partials._batch_helper_script')->render());
                 Admin::script(view('admin.orders._batch_tools_script')->render());
+                Admin::script(view('admin.orders._fulfillment_photo_list_script')->render());
             }
         });
     }
