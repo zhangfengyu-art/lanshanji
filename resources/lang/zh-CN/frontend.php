@@ -88,7 +88,7 @@ return [
         'selected_items' => '已选商品',
         'item_unit' => '件',
         'products_total' => '商品总额',
-        'service_fee' => '服务费 (13%)',
+        'service_fee' => '服务费 (' . (int) round(config('site.service_fee_rate', 0.15) * 100) . '%)',
         'packaging_fee' => '包装费',
         'ems_shipping_fee' => 'EMS快递费',
         'payable_amount' => '应付金额',

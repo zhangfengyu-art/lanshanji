@@ -4,6 +4,8 @@
 @section('content')
 @php
   $defaultSkuId = (int) $defaultSku->id;
+  $serviceFeeRate = (float) config('site.service_fee_rate', 0.15);
+  $serviceFeePercent = (int) round($serviceFeeRate * 100);
 @endphp
 
 <style>
@@ -89,7 +91,7 @@
       <div class="pc-head">支付核算</div>
       <div class="pc-body">
         <div class="pc-summary-line"><span>商品金额</span><strong id="pc-base">0.00</strong></div>
-        <div class="pc-summary-line"><span>服务费(13%)</span><strong id="pc-service">0.00</strong></div>
+        <div class="pc-summary-line"><span>服务费({{ $serviceFeePercent }}%)</span><strong id="pc-service">0.00</strong></div>
         <div class="pc-summary-line"><span>打包费</span><strong id="pc-pack">300.00</strong></div>
         <div class="pc-summary-line"><span>EMS运费</span><strong id="pc-ship">1750.00</strong></div>
         <div class="pc-summary-line pc-summary-total"><span>应付总额</span><strong id="pc-total">0.00</strong></div>
@@ -105,7 +107,7 @@
 @section('scriptsAfterJs')
 <script>
 $(function () {
-  var serviceRate = 0.13;
+  var serviceRate = {{ json_encode($serviceFeeRate) }};
   var packagingFee = 300;
   var shippingFee = 1750;
 

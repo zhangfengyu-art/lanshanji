@@ -39,7 +39,7 @@ class OrderCheckoutQuoteService
         $tobaccoSummary = $this->tobaccoLimits->analyzeSkuItems($items);
         $this->tobaccoLimits->validateLimits($tobaccoSummary);
 
-        $serviceFee = round($productsTotal * 0.13, 2);
+        $serviceFee = round($productsTotal * config('site.service_fee_rate', 0.15), 2);
         $packagingFee = 300.00;
         $emsFee = 0.0;
         $emsWeightGrams = null;

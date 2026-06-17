@@ -164,7 +164,7 @@
     var TOBACCO_MAX_STICKS = {{ (int) $tobaccoLimits['max_sticks'] }};
     var TOBACCO_MAX_BOXES = {{ (int) $tobaccoLimits['max_boxes'] }};
     var TOBACCO_MAX_ROLLING_GRAMS = {{ (int) $tobaccoLimits['max_rolling_grams'] }};
-    var SERVICE_FEE_RATE = 0.13;
+    var SERVICE_FEE_RATE = {{ json_encode((float) config('site.service_fee_rate', 0.15)) }};
     var PACKAGING_FEE = 300;
     var quoteRequestId = 0;
     var urlParams = new URLSearchParams(window.location.search);

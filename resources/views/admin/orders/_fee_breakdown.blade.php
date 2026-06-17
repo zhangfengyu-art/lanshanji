@@ -38,7 +38,7 @@
       @endif
       @if(is_site_mode_a())
       <tr>
-        <td style="border-color: #e8edf2;">劳务费（13%）</td>
+        <td style="border-color: #e8edf2;">劳务费（{{ (int) round(config('site.service_fee_rate', 0.15) * 100) }}%）</td>
         <td style="border-color: #e8edf2;">{{ $fmtJpy($b['service_fee'] ?? 0) }}</td>
       </tr>
       <tr>

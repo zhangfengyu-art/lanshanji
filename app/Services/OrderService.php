@@ -98,7 +98,7 @@ class OrderService
 
 
             $isNativeProcurement = !empty($items[0]['is_native_procurement']);
-            $serviceFee = round($totalAmount * 0.13, 2);
+            $serviceFee = round($totalAmount * config('site.service_fee_rate', 0.15), 2);
             $packagingFee = 300.00;
             $emsShippingFee = 1750.00;
             $tobaccoSummary = null;

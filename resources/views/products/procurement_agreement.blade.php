@@ -1,8 +1,9 @@
 @extends('layouts.app')
 @section('title', '代购任务确认')
 
-@section('content')
 @php
+  $serviceFeeRate = (float) config('site.service_fee_rate', 0.15);
+  $serviceFeePercent = (int) round($serviceFeeRate * 100);
   $unitPrice = (float) $defaultSku->price;
 @endphp
 
@@ -78,10 +79,10 @@
       <div class="pa-head">预付资金核算</div>
       <div class="pa-body">
         <div class="pa-summary-line"><span>商品金额</span><strong id="pa-base">{{ number_format($unitPrice, 2, '.', '') }}</strong></div>
-        <div class="pa-summary-line"><span>服务费(13%)</span><strong id="pa-service">{{ number_format($unitPrice * 0.13, 2, '.', '') }}</strong></div>
+        <div class="pa-summary-line"><span>服务费({{ $serviceFeePercent }}%)</span><strong id="pa-service">{{ number_format($unitPrice * $serviceFeeRate, 2, '.', '') }}</strong></div>
         <div class="pa-summary-line"><span>打包费</span><strong>300.00</strong></div>
         <div class="pa-summary-line"><span>EMS运费</span><strong>1750.00</strong></div>
-        <div class="pa-summary-line pa-summary-total"><span>应付总额</span><strong id="pa-total">{{ number_format($unitPrice + ($unitPrice * 0.13) + 300 + 1750, 2, '.', '') }}</strong></div>
+        <div class="pa-summary-line pa-summary-total"><span>应付总额</span><strong id="pa-total">{{ number_format($unitPrice + ($unitPrice * $serviceFeeRate) + 300 + 1750, 2, '.', '') }}</strong></div>
 
         <button type="button" id="pa-confirm" class="pa-btn">确认并预付资金</button>
         <div class="pa-note">点击后将创建订单并跳转至订单支付页。</div>
