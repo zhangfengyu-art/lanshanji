@@ -100,9 +100,6 @@ Route::group([
     $router->post('orders/{order}/ship', 'OrdersController@ship')->name('admin.orders.ship');
     $router->post('orders/{order}/fulfillment-photo', 'OrdersController@uploadFulfillmentPhoto')->name('admin.orders.fulfillment_photo.upload');
     $router->delete('orders/{order}/fulfillment-photo', 'OrdersController@deleteFulfillmentPhoto')->name('admin.orders.fulfillment_photo.delete');
-    $router->get('orders/{order}/shopping-receipt', 'OrdersController@showShoppingReceipt')->name('admin.orders.shopping_receipt');
-    $router->post('orders/{order}/shopping-receipt', 'OrdersController@uploadShoppingReceipt')->name('admin.orders.shopping_receipt.upload');
-    $router->delete('orders/{order}/shopping-receipt', 'OrdersController@deleteShoppingReceipt')->name('admin.orders.shopping_receipt.delete');
     $router->post('orders/{order}/refund', 'OrdersController@handleRefund')->name('admin.orders.handle_refund');
     $router->post('orders/{order}/manual-offline-refund', 'OrdersController@markManualOfflineRefund')->name('admin.orders.manual_offline_refund');
     $router->post('orders/{order}/mark-logistics-warehouse', 'OrdersController@markLogisticsWarehouse')->name('admin.orders.mark_logistics_warehouse');

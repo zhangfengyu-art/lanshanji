@@ -17,9 +17,6 @@
     ? route('order.photo.fulfillment', ['order_no' => $order->no])
     : '';
   $feeDetails = (array) data_get($order->extra, 'fee_details', []);
-  $shoppingReceiptUrl = $order->hasShoppingReceipt()
-    ? route('order.receipt.download', ['order_no' => $order->no])
-    : '';
   $shippingModeLabel = \App\Services\ShippingModeService::options()[data_get($feeDetails, 'shipping_mode', data_get($order->extra, 'shipping_mode', ''))] ?? '';
   $goodsAmount = (float) data_get($feeDetails, 'base_amount', $order->items->sum(function ($item) {
     return ((float) $item->price) * ((int) $item->amount);
@@ -170,11 +167,6 @@
         @endif
         @if(is_site_mode_a() && $shippingModeLabel !== '')
           <div class="meta-lines">寄送模式：{{ $shippingModeLabel }}</div>
-        @endif
-        @if(is_site_mode_a() && $isPaid && $shoppingReceiptUrl !== '')
-          <div class="meta-lines" style="margin-top: 8px;">
-            <a class="btn btn-default btn-sm" href="{{ $shoppingReceiptUrl }}" target="_blank" download>下载购物凭据（明细书）</a>
-          </div>
         @endif
       </section>
 

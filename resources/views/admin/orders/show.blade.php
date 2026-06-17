@@ -237,35 +237,6 @@
         </td>
       </tr>
       @endif
-      @if($order->paid_at)
-      <tr>
-        <td colspan="4">
-          <h4 style="margin-top: 8px;">购物凭据（EMS 明细书，用户端可下载）</h4>
-          @if($order->hasShoppingReceipt())
-            <div style="margin-bottom: 12px;">
-              <a href="{{ route('admin.orders.shopping_receipt', $order) }}" target="_blank" class="btn btn-xs btn-default">查看/下载凭据</a>
-            </div>
-          @else
-            <p class="text-muted">尚未上传购物凭据。</p>
-          @endif
-          <form action="{{ route('admin.orders.shopping_receipt.upload', $order) }}" method="post" enctype="multipart/form-data" class="form-inline" style="margin-bottom: 8px;">
-            <input type="hidden" name="_token" value="{{ csrf_token() }}">
-            <div class="form-group">
-              <label for="shopping_receipt" class="control-label">上传/更换（PDF/JPG/PNG）</label>
-              <input type="file" id="shopping_receipt" name="receipt" accept=".pdf,image/jpeg,image/png" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary">上传凭据</button>
-          </form>
-          @if($order->hasShoppingReceipt())
-          <form action="{{ route('admin.orders.shopping_receipt.delete', $order) }}" method="post" style="display:inline;" onsubmit="return confirm('确认删除购物凭据？');">
-            <input type="hidden" name="_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="_method" value="DELETE">
-            <button type="submit" class="btn btn-danger btn-sm">删除凭据</button>
-          </form>
-          @endif
-        </td>
-      </tr>
-      @endif
       @if(is_site_mode_a() && $order->paid_at && $refundPreview)
       <tr>
         <td colspan="4">

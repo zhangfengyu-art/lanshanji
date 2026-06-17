@@ -62,18 +62,6 @@ class Order extends Model
         return $path !== '' && \Storage::disk('private')->exists($path);
     }
 
-    public function getShoppingReceiptAttribute()
-    {
-        return (string) data_get($this->extra, 'shopping_receipt', '');
-    }
-
-    public function hasShoppingReceipt()
-    {
-        $path = trim((string) $this->shopping_receipt);
-
-        return $path !== '' && \Storage::disk('private')->exists($path);
-    }
-
     public function fulfillmentService()
     {
         return app(\App\Services\OrderFulfillmentService::class);

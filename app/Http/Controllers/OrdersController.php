@@ -91,36 +91,6 @@ class OrdersController extends Controller
             ]);
         }
 
-    public function showShoppingReceipt($orderNo, Request $request)
-    {
-        $order = Order::query()
-            ->where('no', (string) $orderNo)
-            ->where('user_id', optional($request->user())->id)
-            ->first();
-
-        if (!$order) {
-            abort(403, '无权访问该订单文件');
-        }
-
-        if (!$order->hasShoppingReceipt()) {
-            abort(404, '购物凭据尚未上传');
-        }
-
-        $path = trim((string) $order->shopping_receipt);
-        $disk = Storage::disk('private');
-        $extension = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
-        $safeExt = in_array($extension, ['pdf', 'jpg', 'jpeg', 'png'], true) ? $extension : 'pdf';
-        $downloadName = 'receipt-'.$order->no.'.'.$safeExt;
-        $mimeType = (string) ($disk->mimeType($path) ?: 'application/octet-stream');
-
-        return $disk->response($path, $downloadName, [
-            'Content-Type' => $mimeType,
-            'Cache-Control' => 'private, no-store, no-cache, must-revalidate',
-            'Pragma' => 'no-cache',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
-    }
-
     public function store(OrderRequest $request, OrderService $orderService)
     {
         \Log::info('OrdersController::store called', [
