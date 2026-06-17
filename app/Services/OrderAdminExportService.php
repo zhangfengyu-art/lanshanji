@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class OrderAdminExportService
 {
     /** @var int[] */
-    const TEXT_COLUMN_INDEXES = [0, 4, 6, 21];
+    const TEXT_COLUMN_INDEXES = [0, 4, 6, 27];
 
     /** @var int[] */
     const IMAGE_COLUMN_INDEXES = [11];
@@ -84,6 +84,12 @@ class OrderAdminExportService
             'EMS计费重量(g)',
             '香烟支数',
             '烟丝重量(g)',
+            '香烟商品费合计(日元)',
+            '香烟件数',
+            '香烟均价(日元)',
+            '烟丝商品费合计(日元)',
+            '烟丝件数',
+            '烟丝均价(日元)',
             '订单备注',
             '发货状态',
             '退款状态',
@@ -109,7 +115,8 @@ class OrderAdminExportService
         $tobacco = (array) data_get($order->extra, 'tobacco_summary', []);
         $mode = data_get($fee, 'shipping_mode', data_get($order->extra, 'shipping_mode', ''));
         $head = self::sharedOrderCells($order, $fullAddress, $idCard);
-        $tail = self::tailOrderCells($order, $fee, $tobacco, $mode, $pasteLine);
+        $tobaccoStats = self::tobaccoPurchaseStats($order);
+        $tail = self::tailOrderCells($order, $fee, $tobacco, $mode, $pasteLine, $tobaccoStats);
 
         $items = $order->items;
         if ($items->isEmpty()) {
@@ -148,13 +155,23 @@ class OrderAdminExportService
         ];
     }
 
-    protected static function tailOrderCells(Order $order, $fee, $tobacco, $mode, $pasteLine)
+    protected static function tailOrderCells(Order $order, $fee, $tobacco, $mode, $pasteLine, array $tobaccoStats = null)
     {
+        if ($tobaccoStats === null) {
+            $tobaccoStats = self::tobaccoPurchaseStats($order);
+        }
+
         return [
             ShippingModeService::options()[$mode] ?? $mode,
             data_get($fee, 'ems_weight_grams', ''),
             data_get($tobacco, 'total_cigarette_sticks', ''),
             data_get($tobacco, 'total_rolling_tobacco_grams', ''),
+            self::formatTobaccoStatAmount($tobaccoStats['cigarette_fee'], $tobaccoStats['cigarette_qty']),
+            self::formatTobaccoStatQty($tobaccoStats['cigarette_qty']),
+            self::formatTobaccoStatAvg($tobaccoStats['cigarette_fee'], $tobaccoStats['cigarette_qty']),
+            self::formatTobaccoStatAmount($tobaccoStats['rolling_fee'], $tobaccoStats['rolling_qty']),
+            self::formatTobaccoStatQty($tobaccoStats['rolling_qty']),
+            self::formatTobaccoStatAvg($tobaccoStats['rolling_fee'], $tobaccoStats['rolling_qty']),
             $order->remark ?: '—',
             self::shipStatusLabel($order),
             Order::$refundStatusMap[$order->refund_status] ?? $order->refund_status,
@@ -162,6 +179,71 @@ class OrderAdminExportService
             $order->total_amount,
             $pasteLine,
         ];
+    }
+
+    /**
+     * 按烟草分类汇总本单商品费、件数、均价（香烟含加热烟；烟丝为手卷烟丝）。
+     */
+    public static function tobaccoPurchaseStats(Order $order): array
+    {
+        $cigaretteFee = 0.0;
+        $cigaretteQty = 0;
+        $rollingFee = 0.0;
+        $rollingQty = 0;
+
+        foreach ($order->items as $item) {
+            $product = $item->product;
+            if (!$product) {
+                continue;
+            }
+
+            $type = (string) $product->tobacco_type;
+            $qty = (int) $item->amount;
+            if ($qty <= 0) {
+                continue;
+            }
+
+            $lineFee = round((float) $item->price * $qty, 2);
+
+            if (OrderTobaccoLimitService::countsTowardStickLimit($type)) {
+                $cigaretteFee += $lineFee;
+                $cigaretteQty += $qty;
+            } elseif ($type === OrderTobaccoLimitService::TYPE_ROLLING_TOBACCO) {
+                $rollingFee += $lineFee;
+                $rollingQty += $qty;
+            }
+        }
+
+        return [
+            'cigarette_fee' => round($cigaretteFee, 2),
+            'cigarette_qty' => $cigaretteQty,
+            'rolling_fee' => round($rollingFee, 2),
+            'rolling_qty' => $rollingQty,
+        ];
+    }
+
+    protected static function formatTobaccoStatAmount($fee, $qty)
+    {
+        if ((int) $qty <= 0) {
+            return '—';
+        }
+
+        return number_format((float) $fee, 2, '.', '');
+    }
+
+    protected static function formatTobaccoStatQty($qty)
+    {
+        return (int) $qty > 0 ? (int) $qty : '—';
+    }
+
+    protected static function formatTobaccoStatAvg($fee, $qty)
+    {
+        $qty = (int) $qty;
+        if ($qty <= 0) {
+            return '—';
+        }
+
+        return number_format(round((float) $fee / $qty, 2), 2, '.', '');
     }
 
     public static function resolveOrderIdCard(Order $order)
