@@ -101,6 +101,7 @@ class OrderStockPrepExportService
             'checkbox_cell_size' => 48,
             'column_widths' => ['5%', '42%', '10%', '10%', '28%', '5%'],
             'qty_columns' => [3],
+            'enable_print_css' => true,
             'footer_note' => '请解压本 ZIP 后，用 Excel 或 WPS 打开「备货表.html」，打印前可在浏览器中预览。'
                 .'本表汇总香烟、加热烟、手卷烟丝按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。'
                 .'「确认」列留空供现场打勾。',
