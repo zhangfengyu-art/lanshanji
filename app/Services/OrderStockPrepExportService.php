@@ -25,6 +25,7 @@ class OrderStockPrepExportService
             'pending_fulfillment' => '待发货采购汇总（S1+S2+S3）',
             's1' => 'S1 待处理',
             's2' => 'S2 处理中',
+            's1_s2' => 'S1待处理+S2处理中',
             's3' => 'S3 备货/打包',
             'paid_today' => '今日新支付（待发货）',
             'paid_week' => '近7日新支付（待发货）',
@@ -126,6 +127,7 @@ class OrderStockPrepExportService
             case 'pending_fulfillment':
             case 's1':
             case 's2':
+            case 's1_s2':
             case 's3':
                 $query->where('ship_status', Order::SHIP_STATUS_PENDING);
                 break;
@@ -276,6 +278,11 @@ class OrderStockPrepExportService
                 return $stage === OrderFulfillmentService::STAGE_S1;
             case 's2':
                 return $stage === OrderFulfillmentService::STAGE_S2;
+            case 's1_s2':
+                return in_array($stage, [
+                    OrderFulfillmentService::STAGE_S1,
+                    OrderFulfillmentService::STAGE_S2,
+                ], true);
             case 's3':
                 return $stage === OrderFulfillmentService::STAGE_S3;
             case 'paid_today':

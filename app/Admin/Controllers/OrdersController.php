@@ -5,7 +5,6 @@ namespace App\Admin\Controllers;
 use App\Exceptions\InternalException;
 use App\Models\Order;
 use App\Services\AdminOrderPdfExport;
-use App\Services\AdminOrderZipExport;
 use App\Services\OrderAdminExportService;
 use App\Services\OrderStockPrepExportService;
 use App\Services\OrderFulfillmentService;
@@ -112,23 +111,21 @@ class OrdersController extends Controller
     public function export(Request $request)
     {
         $scope = (string) $request->query('scope', 'all');
-        $options = OrderAdminExportService::scopeOptions();
-        if (!array_key_exists($scope, $options)) {
+        $scopeOptions = OrderAdminExportService::scopeOptions();
+        if (!array_key_exists($scope, $scopeOptions)) {
             $scope = 'all';
         }
 
         $fulfillment = app(OrderFulfillmentService::class);
+        $scopeLabel = $scopeOptions[$scope];
 
-        return AdminOrderZipExport::download(
-            OrderAdminExportService::filename($scope),
+        return AdminOrderPdfExport::download(
+            OrderAdminExportService::pdfFilename($scope),
             OrderAdminExportService::headers(),
             function ($emitRow) use ($scope, $fulfillment) {
                 OrderAdminExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
             },
-            [
-                'text_columns' => OrderAdminExportService::TEXT_COLUMN_INDEXES,
-                'image_columns' => OrderAdminExportService::IMAGE_COLUMN_INDEXES,
-            ]
+            OrderAdminExportService::pdfExportOptions($scopeLabel)
         );
     }
 
@@ -142,25 +139,14 @@ class OrdersController extends Controller
 
         $fulfillment = app(OrderFulfillmentService::class);
         $scopeLabel = $scopeOptions[$scope];
-        $format = strtolower(trim((string) $request->query('format', 'zip')));
-        $rowProducer = function ($emitRow) use ($scope, $fulfillment) {
-            OrderStockPrepExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
-        };
 
-        if ($format === 'pdf') {
-            return AdminOrderPdfExport::download(
-                OrderStockPrepExportService::pdfFilename($scope),
-                OrderStockPrepExportService::headers(),
-                $rowProducer,
-                OrderStockPrepExportService::pdfExportOptions($scopeLabel)
-            );
-        }
-
-        return AdminOrderZipExport::download(
-            OrderStockPrepExportService::filename($scope),
+        return AdminOrderPdfExport::download(
+            OrderStockPrepExportService::pdfFilename($scope),
             OrderStockPrepExportService::headers(),
-            $rowProducer,
-            OrderStockPrepExportService::htmlExportOptions($scopeLabel)
+            function ($emitRow) use ($scope, $fulfillment) {
+                OrderStockPrepExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
+            },
+            OrderStockPrepExportService::pdfExportOptions($scopeLabel)
         );
     }
 
@@ -492,7 +478,7 @@ class OrdersController extends Controller
                     'dropdownLabel' => '导出订单',
                 ]));
                 if (is_site_mode_a()) {
-                    $tools->append(view('admin.partials.stock_prep_export_dropdown', [
+                    $tools->append(view('admin.partials.export_dropdown', [
                         'exportBaseUrl' => route('admin.orders.export_stock_prep'),
                         'scopeOptions' => OrderStockPrepExportService::scopeOptions(),
                         'dropdownLabel' => '导出备货表',

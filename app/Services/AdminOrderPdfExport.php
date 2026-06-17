@@ -38,9 +38,9 @@ class AdminOrderPdfExport
         try {
             @ini_set('pcre.backtrack_limit', '10000000');
 
-            $mpdf = new \Mpdf\Mpdf([
-                'mode' => 'utf-8',
-                'format' => 'A4-L',
+        $mpdf = new \Mpdf\Mpdf([
+            'mode' => 'utf-8',
+            'format' => (string) ($options['pdf_format'] ?? 'A4-L'),
                 'margin_left' => 6,
                 'margin_right' => 6,
                 'margin_top' => 8,

@@ -25,6 +25,7 @@ class OrderAdminExportService
             'shipped' => '已发货未签收',
             'refund_applied' => '退款申请中',
             's1_pending' => '待处理（S1，未开始处理）',
+            's1_s2' => 'S1待处理+S2处理中',
         ];
     }
 
@@ -54,6 +55,7 @@ class OrderAdminExportService
                 $query->where('refund_status', Order::REFUND_STATUS_APPLIED);
                 break;
             case 's1_pending':
+            case 's1_s2':
                 $query->where('ship_status', Order::SHIP_STATUS_PENDING)
                     ->where('refund_status', Order::REFUND_STATUS_PENDING);
                 break;
@@ -767,11 +769,58 @@ class OrderAdminExportService
         return $safe.'_'.date('Ymd_His').'.zip';
     }
 
+    public static function pdfFilename($scope)
+    {
+        return preg_replace('/\.zip$/', '.pdf', self::filename($scope));
+    }
+
+    public static function pdfExportOptions($scopeLabel)
+    {
+        return [
+            'text_columns' => self::TEXT_COLUMN_INDEXES,
+            'image_columns' => self::IMAGE_COLUMN_INDEXES,
+            'numeric_columns' => [4, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16, 21],
+            'center_columns' => [4, 7, 8, 9, 10, 12, 14, 16, 18, 19, 20],
+            'column_widths_mm' => [
+                '14mm', '13mm', '11mm', '32mm', '7mm', '9mm', '16mm',
+                '9mm', '9mm', '8mm', '8mm',
+                '10mm', '7mm', '9mm', '10mm', '7mm', '9mm',
+                '12mm', '9mm', '9mm', '9mm', '10mm', '28mm',
+            ],
+            'title_note' => '订单导出 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
+            'pdf_title' => '订单导出',
+            'pdf_format' => 'A3-L',
+            'style_mode' => 'pdf',
+            'image_max_size' => 320,
+            'image_display_width' => 52,
+            'image_display_height' => 52,
+            'image_jpeg_quality' => 90,
+            'table_font_size' => 9,
+            'footer_note' => '每行对应订单中的一件商品；地址列仅供后台履约使用，请注意保密。',
+        ];
+    }
+
+    protected static function orderIncludedInExport(Order $order, $scope, OrderFulfillmentService $fulfillment)
+    {
+        if ($scope === 's1_pending') {
+            return $fulfillment->resolveStage($order) === OrderFulfillmentService::STAGE_S1;
+        }
+
+        if ($scope === 's1_s2') {
+            return in_array($fulfillment->resolveStage($order), [
+                OrderFulfillmentService::STAGE_S1,
+                OrderFulfillmentService::STAGE_S2,
+            ], true);
+        }
+
+        return true;
+    }
+
     public static function exportRowsWithProducer($scope, OrderFulfillmentService $fulfillment, callable $emitRow)
     {
         static::buildQuery($scope)->chunk(50, function ($orders) use ($scope, $fulfillment, $emitRow) {
             foreach ($orders as $order) {
-                if ($scope === 's1_pending' && $fulfillment->resolveStage($order) !== OrderFulfillmentService::STAGE_S1) {
+                if (!self::orderIncludedInExport($order, $scope, $fulfillment)) {
                     continue;
                 }
                 foreach (self::rowsForOrder($order) as $row) {
