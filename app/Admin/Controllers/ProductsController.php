@@ -79,12 +79,24 @@ class ProductsController extends Controller
      */
     protected function grid()
     {
-        return Admin::grid(Product::class, function (Grid $grid) {
+        $controller = $this;
+
+        return Admin::grid(Product::class, function (Grid $grid) use ($controller) {
             $grid->model()->with(['category', 'skus']);
             if (db_has_column('products', 'sort_order')) {
                 $grid->model()->orderBy('sort_order')->orderBy('id');
             }
             $categoryMode = request('category_mode', 'aggregate');
+
+            $keyword = trim((string) request()->query('keyword', ''));
+            if ($keyword !== '') {
+                $grid->model()->where(function ($query) use ($keyword) {
+                    if (is_numeric($keyword)) {
+                        $query->orWhere('id', (int) $keyword);
+                    }
+                    $query->orWhere('title', 'like', '%'.$keyword.'%');
+                });
+            }
 
             if ($categoryId = request('category_id')) {
                 $category = Category::query()->find((int) $categoryId);
@@ -158,15 +170,15 @@ class ProductsController extends Controller
                 $actions->disableView();
                 $actions->disableDelete();
             });
-            $grid->tools(function ($tools) {
+            $grid->tools(function ($tools) use ($controller) {
+                $keyword = trim((string) request()->query('keyword', ''));
+                $tools->append($controller->renderProductSearchTool($keyword));
                 // 禁用批量删除按钮
                 $tools->batch(function ($batch) {
                     $batch->disableDelete();
                 });
 
-                $tools->append(view('admin.products._batch_tools', [
-                    'categories' => $this->categoryOptions(),
-                ]));
+                $tools->append(view('admin.products._batch_tools'));
                 $tools->append(
                     '<a class="btn btn-sm btn-default" href="'.route('admin.products.import_template').'" style="margin-left:6px;">'
                     .'<i class="fa fa-download"></i> 导入模板</a>'
@@ -177,6 +189,29 @@ class ProductsController extends Controller
 
             Admin::script(view('admin.products._batch_tools_script')->render());
         });
+    }
+
+    protected function renderProductSearchTool($keyword = '')
+    {
+        $keyword = trim((string) $keyword);
+        $hidden = '';
+        foreach (['category_id', 'category_mode'] as $param) {
+            $val = request()->query($param);
+            if ($val !== null && $val !== '') {
+                $hidden .= '<input type="hidden" name="'.$param.'" value="'.e($val).'">';
+            }
+        }
+
+        return '<form method="GET" action="" class="form-inline" style="display:inline-block;margin-right:10px;">'
+            .$hidden
+            .'<div class="input-group input-group-sm" style="width:300px;">'
+            .'<input type="text" class="form-control" name="keyword" value="'.e($keyword).'" placeholder="搜索商品ID/名称">'
+            .'<span class="input-group-btn">'
+            .'<button type="submit" class="btn btn-primary">搜索</button>'
+            .'</span>'
+            .'</div>'
+            .'</form>'
+            .'<a class="btn btn-sm btn-default" href="'.url()->current().'">重置</a>';
     }
 
     /**

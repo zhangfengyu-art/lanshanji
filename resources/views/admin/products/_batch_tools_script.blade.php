@@ -48,76 +48,16 @@
 
   var ADMIN_BASE = '{{ admin_base_path() }}';
   var routes = {
-    category: ADMIN_BASE + '/products/batch/category',
-    'shipping-mode': ADMIN_BASE + '/products/batch/shipping-mode',
-    'tobacco-type': ADMIN_BASE + '/products/batch/tobacco-type',
-    'sale-status': ADMIN_BASE + '/products/batch/sale-status',
-    'on-sale': ADMIN_BASE + '/products/batch/on-sale',
     logistics: ADMIN_BASE + '/products/batch/logistics',
     'purchase-limit': ADMIN_BASE + '/products/batch/purchase-limit',
-    'inherit-category': ADMIN_BASE + '/products/batch/inherit-category',
     'adjust-price': ADMIN_BASE + '/products/batch/adjust-price'
   };
-
-  $(document).on('change', '.batch-sale-status', function () {
-    var isLimited = $(this).val() === 'LIMITED';
-    $('.batch-purchase-limit').toggle(isLimited);
-  });
 
   $(document).on('click', '[data-batch-action]', function (e) {
     e.preventDefault();
     var action = $(this).data('batch-action');
     var url = routes[action];
     if (!url) {
-      return;
-    }
-
-    if (action === 'category') {
-      var categoryId = $('.batch-category-select').val();
-      if (!categoryId) {
-        alert('请选择目标分类');
-        return;
-      }
-      postBatch(url, { category_id: categoryId });
-      return;
-    }
-
-    if (action === 'shipping-mode') {
-      var mode = $('.batch-shipping-mode').val();
-      if (!mode) {
-        alert('请选择寄送模式');
-        return;
-      }
-      postBatch(url, { shipping_mode: mode });
-      return;
-    }
-
-    if (action === 'tobacco-type') {
-      var type = $('.batch-tobacco-type').val();
-      if (!type) {
-        alert('请选择烟草分类');
-        return;
-      }
-      postBatch(url, { tobacco_type: type });
-      return;
-    }
-
-    if (action === 'sale-status') {
-      var status = $('.batch-sale-status').val();
-      if (!status) {
-        alert('请选择销售状态');
-        return;
-      }
-      var payload = { sale_status: status };
-      if (status === 'LIMITED') {
-        payload.purchase_limit = $('.batch-purchase-limit').val();
-      }
-      postBatch(url, payload);
-      return;
-    }
-
-    if (action === 'on-sale') {
-      postBatch(url, { on_sale: $(this).data('on-sale') });
       return;
     }
 
@@ -129,8 +69,7 @@
       }
       postBatch(url, {
         unit_weight_grams: weight,
-        unit_sticks: $('.batch-unit-sticks').val(),
-        only_empty: $('.batch-only-empty').prop('checked') ? 1 : 0
+        only_empty: 0
       });
       return;
     }
@@ -142,11 +81,6 @@
         return;
       }
       postBatch(url, { purchase_limit: limit });
-      return;
-    }
-
-    if (action === 'inherit-category') {
-      postBatch(url, {}, '将未单独设置寄送模式的商品，改为其所属分类的默认寄送模式。继续？');
       return;
     }
 
