@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a10e43405f3212c647230fbae9ff5d4c",
+    "content-hash": "7977a331682fe1c7dce357fc0b410046",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -717,29 +717,26 @@
         },
         {
             "name": "endroid/qr-code",
-            "version": "4.8.5",
+            "version": "4.5.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/endroid/qr-code.git",
-                "reference": "0db25b506a8411a5e1644ebaa67123a6eb7b6a77"
+                "reference": "aec7fb1f008ed515f0580d7871dffa19428efb82"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/endroid/qr-code/zipball/0db25b506a8411a5e1644ebaa67123a6eb7b6a77",
-                "reference": "0db25b506a8411a5e1644ebaa67123a6eb7b6a77",
+                "url": "https://api.github.com/repos/endroid/qr-code/zipball/aec7fb1f008ed515f0580d7871dffa19428efb82",
+                "reference": "aec7fb1f008ed515f0580d7871dffa19428efb82",
                 "shasum": ""
             },
             "require": {
                 "bacon/bacon-qr-code": "^2.0.5",
-                "php": "^8.1"
-            },
-            "conflict": {
-                "khanamiryan/qrcode-detector-decoder": "^1.0.6"
+                "php": "^7.4||^8.0"
             },
             "require-dev": {
                 "endroid/quality": "dev-master",
                 "ext-gd": "*",
-                "khanamiryan/qrcode-detector-decoder": "^1.0.4||^2.0.2",
+                "khanamiryan/qrcode-detector-decoder": "^1.0.4",
                 "setasign/fpdf": "^1.8.2"
             },
             "suggest": {
@@ -780,7 +777,7 @@
             ],
             "support": {
                 "issues": "https://github.com/endroid/qr-code/issues",
-                "source": "https://github.com/endroid/qr-code/tree/4.8.5"
+                "source": "https://github.com/endroid/qr-code/tree/4.5.2"
             },
             "funding": [
                 {
@@ -788,7 +785,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2023-09-29T14:03:20+00:00"
+            "time": "2022-09-28T11:14:01+00:00"
         },
         {
             "name": "erusev/parsedown",
