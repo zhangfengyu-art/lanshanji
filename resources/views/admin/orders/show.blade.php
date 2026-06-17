@@ -88,55 +88,59 @@
       @if($order->paid_at && !is_site_mode_b() && !$order->closed)
       @php
         $fulfillment = app(\App\Services\OrderFulfillmentService::class);
-        $fulfillmentStage = $fulfillment->resolveStage($order);
-        $processingStarted = trim((string) data_get($order->extra, 'processing_started_at', '')) !== '';
-        $lockedAt = trim((string) data_get($order->extra, 'locked_at', '')) !== '';
+        $actions = $fulfillment->adminActionAvailability($order);
+        $fulfillmentStage = $actions['stage'];
       @endphp
       <tr>
         <td>履约阶段：</td>
         <td colspan="3">
           <strong>{{ $fulfillment->stageLabel($order) }}</strong>（{{ $fulfillmentStage }}）
           · 自助改址已用 {{ (int) data_get($order->extra, 'address_change_count', 0) }}/2 次
-          @if($processingStarted)
+          @if(data_get($order->extra, 'processing_started_at'))
             <span class="text-muted"> · 开始处理：{{ data_get($order->extra, 'processing_started_at') }}</span>
           @endif
-          @if($lockedAt)
-            <span class="text-muted"> · 锁定：{{ data_get($order->extra, 'locked_at') }}</span>
+          @if(data_get($order->extra, 'locked_at'))
+            <span class="text-muted"> · 进入备货：{{ data_get($order->extra, 'locked_at') }}</span>
+          @endif
+          @if($actions['at_warehouse'])
+            <span class="text-danger"> · 已送往物流仓库：{{ data_get($order->extra, 'logistics_warehouse_at') }}</span>
           @endif
         </td>
       </tr>
       <tr>
         <td>履约操作：</td>
         <td colspan="3" style="padding-bottom: 12px;">
-          @if(!$processingStarted && $fulfillmentStage !== \App\Services\OrderFulfillmentService::STAGE_S4)
+          @if($actions['can_start_processing'])
             <form action="{{ route('admin.orders.start_processing', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('确认开始处理？用户将无法再自助改址。');">开始处理（S1→S2）</button>
+              <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('确认开始处理（S1→S2）？用户将无法再自助改址。');">开始处理（S1→S2）</button>
             </form>
           @endif
-          @if(!$lockedAt && !in_array($fulfillmentStage, [\App\Services\OrderFulfillmentService::STAGE_S4], true))
+          @if($actions['can_enter_stock_prep'])
             <form action="{{ route('admin.orders.lock', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn-default btn-sm">锁定订单（→S3）</button>
+              <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('确认进入备货/打包（S3）？可直接从 S1 跳过 S2。');">进入备货/打包（→S3）</button>
             </form>
           @endif
-          @if($lockedAt && !$order->hasFulfillmentPhoto())
+          @if($actions['can_revert_to_pending'])
+            <form action="{{ route('admin.orders.revert_pending', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
+              <input type="hidden" name="_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-default btn-sm" onclick="return confirm('确认退回待处理（S2→S1）？用户将可再次自助改址。');">退回待处理（S2→S1）</button>
+            </form>
+          @endif
+          @if($actions['can_revert_from_stock_prep'])
             <form action="{{ route('admin.orders.unlock', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn-default btn-sm">解除锁定</button>
+              <button type="submit" class="btn btn-default btn-sm" onclick="return confirm('确认从 S3 退回上一阶段？');">退回上一阶段</button>
             </form>
           @endif
-          @php $atWarehouse = trim((string) data_get($order->extra, 'logistics_warehouse_at', '')) !== ''; @endphp
-          @if(!$atWarehouse && in_array($fulfillmentStage, [\App\Services\OrderFulfillmentService::STAGE_S2, \App\Services\OrderFulfillmentService::STAGE_S3], true))
+          @if($actions['can_mark_warehouse'])
             <form action="{{ route('admin.orders.mark_logistics_warehouse', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn-default btn-sm" onclick="return confirm('确认包裹已送往物流仓库？标记后用户将无法按规则取消订单。');">标记：已送往物流仓库</button>
+              <button type="submit" class="btn btn-default btn-sm" onclick="return confirm('确认包裹已送往物流仓库？（仍为 S3，原则上不可退款）');">标记：已送往物流仓库</button>
             </form>
           @endif
-          @if($atWarehouse)
-            <span class="text-danger" style="margin-left: 8px;">已送往物流仓库：{{ data_get($order->extra, 'logistics_warehouse_at') }}</span>
-          @endif
-          <span class="help-block" style="margin: 6px 0 0;">上传履约实拍图也会进入 S3。已发货为 S4。送往物流仓库后原则上不可取消。</span>
+          <span class="help-block" style="margin: 6px 0 0;">锁定、上传实拍图、送往仓库均属 S3 备货/打包。填写物流发货后进入 S4。S1 可全额退，S2 部分退，S3 原则上不可退。</span>
         </td>
       </tr>
       @endif

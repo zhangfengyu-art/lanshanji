@@ -17,45 +17,52 @@ class OrderBatchService
             $fulfillment->startProcessing($order);
 
             return 'ok';
-        }, '已开始处理');
+        }, '已开始处理（S2）');
     }
 
-    public function batchLockOrders(array $orderIds, OrderFulfillmentService $fulfillment)
+    public function batchEnterStockPrep(array $orderIds, OrderFulfillmentService $fulfillment)
     {
         return $this->runBatch($orderIds, function (Order $order) use ($fulfillment) {
             $stage = $fulfillment->resolveStage($order);
-            if (in_array($stage, [OrderFulfillmentService::STAGE_S3, OrderFulfillmentService::STAGE_S4], true)) {
+            if (!in_array($stage, [OrderFulfillmentService::STAGE_S1, OrderFulfillmentService::STAGE_S2], true)) {
                 return 'skip';
             }
 
-            $fulfillment->lockOrder($order);
+            $fulfillment->enterStockPrep($order);
 
             return 'ok';
-        }, '已锁定（S3）');
+        }, '已进入备货/打包（S3）');
     }
 
-    public function batchUnlockOrders(array $orderIds, OrderFulfillmentService $fulfillment)
+    /** @deprecated */
+    public function batchLockOrders(array $orderIds, OrderFulfillmentService $fulfillment)
+    {
+        return $this->batchEnterStockPrep($orderIds, $fulfillment);
+    }
+
+    public function batchRevertFromStockPrep(array $orderIds, OrderFulfillmentService $fulfillment)
     {
         return $this->runBatch($orderIds, function (Order $order) use ($fulfillment) {
-            if ($order->hasFulfillmentPhoto()) {
+            if ($fulfillment->resolveStage($order) !== OrderFulfillmentService::STAGE_S3) {
                 return 'skip';
             }
 
-            if (trim((string) data_get($order->extra, 'locked_at', '')) === '') {
-                return 'skip';
-            }
-
-            $fulfillment->unlockOrder($order);
+            $fulfillment->revertFromStockPrep($order);
 
             return 'ok';
-        }, '已解除锁定');
+        }, '已退回上一阶段');
+    }
+
+    /** @deprecated */
+    public function batchUnlockOrders(array $orderIds, OrderFulfillmentService $fulfillment)
+    {
+        return $this->batchRevertFromStockPrep($orderIds, $fulfillment);
     }
 
     public function batchMarkLogisticsWarehouse(array $orderIds, OrderFulfillmentService $fulfillment)
     {
         return $this->runBatch($orderIds, function (Order $order) use ($fulfillment) {
-            $stage = $fulfillment->resolveStage($order);
-            if (!in_array($stage, [OrderFulfillmentService::STAGE_S2, OrderFulfillmentService::STAGE_S3], true)) {
+            if ($fulfillment->resolveStage($order) !== OrderFulfillmentService::STAGE_S3) {
                 return 'skip';
             }
 

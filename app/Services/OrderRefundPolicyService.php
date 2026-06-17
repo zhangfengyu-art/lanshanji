@@ -111,17 +111,12 @@ class OrderRefundPolicyService
         }
 
         if ($stage === OrderFulfillmentService::STAGE_S3) {
+            $result['message'] = '备货/打包阶段原则上不支持退款。';
             if ($result['package_at_warehouse']) {
-                $result['message'] = '包裹已送往物流仓库，无法承诺来得及取消，原则上不支持退款。';
-
-                return $this->finishEvaluate($result, $strict);
+                $result['policy_hint'] = '包裹已送往物流仓库，无法承诺来得及取消。';
             }
 
-            $result['allowed'] = true;
-            $result['refund_ratio'] = $this->partialRefundRatio();
-            $result['policy_hint'] = '已开始发货处理且包裹尚未送往物流仓库：收取 20% 取消费，退款 80%。';
-
-            return $this->applyAmounts($result);
+            return $this->finishEvaluate($result, $strict);
         }
 
         if ($stage === OrderFulfillmentService::STAGE_S4) {

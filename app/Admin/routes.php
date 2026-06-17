@@ -100,6 +100,7 @@ Route::group([
     $router->get('orders/{order}/fulfillment-photo', 'OrdersController@showFulfillmentPhoto')->name('admin.orders.fulfillment_photo');
     $router->post('orders/{order}/start-processing', 'OrdersController@startProcessing')->name('admin.orders.start_processing');
     $router->post('orders/{order}/lock', 'OrdersController@lockOrder')->name('admin.orders.lock');
+    $router->post('orders/{order}/revert-pending', 'OrdersController@revertToPending')->name('admin.orders.revert_pending');
     $router->post('orders/{order}/unlock', 'OrdersController@unlockOrder')->name('admin.orders.unlock');
     $router->post('orders/{order}/ship', 'OrdersController@ship')->name('admin.orders.ship');
     $router->post('orders/{order}/fulfillment-photo', 'OrdersController@uploadFulfillmentPhoto')->name('admin.orders.fulfillment_photo.upload');

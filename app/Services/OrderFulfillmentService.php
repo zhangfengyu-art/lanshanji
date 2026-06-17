@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\InvalidRequestException;
 use App\Models\Order;
+
 class OrderFulfillmentService
 {
     const STAGE_S0 = 'S0';
@@ -25,32 +26,60 @@ class OrderFulfillmentService
         ];
     }
 
+    /**
+     * 读取显式履约阶段（缺失时按旧规则推断并回写）。
+     */
     public function resolveStage(Order $order)
     {
         if (!$order->paid_at || $order->closed) {
             return self::STAGE_S0;
         }
 
-        if (in_array($order->ship_status, [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED], true)) {
+        if ($this->isShipped($order)) {
+            $stored = $this->storedStage($order);
+            if ($stored !== self::STAGE_S4) {
+                $this->setStage($order, self::STAGE_S4, 'ship_status_sync');
+            }
+
             return self::STAGE_S4;
         }
 
-        if ($this->isLocked($order) || $order->hasFulfillmentPhoto()) {
+        $stored = $this->storedStage($order);
+        if ($stored === '') {
+            $stored = $this->inferLegacyStage($order);
+            $this->setStage($order, $stored, 'legacy_backfill', false);
+        }
+
+        if ($stored === self::STAGE_S4) {
+            $this->setStage($order, self::STAGE_S3, 'ship_status_reverted', false);
+
             return self::STAGE_S3;
         }
 
-        if ($this->processingStartedAt($order)) {
-            return self::STAGE_S2;
-        }
-
-        return self::STAGE_S1;
+        return $stored;
     }
 
     public function stageLabel(Order $order)
     {
+        return data_get(self::stageLabels(), $this->resolveStage($order), '—');
+    }
+
+    public function adminActionAvailability(Order $order)
+    {
         $stage = $this->resolveStage($order);
 
-        return data_get(self::stageLabels(), $stage, $stage);
+        return [
+            'stage' => $stage,
+            'can_start_processing' => $stage === self::STAGE_S1,
+            'can_enter_stock_prep' => in_array($stage, [self::STAGE_S1, self::STAGE_S2], true),
+            'can_revert_to_pending' => $stage === self::STAGE_S2,
+            'can_revert_from_stock_prep' => $stage === self::STAGE_S3
+                && !$order->hasFulfillmentPhoto()
+                && !$this->packageAtLogisticsWarehouse($order),
+            'can_mark_warehouse' => $stage === self::STAGE_S3 && !$this->packageAtLogisticsWarehouse($order),
+            'at_warehouse' => $this->packageAtLogisticsWarehouse($order),
+            'has_fulfillment_photo' => $order->hasFulfillmentPhoto(),
+        ];
     }
 
     public function canSelfChangeAddress(Order $order)
@@ -86,7 +115,7 @@ class OrderFulfillmentService
             'address' => $detail,
             'contact_name' => $contactName,
             'contact_phone' => $contactPhone,
-        ] as $label => $value) {
+        ] as $value) {
             if ($value === '') {
                 throw new InvalidRequestException('请完整填写省市区、详细地址、收件人与手机号。');
             }
@@ -164,50 +193,224 @@ class OrderFulfillmentService
 
     public function startProcessing(Order $order)
     {
-        if (!$order->paid_at) {
-            throw new InvalidRequestException('仅已支付订单可开始处理。');
-        }
-
-        if ($this->resolveStage($order) === self::STAGE_S4) {
-            throw new InvalidRequestException('订单已发货，无法开始处理。');
+        $this->assertPaidAndNotShipped($order);
+        if ($this->resolveStage($order) !== self::STAGE_S1) {
+            throw new InvalidRequestException('仅待处理（S1）订单可开始处理。');
         }
 
         $extra = $this->normalizeExtraArray($order);
-        if ($this->processingStartedAt($order)) {
-            throw new InvalidRequestException('订单已在处理中。');
-        }
-
         $extra['processing_started_at'] = now()->toDateTimeString();
 
-        return $this->persistExtra($order, $extra);
+        return $this->setStage($order, self::STAGE_S2, 'start_processing', true, $extra);
     }
 
+    /**
+     * 进入备货/打包（S3）：允许 S1 或 S2 进入，可跳过 S2。
+     */
+    public function enterStockPrep(Order $order)
+    {
+        $this->assertPaidAndNotShipped($order);
+        $stage = $this->resolveStage($order);
+        if (!in_array($stage, [self::STAGE_S1, self::STAGE_S2], true)) {
+            throw new InvalidRequestException('仅待处理或处理中订单可进入备货/打包。');
+        }
+
+        $extra = $this->normalizeExtraArray($order);
+        if ($stage === self::STAGE_S1 && !$this->processingStartedAt($order)) {
+            $extra['processing_started_at'] = now()->toDateTimeString();
+        }
+        if (!$this->isLocked($order)) {
+            $extra['locked_at'] = now()->toDateTimeString();
+        }
+
+        return $this->setStage($order, self::STAGE_S3, 'enter_stock_prep', true, $extra);
+    }
+
+    /** @deprecated 使用 enterStockPrep */
     public function lockOrder(Order $order)
     {
-        if (!$order->paid_at) {
-            throw new InvalidRequestException('仅已支付订单可锁定。');
-        }
+        return $this->enterStockPrep($order);
+    }
 
-        if (in_array($order->ship_status, [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED], true)) {
-            throw new InvalidRequestException('订单已发货，无法锁定。');
+    public function revertToPending(Order $order)
+    {
+        $this->assertPaidAndNotShipped($order);
+        if ($this->resolveStage($order) !== self::STAGE_S2) {
+            throw new InvalidRequestException('仅处理中（S2）订单可退回待处理。');
         }
 
         $extra = $this->normalizeExtraArray($order);
-        $extra['locked_at'] = now()->toDateTimeString();
+        unset($extra['processing_started_at']);
+
+        return $this->setStage($order, self::STAGE_S1, 'revert_to_pending', true, $extra);
+    }
+
+    public function revertFromStockPrep(Order $order)
+    {
+        $this->assertPaidAndNotShipped($order);
+        if ($this->resolveStage($order) !== self::STAGE_S3) {
+            throw new InvalidRequestException('仅备货/打包（S3）订单可退回上一阶段。');
+        }
+        if ($order->hasFulfillmentPhoto()) {
+            throw new InvalidRequestException('已上传履约实拍图，请先删除图片后再退回。');
+        }
+        if ($this->packageAtLogisticsWarehouse($order)) {
+            throw new InvalidRequestException('已标记送往物流仓库，无法退回上一阶段。');
+        }
+
+        $extra = $this->normalizeExtraArray($order);
+        unset($extra['locked_at'], $extra['logistics_warehouse_at']);
+
+        $target = $this->processingStartedAt($order) ? self::STAGE_S2 : self::STAGE_S1;
+
+        return $this->setStage($order, $target, 'revert_from_stock_prep', true, $extra);
+    }
+
+    /** @deprecated 使用 revertFromStockPrep */
+    public function unlockOrder(Order $order)
+    {
+        return $this->revertFromStockPrep($order);
+    }
+
+    public function markPackageAtLogisticsWarehouse(Order $order)
+    {
+        $this->assertPaidAndNotShipped($order);
+        if ($this->resolveStage($order) !== self::STAGE_S3) {
+            throw new InvalidRequestException('仅备货/打包（S3）订单可标记送往物流仓库。');
+        }
+        if ($this->packageAtLogisticsWarehouse($order)) {
+            throw new InvalidRequestException('订单已标记为送往物流仓库。');
+        }
+
+        $extra = $this->normalizeExtraArray($order);
+        $extra['logistics_warehouse_at'] = now()->toDateTimeString();
+
+        return $this->setStage($order, self::STAGE_S3, 'mark_logistics_warehouse', true, $extra);
+    }
+
+    public function syncShippedStage(Order $order)
+    {
+        if (!$this->isShipped($order)) {
+            return $order;
+        }
+
+        return $this->setStage($order, self::STAGE_S4, 'ship');
+    }
+
+    public function syncUnshippedStage(Order $order)
+    {
+        if ($this->isShipped($order)) {
+            return $order;
+        }
+
+        $stored = $this->storedStage($order);
+        if ($stored === self::STAGE_S4) {
+            $fallback = $this->inferLegacyStage($order);
+
+            return $this->setStage($order, $fallback === self::STAGE_S4 ? self::STAGE_S3 : $fallback, 'unship_revert');
+        }
+
+        return $order;
+    }
+
+    public function packageAtLogisticsWarehouse(Order $order)
+    {
+        return trim((string) data_get($order->extra, 'logistics_warehouse_at', '')) !== '';
+    }
+
+    public static function stageFilterOptions()
+    {
+        return [
+            '' => '全部阶段',
+            self::STAGE_S1 => 'S1 待处理',
+            self::STAGE_S2 => 'S2 处理中',
+            self::STAGE_S3 => 'S3 备货/打包',
+            self::STAGE_S4 => 'S4 已发货',
+        ];
+    }
+
+    public function applyStageFilter($query, $stage)
+    {
+        $stage = strtoupper(trim((string) $stage));
+        if (!in_array($stage, [self::STAGE_S1, self::STAGE_S2, self::STAGE_S3, self::STAGE_S4], true)) {
+            return $query;
+        }
+
+        if ($stage === self::STAGE_S4) {
+            return $query->whereIn('ship_status', [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED]);
+        }
+
+        $query = $query->whereNotIn('ship_status', [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED]);
+
+        return $query->whereRaw(
+            "JSON_UNQUOTE(JSON_EXTRACT(extra, '$.fulfillment_stage')) = ?",
+            [$stage]
+        );
+    }
+
+    protected function storedStage(Order $order)
+    {
+        $stage = strtoupper(trim((string) data_get($order->extra, 'fulfillment_stage', '')));
+        $valid = [self::STAGE_S1, self::STAGE_S2, self::STAGE_S3, self::STAGE_S4];
+
+        return in_array($stage, $valid, true) ? $stage : '';
+    }
+
+    protected function setStage(Order $order, $stage, $action, $appendLog = true, array $extra = null)
+    {
+        $extra = $extra ?? $this->normalizeExtraArray($order);
+        $from = $this->storedStage($order);
+        $extra['fulfillment_stage'] = $stage;
+
+        if ($appendLog) {
+            $log = (array) data_get($extra, 'fulfillment_stage_log', []);
+            $log[] = [
+                'at' => now()->toDateTimeString(),
+                'action' => (string) $action,
+                'from' => $from !== '' ? $from : null,
+                'to' => $stage,
+            ];
+            $extra['fulfillment_stage_log'] = $log;
+        }
 
         return $this->persistExtra($order, $extra);
     }
 
-    public function unlockOrder(Order $order)
+    protected function inferLegacyStage(Order $order)
     {
-        if (in_array($order->ship_status, [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED], true)) {
-            throw new InvalidRequestException('订单已发货，无法解除锁定。');
+        if (!$order->paid_at || $order->closed) {
+            return self::STAGE_S0;
         }
 
-        $extra = $this->normalizeExtraArray($order);
-        unset($extra['locked_at']);
+        if ($this->isShipped($order)) {
+            return self::STAGE_S4;
+        }
 
-        return $this->persistExtra($order, $extra);
+        if ($this->isLocked($order) || $order->hasFulfillmentPhoto()) {
+            return self::STAGE_S3;
+        }
+
+        if ($this->processingStartedAt($order)) {
+            return self::STAGE_S2;
+        }
+
+        return self::STAGE_S1;
+    }
+
+    protected function assertPaidAndNotShipped(Order $order)
+    {
+        if (!$order->paid_at) {
+            throw new InvalidRequestException('仅已支付订单可操作。');
+        }
+
+        if ($this->isShipped($order)) {
+            throw new InvalidRequestException('订单已发货，无法变更履约阶段。');
+        }
+    }
+
+    protected function isShipped(Order $order)
+    {
+        return in_array($order->ship_status, [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED], true);
     }
 
     protected function refundAllowsModification(Order $order)
@@ -225,109 +428,8 @@ class OrderFulfillmentService
         return trim((string) data_get($order->extra, 'locked_at', '')) !== '';
     }
 
-    public function packageAtLogisticsWarehouse(Order $order)
-    {
-        return trim((string) data_get($order->extra, 'logistics_warehouse_at', '')) !== '';
-    }
-
-    public function markPackageAtLogisticsWarehouse(Order $order)
-    {
-        if (!$order->paid_at) {
-            throw new InvalidRequestException('仅已支付订单可标记。');
-        }
-
-        if (in_array($order->ship_status, [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED], true)) {
-            throw new InvalidRequestException('订单已发货，无法标记送往仓库。');
-        }
-
-        $extra = $this->normalizeExtraArray($order);
-        if ($this->packageAtLogisticsWarehouse($order)) {
-            throw new InvalidRequestException('订单已标记为送往物流仓库。');
-        }
-
-        $extra['logistics_warehouse_at'] = now()->toDateTimeString();
-
-        return $this->persistExtra($order, $extra);
-    }
-
-    public static function stageFilterOptions()
-    {
-        return [
-            '' => '全部阶段',
-            self::STAGE_S1 => 'S1 待处理',
-            self::STAGE_S2 => 'S2 处理中',
-            self::STAGE_S3 => 'S3 备货/打包',
-            self::STAGE_S4 => 'S4 已发货',
-        ];
-    }
-
-    /**
-     * 按履约阶段筛选已支付订单（与 resolveStage 规则一致）。
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $stage
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    public function applyStageFilter($query, $stage)
-    {
-        $stage = strtoupper(trim((string) $stage));
-        $valid = [self::STAGE_S1, self::STAGE_S2, self::STAGE_S3, self::STAGE_S4];
-        if (!in_array($stage, $valid, true)) {
-            return $query;
-        }
-
-        if ($stage === self::STAGE_S4) {
-            return $query->whereIn('ship_status', [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED]);
-        }
-
-        $query = $query->whereNotIn('ship_status', [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED]);
-
-        if ($stage === self::STAGE_S3) {
-            return $query->where(function ($q) {
-                $q->where(function ($inner) {
-                    $this->whereExtraFieldPresent($inner, 'locked_at');
-                })->orWhere(function ($inner) {
-                    $this->whereExtraFieldPresent($inner, 'fulfillment_photo');
-                });
-            });
-        }
-
-        $query = $query->where(function ($q) {
-            $this->whereExtraFieldAbsent($q, 'locked_at');
-        })->where(function ($q) {
-            $this->whereExtraFieldAbsent($q, 'fulfillment_photo');
-        });
-
-        if ($stage === self::STAGE_S2) {
-            return $this->whereExtraFieldPresent($query, 'processing_started_at');
-        }
-
-        return $this->whereExtraFieldAbsent($query, 'processing_started_at');
-    }
-
-    protected function whereExtraFieldPresent($query, $field)
-    {
-        $jsonPath = '$.'.$field;
-
-        return $query->whereRaw(
-            'JSON_EXTRACT(extra, ?) IS NOT NULL AND JSON_UNQUOTE(JSON_EXTRACT(extra, ?)) <> ?',
-            [$jsonPath, $jsonPath, '']
-        );
-    }
-
-    protected function whereExtraFieldAbsent($query, $field)
-    {
-        $jsonPath = '$.'.$field;
-
-        return $query->where(function ($q) use ($jsonPath) {
-            $q->whereRaw('JSON_EXTRACT(extra, ?) IS NULL', [$jsonPath])
-                ->orWhereRaw('JSON_UNQUOTE(JSON_EXTRACT(extra, ?)) = ?', [$jsonPath, '']);
-        });
-    }
-
     protected function addressChangeCount(Order $order)
     {
         return (int) data_get($order->extra, 'address_change_count', 0);
     }
-
 }

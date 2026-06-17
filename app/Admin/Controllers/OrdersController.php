@@ -198,11 +198,14 @@ class OrdersController extends Controller
         $extra['fulfillment_photo'] = $path;
         $extra['fulfillment_photo_uploaded_at'] = now()->toDateTimeString();
 
-        if (!data_get($extra, 'locked_at')) {
-            $extra['locked_at'] = now()->toDateTimeString();
-        }
-
         $order->update(['extra' => $extra]);
+        $order->refresh();
+
+        $fulfillment = app(OrderFulfillmentService::class);
+        $stage = $fulfillment->resolveStage($order);
+        if (in_array($stage, [OrderFulfillmentService::STAGE_S1, OrderFulfillmentService::STAGE_S2], true)) {
+            $fulfillment->enterStockPrep($order);
+        }
 
         return redirect()
             ->back()
@@ -219,19 +222,22 @@ class OrdersController extends Controller
     public function lockOrder(Order $order, OrderFulfillmentService $fulfillment)
     {
         return $this->handleFulfillmentAction($order, function () use ($order, $fulfillment) {
-            $fulfillment->lockOrder($order);
-        }, '订单已锁定（S3），用户不可再自助改址。');
+            $fulfillment->enterStockPrep($order);
+        }, '订单已进入备货/打包（S3），用户不可再自助改址。');
+    }
+
+    public function revertToPending(Order $order, OrderFulfillmentService $fulfillment)
+    {
+        return $this->handleFulfillmentAction($order, function () use ($order, $fulfillment) {
+            $fulfillment->revertToPending($order);
+        }, '订单已退回待处理（S1），用户可继续自助改址。');
     }
 
     public function unlockOrder(Order $order, OrderFulfillmentService $fulfillment)
     {
         return $this->handleFulfillmentAction($order, function () use ($order, $fulfillment) {
-            if ($order->hasFulfillmentPhoto()) {
-                throw new InvalidRequestException('已上传履约照片，不可解除锁定。');
-            }
-
-            $fulfillment->unlockOrder($order);
-        }, '已解除锁定；若未开始处理则回到待处理（S1），否则为处理中（S2）。');
+            $fulfillment->revertFromStockPrep($order);
+        }, '订单已退回上一履约阶段。');
     }
 
     public function markManualOfflineRefund(Order $order, Request $request)
@@ -342,6 +348,14 @@ class OrdersController extends Controller
 
         $wasPending = $order->ship_status === Order::SHIP_STATUS_PENDING;
         $order->update($payload);
+        $order->refresh();
+
+        $fulfillment = app(OrderFulfillmentService::class);
+        if (in_array($shipStatus, [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED], true)) {
+            $fulfillment->syncShippedStage($order);
+        } else {
+            $fulfillment->syncUnshippedStage($order);
+        }
         $order->refresh();
 
         if ($shipStatus === Order::SHIP_STATUS_DELIVERED
@@ -532,7 +546,7 @@ class OrdersController extends Controller
     public function batchLockOrders(Request $request, \App\Services\OrderBatchService $batch)
     {
         return $this->batchTry(function () use ($request, $batch) {
-            return $batch->batchLockOrders(
+            return $batch->batchEnterStockPrep(
                 $this->batchIds($request, '请先勾选订单'),
                 app(OrderFulfillmentService::class)
             );
@@ -542,7 +556,7 @@ class OrdersController extends Controller
     public function batchUnlockOrders(Request $request, \App\Services\OrderBatchService $batch)
     {
         return $this->batchTry(function () use ($request, $batch) {
-            return $batch->batchUnlockOrders(
+            return $batch->batchRevertFromStockPrep(
                 $this->batchIds($request, '请先勾选订单'),
                 app(OrderFulfillmentService::class)
             );
