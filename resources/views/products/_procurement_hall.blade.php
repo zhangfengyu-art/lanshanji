@@ -57,7 +57,6 @@
 
         $status = (int) $order->proxy_status;
         $statusLabel = isset($statusMeta[$status]) ? $statusMeta[$status] : ['text' => '待接单', 'class' => 'is-success'];
-        $isDemoData = (bool) data_get($order, 'is_mock', false) || (bool) data_get($order, 'extra.is_demo_data', false);
         $category = trim((string) data_get($order, 'extra.category', data_get($order, 'extra.reference_category', '')));
         $buyUrl = (string) data_get($order, 'buy_url', route('products.index', ['search' => (string) $order->item_name]));
       @endphp
