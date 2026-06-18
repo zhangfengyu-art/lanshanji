@@ -22,10 +22,11 @@ class OrderAdminExportService
             'today' => '今日支付订单',
             'week' => '近7日支付订单',
             'pending_ship' => '待发货订单',
-            'shipped' => '已发货未签收',
+            'shipped' => '已发货',
             'refund_applied' => '退款申请中',
             's1_pending' => '待处理（S1，未开始处理）',
             's1_s2' => 'S1待处理+S2处理中',
+            's3' => 'S3备货/打包',
         ];
     }
 
@@ -56,6 +57,7 @@ class OrderAdminExportService
                 break;
             case 's1_pending':
             case 's1_s2':
+            case 's3':
                 $query->where('ship_status', Order::SHIP_STATUS_PENDING)
                     ->where('refund_status', Order::REFUND_STATUS_PENDING);
                 break;
@@ -811,6 +813,10 @@ class OrderAdminExportService
                 OrderFulfillmentService::STAGE_S1,
                 OrderFulfillmentService::STAGE_S2,
             ], true);
+        }
+
+        if ($scope === 's3') {
+            return $fulfillment->resolveStage($order) === OrderFulfillmentService::STAGE_S3;
         }
 
         return true;

@@ -6,7 +6,7 @@ use App\Exceptions\InternalException;
 use App\Models\Order;
 use App\Services\AdminOrderPdfExport;
 use App\Services\OrderAdminExportService;
-use App\Services\OrderStockPrepExportService;
+use App\Services\ShippingModeService;
 use App\Services\OrderFulfillmentPhotoService;
 use App\Services\OrderFulfillmentService;
 use Illuminate\Http\Request;
@@ -347,11 +347,68 @@ class OrdersController extends Controller
             'express_no' => is_site_mode_b() ? '转寄单号' : '物流单号',
         ]);
 
+        $expressCompany = trim((string) data_get($data, 'express_company', ''));
+        $expressNo = trim((string) data_get($data, 'express_no', ''));
+
+        return $this->applyOrderShipment(
+            $order,
+            $shipStatus,
+            $expressCompany,
+            $expressNo,
+            '物流信息已更新，用户端将同步显示最新状态'
+        );
+    }
+
+    public function quickShip(Order $order, Request $request)
+    {
+        try {
+            if (!$order->paid_at) {
+                throw new InvalidRequestException('该订单未付款');
+            }
+            if ($order->refund_status === Order::REFUND_STATUS_SUCCESS) {
+                throw new InvalidRequestException('该订单已退款，无法发货');
+            }
+
+            $data = $this->validate($request, [
+                'express_no' => ['required', 'string', 'max:255'],
+                'express_company' => ['nullable', 'string', 'max:255'],
+            ], [], [
+                'express_no' => is_site_mode_b() ? '转寄单号' : '物流单号',
+                'express_company' => is_site_mode_b() ? '代购人' : '物流公司',
+            ]);
+
+            $expressNo = trim($data['express_no']);
+            $expressCompany = trim((string) data_get($data, 'express_company', ''));
+            if ($expressCompany === '') {
+                $expressCompany = $this->defaultExpressCarrierForOrder($order);
+            }
+
+            if (is_site_mode_a()) {
+                $allowed = site_express_carrier_options();
+                if (!in_array($expressCompany, $allowed, true)) {
+                    $expressCompany = $allowed[0] ?? $expressCompany;
+                }
+            }
+
+            return $this->applyOrderShipment(
+                $order,
+                Order::SHIP_STATUS_DELIVERED,
+                $expressCompany,
+                $expressNo,
+                '物流单号已保存，订单已标记为已发货'
+            );
+        } catch (InvalidRequestException $e) {
+            return redirect()->back()->with('error', admin_flash_error($e->getMessage()));
+        }
+    }
+
+    protected function applyOrderShipment(Order $order, $shipStatus, $expressCompany, $expressNo, $successMessage)
+    {
         $payload = ['ship_status' => $shipStatus];
         if (in_array($shipStatus, [Order::SHIP_STATUS_DELIVERED, Order::SHIP_STATUS_RECEIVED], true)) {
             $payload['ship_data'] = [
-                'express_company' => trim($data['express_company']),
-                'express_no' => trim($data['express_no']),
+                'express_company' => $expressCompany,
+                'express_no' => $expressNo,
             ];
         } else {
             $payload['ship_data'] = null;
@@ -378,7 +435,23 @@ class OrdersController extends Controller
 
         return redirect()
             ->back()
-            ->with('success', admin_flash_success('物流信息已更新，用户端将同步显示最新状态'));
+            ->with('success', admin_flash_success($successMessage));
+    }
+
+    protected function defaultExpressCarrierForOrder(Order $order)
+    {
+        $mode = trim((string) data_get($order->extra, 'fee_details.shipping_mode', data_get($order->extra, 'shipping_mode', '')));
+        $options = site_express_carrier_options();
+
+        if ($mode === ShippingModeService::MODE_EMS) {
+            foreach ($options as $option) {
+                if (stripos($option, 'EMS') !== false) {
+                    return $option;
+                }
+            }
+        }
+
+        return $options[0] ?? 'EMS自缴税';
     }
 
     protected function grid()
@@ -466,6 +539,9 @@ class OrdersController extends Controller
 
                 return $value ?: '—';
             });
+            $grid->column('quick_ship_cell', '物流单号')->display(function () {
+                return view('admin.orders._quick_ship_cell', ['order' => $this])->render();
+            });
             $grid->ship_status('发货状态')->display(function($value) {
                 return Order::$shipStatusMap[$value];
             });
@@ -514,6 +590,7 @@ class OrdersController extends Controller
                 Admin::script(view('admin.partials._batch_helper_script')->render());
                 Admin::script(view('admin.orders._batch_tools_script')->render());
                 Admin::script(view('admin.orders._fulfillment_photo_list_script')->render());
+                Admin::script(view('admin.orders._quick_ship_script')->render());
             }
         });
     }

@@ -104,6 +104,7 @@ Route::group([
     $router->post('orders/{order}/revert-pending', 'OrdersController@revertToPending')->name('admin.orders.revert_pending');
     $router->post('orders/{order}/unlock', 'OrdersController@unlockOrder')->name('admin.orders.unlock');
     $router->post('orders/{order}/ship', 'OrdersController@ship')->name('admin.orders.ship');
+    $router->post('orders/{order}/quick-ship', 'OrdersController@quickShip')->name('admin.orders.quick_ship');
     $router->post('orders/{order}/fulfillment-photo', 'OrdersController@uploadFulfillmentPhoto')->name('admin.orders.fulfillment_photo.upload');
     $router->delete('orders/{order}/fulfillment-photo', 'OrdersController@deleteFulfillmentPhoto')->name('admin.orders.fulfillment_photo.delete');
     $router->post('orders/{order}/refund', 'OrdersController@handleRefund')->name('admin.orders.handle_refund');
