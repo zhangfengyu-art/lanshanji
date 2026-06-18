@@ -94,7 +94,10 @@
       <tr>
         <td>履约阶段：</td>
         <td colspan="3">
-          <strong>{{ $fulfillment->stageLabel($order) }}</strong>（{{ $fulfillmentStage }}）
+          <strong>{{ $fulfillment->stageLabel($order) }}</strong>
+          @if($actions['processing_started'])
+            <span class="text-muted">（已开始处理）</span>
+          @endif
           · 自助改址已用 {{ (int) data_get($order->extra, 'address_change_count', 0) }}/2 次
           @if(data_get($order->extra, 'processing_started_at'))
             <span class="text-muted"> · 开始处理：{{ data_get($order->extra, 'processing_started_at') }}</span>
@@ -113,19 +116,19 @@
           @if($actions['can_start_processing'])
             <form action="{{ route('admin.orders.start_processing', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('确认开始处理（S1→S2）？用户将无法再自助改址。');">开始处理（S1→S2）</button>
+              <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('确认标记开始处理？标记后用户将无法再自助改址。');">标记开始处理</button>
             </form>
           @endif
           @if($actions['can_enter_stock_prep'])
             <form action="{{ route('admin.orders.lock', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('确认进入备货/打包（S3）？可直接从 S1 跳过 S2。');">进入备货/打包（→S3）</button>
+              <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('确认进入备货/打包？');">进入备货/打包</button>
             </form>
           @endif
           @if($actions['can_revert_to_pending'])
             <form action="{{ route('admin.orders.revert_pending', ['order' => $order->id]) }}" method="post" data-pjax="false" style="display:inline-block; margin-right: 8px;">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn-default btn-sm" onclick="return confirm('确认退回待处理（S2→S1）？用户将可再次自助改址。');">退回待处理（S2→S1）</button>
+              <button type="submit" class="btn btn-default btn-sm" onclick="return confirm('确认恢复为未受理状态？用户将可再次自助改址。');">恢复未受理</button>
             </form>
           @endif
           @if($actions['can_revert_from_stock_prep'])
@@ -140,7 +143,7 @@
               <button type="submit" class="btn btn-default btn-sm" onclick="return confirm('确认包裹已送往物流仓库？（仍为 S3，原则上不可退款）');">标记：已送往物流仓库</button>
             </form>
           @endif
-          <span class="help-block" style="margin: 6px 0 0;">锁定、上传实拍图、送往仓库均属 S3 备货/打包。填写物流发货后进入 S4。S1 可全额退，S2 部分退，S3 原则上不可退。</span>
+          <span class="help-block" style="margin: 6px 0 0;">实拍图、送往仓库均属备货/打包阶段。填写物流发货后进入已发货。未开始处理可全额秒退；已开始处理后按客户反馈规则退款。</span>
         </td>
       </tr>
       @endif

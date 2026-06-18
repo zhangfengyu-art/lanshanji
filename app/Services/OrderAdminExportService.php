@@ -24,9 +24,22 @@ class OrderAdminExportService
             'pending_ship' => '待发货订单',
             'shipped' => '已发货',
             'refund_applied' => '退款申请中',
-            's1_pending' => '待处理（S1，未开始处理）',
-            's1_s2' => 'S1待处理+S2处理中',
-            's3' => 'S3备货/打包',
+            'pending' => '待处理',
+            's3' => '已打包',
+        ];
+    }
+
+    public static function exportStatusCodes()
+    {
+        return [
+            'all' => '已支付',
+            'today' => '已支付',
+            'week' => '已支付',
+            'pending_ship' => '待发货',
+            'shipped' => '已发货',
+            'refund_applied' => '退款中',
+            'pending' => '待处理',
+            's3' => '已打包',
         ];
     }
 
@@ -57,6 +70,7 @@ class OrderAdminExportService
                 break;
             case 's1_pending':
             case 's1_s2':
+            case 'pending':
             case 's3':
                 $query->where('ship_status', Order::SHIP_STATUS_PENDING)
                     ->where('refund_status', Order::REFUND_STATUS_PENDING);
@@ -764,18 +778,16 @@ class OrderAdminExportService
 
     public static function filename($scope)
     {
-        $label = self::scopeOptions()[$scope] ?? '订单';
-        $safe = preg_replace('/[^\x{4e00}-\x{9fa5}a-zA-Z0-9_-]+/u', '', $label);
-        if ($safe === '') {
-            $safe = 'orders';
-        }
-
-        return $safe.'_'.date('Ymd_His').'.zip';
+        return AdminExportFilenameBuilder::buildPdfFilename(
+            '订单',
+            self::exportStatusCodes()[$scope] ?? '订单',
+            AdminExportFilenameBuilder::timeCodeForScope($scope)
+        );
     }
 
     public static function pdfFilename($scope)
     {
-        return preg_replace('/\.zip$/', '.pdf', self::filename($scope));
+        return self::filename($scope);
     }
 
     public static function pdfExportOptions($scopeLabel)
@@ -806,11 +818,7 @@ class OrderAdminExportService
 
     protected static function orderIncludedInExport(Order $order, $scope, OrderFulfillmentService $fulfillment)
     {
-        if ($scope === 's1_pending') {
-            return $fulfillment->resolveStage($order) === OrderFulfillmentService::STAGE_S1;
-        }
-
-        if ($scope === 's1_s2') {
+        if ($scope === 'pending' || $scope === 's1_s2' || $scope === 's1_pending') {
             return in_array($fulfillment->resolveStage($order), [
                 OrderFulfillmentService::STAGE_S1,
                 OrderFulfillmentService::STAGE_S2,

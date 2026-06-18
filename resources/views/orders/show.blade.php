@@ -30,6 +30,11 @@
   $exchangeRate = $order->getExchangeRateJpyPerCny();
   $fulfillmentStage = $order->fulfillment_stage;
   $fulfillmentStageLabel = $order->fulfillment_stage_label;
+  $fulfillmentStageDisplay = $fulfillmentStageLabel;
+  if (is_site_mode_a() && $fulfillmentStage === \App\Services\OrderFulfillmentService::STAGE_S1
+      && trim((string) data_get($order->extra, 'processing_started_at', '')) !== '') {
+      $fulfillmentStageDisplay .= '（已开始处理）';
+  }
   $canChangeAddress = $order->canSelfChangeAddress();
   $remainingAddressChanges = $isPaid ? app(\App\Services\OrderFulfillmentService::class)->remainingAddressChanges($order) : 0;
   $canInstantRefund = $isPaid && $order->canSelfInstantRefund();
@@ -97,7 +102,7 @@
         <div class="meta-lines">{{ trans('frontend.order.placed_at') }}：{{ $createdAtText }}</div>
         <div class="meta-lines">{{ is_site_mode_b() ? '履行进度' : trans('frontend.order.shipping_status') }}：{{ is_site_mode_b() ? $orderStatusText : $shipStatusTextForDisplay }}</div>
         @if(is_site_mode_a() && $isPaid && !$isClosed)
-          <div class="meta-lines">履约阶段：{{ $fulfillmentStageLabel }}（{{ $fulfillmentStage }}）</div>
+          <div class="meta-lines">履约阶段：{{ $fulfillmentStageDisplay }}</div>
         @endif
         @if(is_site_mode_a() && $shippingModeLabel !== '')
           <div class="meta-lines">寄送模式：{{ $shippingModeLabel }}</div>
@@ -258,7 +263,7 @@
 
             <div class="kv"><span class="k">订单状态：</span><span class="v">{{ $orderStatusText }}</span></div>
             @if(is_site_mode_a() && $isPaid)
-              <div class="kv"><span class="k">履约阶段：</span><span class="v">{{ $fulfillmentStageLabel }}</span></div>
+              <div class="kv"><span class="k">履约阶段：</span><span class="v">{{ $fulfillmentStageDisplay }}</span></div>
               @if($remainingAddressChanges > 0)
                 <div class="kv"><span class="k">自助改址：</span><span class="v">剩余 {{ $remainingAddressChanges }} 次</span></div>
               @endif

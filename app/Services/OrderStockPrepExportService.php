@@ -22,14 +22,22 @@ class OrderStockPrepExportService
     public static function scopeOptions()
     {
         return [
-            'pending_fulfillment' => '待发货采购汇总（S1+S2+S3）',
-            's1' => 'S1 待处理',
-            's2' => 'S2 处理中',
-            's1_s2' => 'S1待处理+S2处理中',
-            's3' => 'S3 备货/打包',
+            'history_total' => '历史总发货代购汇总',
+            'pending' => '待处理',
             'paid_today' => '今日新支付（待发货）',
             'paid_week' => '近7日新支付（待发货）',
             'refund_applied' => '退款申请中（慎选）',
+        ];
+    }
+
+    public static function exportStatusCodes()
+    {
+        return [
+            'history_total' => '总采购汇总',
+            'pending' => '待处理',
+            'paid_today' => '今日新支付待发货',
+            'paid_week' => '近7日新支付待发货',
+            'refund_applied' => '退款中',
         ];
     }
 
@@ -47,22 +55,22 @@ class OrderStockPrepExportService
 
     public static function filename($scope)
     {
-        $label = self::scopeOptions()[$scope] ?? '备货';
-        $safe = preg_replace('/[^\x{4e00}-\x{9fa5}a-zA-Z0-9_-]+/u', '', $label.'_备货表');
-        if ($safe === '') {
-            $safe = 'stock_prep';
-        }
-
-        return $safe.'_'.date('Ymd_His').'.zip';
+        return AdminExportFilenameBuilder::buildPdfFilename(
+            '备货',
+            self::exportStatusCodes()[$scope] ?? '备货',
+            AdminExportFilenameBuilder::timeCodeForScope($scope)
+        );
     }
 
     public static function pdfFilename($scope)
     {
-        return preg_replace('/\.zip$/', '.pdf', self::filename($scope));
+        return self::filename($scope);
     }
 
-    public static function pdfExportOptions($scopeLabel)
+    public static function pdfExportOptions($scope, $scopeLabel = null)
     {
+        $scopeLabel = $scopeLabel ?? (self::scopeOptions()[$scope] ?? '');
+
         return [
             'text_columns' => self::TEXT_COLUMN_INDEXES,
             'image_columns' => self::IMAGE_COLUMN_INDEXES,
@@ -80,7 +88,7 @@ class OrderStockPrepExportService
             'image_jpeg_quality' => 96,
             'table_font_size' => 16,
             'checkbox_cell_size' => 36,
-            'footer_note' => self::pdfFooterNote(),
+            'footer_note' => self::pdfFooterNote($scope),
         ];
     }
 
@@ -109,9 +117,13 @@ class OrderStockPrepExportService
         ];
     }
 
-    public static function pdfFooterNote()
+    public static function pdfFooterNote($scope = null)
     {
-        return '本表汇总香烟、加热烟、手卷烟丝按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。「确认」列留空供现场打勾。';
+        if ($scope === 'history_total') {
+            return '本表汇总历史香烟、加热烟、手卷烟丝按包采购数量，含待处理、已打包与已发货订单；不含已退款成功订单。「确认」列留空供现场打勾。';
+        }
+
+        return '本表汇总香烟、加热烟、手卷烟丝按包采购数量，不含用户地址与身份信息；已退款成功、已发货订单不计入。「确认」列留空供现场打勾。';
     }
 
     public static function buildQuery($scope)
@@ -124,11 +136,14 @@ class OrderStockPrepExportService
         $today = Carbon::today();
 
         switch ($scope) {
-            case 'pending_fulfillment':
+            case 'history_total':
+                break;
+            case 'pending':
             case 's1':
             case 's2':
             case 's1_s2':
             case 's3':
+            case 'pending_fulfillment':
                 $query->where('ship_status', Order::SHIP_STATUS_PENDING);
                 break;
             case 'paid_today':
@@ -268,23 +283,21 @@ class OrderStockPrepExportService
         $stage = $fulfillment->resolveStage($order);
 
         switch ($scope) {
-            case 'pending_fulfillment':
+            case 'history_total':
                 return in_array($stage, [
                     OrderFulfillmentService::STAGE_S1,
                     OrderFulfillmentService::STAGE_S2,
                     OrderFulfillmentService::STAGE_S3,
+                    OrderFulfillmentService::STAGE_S4,
                 ], true);
-            case 's1':
-                return $stage === OrderFulfillmentService::STAGE_S1;
-            case 's2':
-                return $stage === OrderFulfillmentService::STAGE_S2;
+            case 'pending':
             case 's1_s2':
+            case 's1':
+            case 's2':
                 return in_array($stage, [
                     OrderFulfillmentService::STAGE_S1,
                     OrderFulfillmentService::STAGE_S2,
                 ], true);
-            case 's3':
-                return $stage === OrderFulfillmentService::STAGE_S3;
             case 'paid_today':
             case 'paid_week':
                 return in_array($stage, [

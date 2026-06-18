@@ -14,24 +14,27 @@ class OrderBatchService
                 return 'skip';
             }
 
+            if (trim((string) data_get($order->extra, 'processing_started_at', '')) !== '') {
+                return 'skip';
+            }
+
             $fulfillment->startProcessing($order);
 
             return 'ok';
-        }, '已开始处理（S2）');
+        }, '已标记开始处理');
     }
 
     public function batchEnterStockPrep(array $orderIds, OrderFulfillmentService $fulfillment)
     {
         return $this->runBatch($orderIds, function (Order $order) use ($fulfillment) {
-            $stage = $fulfillment->resolveStage($order);
-            if (!in_array($stage, [OrderFulfillmentService::STAGE_S1, OrderFulfillmentService::STAGE_S2], true)) {
+            if ($fulfillment->resolveStage($order) !== OrderFulfillmentService::STAGE_S1) {
                 return 'skip';
             }
 
             $fulfillment->enterStockPrep($order);
 
             return 'ok';
-        }, '已进入备货/打包（S3）');
+        }, '已进入备货/打包');
     }
 
     /** @deprecated */

@@ -44,7 +44,8 @@ class OrderRefundService
             return false;
         }
 
-        return $this->fulfillment->resolveStage($order) === OrderFulfillmentService::STAGE_S1;
+        return $this->fulfillment->resolveStage($order) === OrderFulfillmentService::STAGE_S1
+            && trim((string) data_get($order->extra, 'processing_started_at', '')) === '';
     }
 
     public function shouldUseRefundFeedback(Order $order)

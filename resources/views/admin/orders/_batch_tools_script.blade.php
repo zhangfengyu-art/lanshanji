@@ -8,10 +8,10 @@
   };
 
   var confirms = {
-    'start-processing': '将选中且处于「待处理 S1」的订单批量标记为开始处理（S2），继续？',
-    lock: '将选中且处于 S1/S2 的订单批量进入备货/打包（S3），继续？',
-    unlock: '将选中且可退回的 S3 订单批量退回上一阶段，继续？',
-    'logistics-warehouse': '将选中且处于 S2/S3 的订单批量标记为「已送往物流仓库」，继续？'
+    'start-processing': '将选中且处于「待处理（未开始处理）」的订单批量标记为已开始处理，继续？',
+    lock: '将选中且处于「待处理」的订单批量进入备货/打包，继续？',
+    unlock: '将选中且可退回的备货/打包订单批量退回待处理，继续？',
+    'logistics-warehouse': '将选中且处于备货/打包的订单批量标记为「已送往物流仓库」，继续？'
   };
 
   $(document).on('click', '[data-order-batch]', function (e) {

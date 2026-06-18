@@ -82,14 +82,16 @@ class OrderRefundPolicyService
         $stage = $result['stage'];
 
         if ($stage === OrderFulfillmentService::STAGE_S1) {
-            $result['allowed'] = true;
-            $result['refund_ratio'] = 1.0;
-            $result['policy_hint'] = '待处理阶段：全额退款（100%）。';
+            $processingStarted = trim((string) data_get($order->extra, 'processing_started_at', '')) !== '';
 
-            return $this->applyAmounts($result);
-        }
+            if (!$processingStarted) {
+                $result['allowed'] = true;
+                $result['refund_ratio'] = 1.0;
+                $result['policy_hint'] = '待处理阶段（未开始处理）：全额退款（100%）。';
 
-        if ($stage === OrderFulfillmentService::STAGE_S2) {
+                return $this->applyAmounts($result);
+            }
+
             $result['show_supplier_shortage'] = true;
             $exceeded = $this->waitingSupplierExceeded($order);
 
@@ -105,9 +107,15 @@ class OrderRefundPolicyService
 
             $result['allowed'] = true;
             $result['refund_ratio'] = $this->partialRefundRatio();
-            $result['policy_hint'] = '等待供应商配送未满 '.(int) config('order_refund.waiting_supplier_hours', 168).' 小时：收取 20% 取消费，退款 80%。';
+            $result['policy_hint'] = '待处理阶段（已开始处理）：收取 20% 取消费，退款 80%。';
 
             return $this->applyAmounts($result);
+        }
+
+        if ($stage === OrderFulfillmentService::STAGE_S2) {
+            $result['message'] = '订单阶段数据待同步，请刷新后重试。';
+
+            return $this->finishEvaluate($result, $strict);
         }
 
         if ($stage === OrderFulfillmentService::STAGE_S3) {

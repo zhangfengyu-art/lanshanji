@@ -5,20 +5,20 @@
   </div>
   <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
     <button type="button" class="btn btn-sm btn-warning" data-order-batch="start-processing">
-      <i class="fa fa-play"></i> 开始处理（S1→S2）
+      <i class="fa fa-play"></i> 标记开始处理
     </button>
     <button type="button" class="btn btn-sm btn-primary" data-order-batch="lock">
-      <i class="fa fa-cubes"></i> 进入备货/打包（→S3）
+      <i class="fa fa-cubes"></i> 进入备货/打包
     </button>
     <button type="button" class="btn btn-sm btn-default" data-order-batch="unlock">
-      <i class="fa fa-undo"></i> 退回上一阶段（S3）
+      <i class="fa fa-undo"></i> 退回待处理（从备货/打包）
     </button>
     <button type="button" class="btn btn-sm btn-info" data-order-batch="logistics-warehouse">
       <i class="fa fa-truck"></i> 标记送往物流仓库
     </button>
   </div>
   <p class="text-muted" style="margin: 8px 0 0; font-size: 12px;">
-    S1 待处理 · S2 处理中 · S3 备货/打包（含锁定/实拍图/送仓）· S4 已发货。各按钮仅对当前阶段符合条件的订单生效。列表「实拍图」列可逐单上传。
+    待处理 · 备货/打包（含实拍图/送仓）· 已发货。各按钮仅对当前阶段符合条件的订单生效。列表「实拍图」列可逐单上传。
   </p>
 </div>
 @endif

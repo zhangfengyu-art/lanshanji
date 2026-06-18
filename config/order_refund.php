@@ -2,7 +2,7 @@
 
 return [
     /*
-    | S1 待处理阶段：全额秒退（100%），防刷限制（按用户统计）
+    | S1 待处理阶段：未开始处理时可全额秒退（100%），防刷限制（按用户统计）
     */
     'instant' => [
         'window_hours' => (int) env('ORDER_INSTANT_REFUND_WINDOW_HOURS', 24),

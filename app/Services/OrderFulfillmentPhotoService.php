@@ -37,7 +37,7 @@ class OrderFulfillmentPhotoService
 
         $fulfillment = app(OrderFulfillmentService::class);
         $stage = $fulfillment->resolveStage($order);
-        if (in_array($stage, [OrderFulfillmentService::STAGE_S1, OrderFulfillmentService::STAGE_S2], true)) {
+        if ($stage === OrderFulfillmentService::STAGE_S1) {
             $fulfillment->enterStockPrep($order);
         }
     }

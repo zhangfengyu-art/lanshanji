@@ -112,6 +112,11 @@ class OrdersController extends Controller
     public function export(Request $request)
     {
         $scope = (string) $request->query('scope', 'all');
+        $legacyScopes = [
+            's1_s2' => 'pending',
+            's1_pending' => 'pending',
+        ];
+        $scope = $legacyScopes[$scope] ?? $scope;
         $scopeOptions = OrderAdminExportService::scopeOptions();
         if (!array_key_exists($scope, $scopeOptions)) {
             $scope = 'all';
@@ -132,10 +137,10 @@ class OrdersController extends Controller
 
     public function exportStockPrep(Request $request)
     {
-        $scope = (string) $request->query('scope', 'pending_fulfillment');
+        $scope = (string) $request->query('scope', 'pending');
         $scopeOptions = OrderStockPrepExportService::scopeOptions();
         if (!array_key_exists($scope, $scopeOptions)) {
-            $scope = 'pending_fulfillment';
+            $scope = 'pending';
         }
 
         $fulfillment = app(OrderFulfillmentService::class);
@@ -147,7 +152,7 @@ class OrdersController extends Controller
             function ($emitRow) use ($scope, $fulfillment) {
                 OrderStockPrepExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
             },
-            OrderStockPrepExportService::pdfExportOptions($scopeLabel)
+            OrderStockPrepExportService::pdfExportOptions($scope, $scopeLabel)
         );
     }
 
@@ -188,7 +193,7 @@ class OrdersController extends Controller
     {
         return $this->handleFulfillmentAction($order, function () use ($order, $fulfillment) {
             $fulfillment->startProcessing($order);
-        }, '订单已开始处理（S2），用户不可再自助改址。');
+        }, '订单已标记开始处理，用户不可再自助改址。');
     }
 
     public function lockOrder(Order $order, OrderFulfillmentService $fulfillment)
@@ -202,7 +207,7 @@ class OrdersController extends Controller
     {
         return $this->handleFulfillmentAction($order, function () use ($order, $fulfillment) {
             $fulfillment->revertToPending($order);
-        }, '订单已退回待处理（S1），用户可继续自助改址。');
+        }, '订单已恢复为未受理状态，用户可继续自助改址。');
     }
 
     public function unlockOrder(Order $order, OrderFulfillmentService $fulfillment)
@@ -499,7 +504,6 @@ class OrdersController extends Controller
                     $colors = [
                         OrderFulfillmentService::STAGE_S0 => 'default',
                         OrderFulfillmentService::STAGE_S1 => 'default',
-                        OrderFulfillmentService::STAGE_S2 => 'warning',
                         OrderFulfillmentService::STAGE_S3 => 'info',
                         OrderFulfillmentService::STAGE_S4 => 'success',
                     ];
