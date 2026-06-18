@@ -14,17 +14,4 @@
     $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> 上传中');
     this.form.submit();
   });
-
-  $(document).on('click', '[data-order-fp-batch-trigger]', function () {
-    $(this).closest('form').find('[data-order-fp-batch-input]').trigger('click');
-  });
-
-  $(document).on('change', '[data-order-fp-batch-input]', function () {
-    if (!this.files || !this.files.length) {
-      return;
-    }
-    var $btn = $(this).closest('form').find('[data-order-fp-batch-trigger]');
-    $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> 导入中…');
-    this.form.submit();
-  });
 })();

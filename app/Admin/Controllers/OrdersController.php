@@ -6,6 +6,7 @@ use App\Exceptions\InternalException;
 use App\Models\Order;
 use App\Services\AdminOrderPdfExport;
 use App\Services\OrderAdminExportService;
+use App\Services\OrderStockPrepExportService;
 use App\Services\ShippingModeService;
 use App\Services\OrderFulfillmentPhotoService;
 use App\Services\OrderFulfillmentService;
@@ -181,46 +182,6 @@ class OrdersController extends Controller
         return redirect()
             ->back()
             ->with('success', admin_flash_success('实拍照片已上传；订单已进入备货/打包阶段（S3），用户不可再自助改址。'));
-    }
-
-    public function batchUploadFulfillmentPhotos(Request $request, OrderFulfillmentPhotoService $photos)
-    {
-        $this->validate($request, [
-            'photos' => ['required', 'array', 'min:1'],
-            'photos.*' => ['image', 'max:10240'],
-        ], [], [
-            'photos' => '实拍照片',
-            'photos.*' => '实拍照片',
-        ]);
-
-        $result = $photos->batchImport((array) $request->file('photos', []));
-
-        $parts = [];
-        if ($result['success'] > 0) {
-            $parts[] = '成功导入 '.$result['success'].' 张';
-        }
-        if (count($result['skipped']) > 0) {
-            $parts[] = '跳过 '.count($result['skipped']).' 张';
-        }
-        if (count($result['failed']) > 0) {
-            $parts[] = '失败 '.count($result['failed']).' 张';
-        }
-
-        $detail = array_merge($result['failed'], $result['skipped']);
-        $message = $parts ? implode('，', $parts) : '未处理任何图片';
-        if (count($detail) > 0) {
-            $message .= '：'.implode('；', array_slice($detail, 0, 5));
-            if (count($detail) > 5) {
-                $message .= '…';
-            }
-        }
-
-        $flashKey = ($result['success'] > 0 || count($result['skipped']) > 0) ? 'success' : 'error';
-        $flashFn = $flashKey === 'success' ? 'admin_flash_success' : 'admin_flash_error';
-
-        return redirect()
-            ->back()
-            ->with($flashKey, $flashFn($message));
     }
 
     public function startProcessing(Order $order, OrderFulfillmentService $fulfillment)
@@ -581,7 +542,6 @@ class OrdersController extends Controller
                     ]));
                 }
                 if (is_site_mode_a()) {
-                    $tools->append(view('admin.orders._fulfillment_photo_batch_import'));
                     $tools->append(view('admin.orders._batch_tools'));
                 }
             });
