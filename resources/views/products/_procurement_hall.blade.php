@@ -69,9 +69,6 @@
               @if($category !== '')
                 <span class="proc-tag is-category">{{ $category }}</span>
               @endif
-              @if($isDemoData)
-                <span class="proc-tag is-demo">演示</span>
-              @endif
               <span class="proc-tag {{ $statusLabel['class'] }}">{{ $statusLabel['text'] }}</span>
             </span>
           </div>
