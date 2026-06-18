@@ -79,73 +79,7 @@
   .status-pill.is-info { background: #e8f1ff; color: #1d4ed8; }
   .status-pill.is-pending { background: #fff4e5; color: #b45309; }
   .status-pill.is-success { background: #e8f8ef; color: #0f7a3f; }
-</style>
-<style>
   .status-pill.is-closed { background: #f4f4f5; color: #52525b; }
-
-  .fulfillment-photo-kv {
-    display: block !important;
-  }
-
-  .fulfillment-photo-kv .v {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .fulfillment-photo-thumb {
-    max-width: 100%;
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-    background: #f8fafc;
-  }
-
-  .fulfillment-photo-link {
-    display: block;
-    border-radius: 8px;
-    overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .fulfillment-photo-link:hover .fulfillment-photo-thumb {
-    transform: scale(1.02);
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
-  }
-
-  .fulfillment-photo-download {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6px 12px;
-    border-radius: 6px;
-    background: #f3f4f6;
-    border: 1px solid #d1d5db;
-    color: #334155;
-    font-size: 12px;
-    font-weight: 500;
-    text-decoration: none;
-    transition: all 0.2s ease;
-  }
-
-  .fulfillment-photo-download:hover {
-    background: #e5e7eb;
-    border-color: #9ca3af;
-    color: #1f2937;
-    text-decoration: none;
-  }
-
-  .fulfillment-photo-placeholder {
-    display: inline-block;
-    padding: 8px 10px;
-    border-radius: 8px;
-    background: #f8fafc;
-    border: 1px dashed #cbd5e1;
-    color: #64748b;
-    font-size: 12px;
-  }
 </style>
 
 
