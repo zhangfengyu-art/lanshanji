@@ -4,7 +4,7 @@
   $shipCompany = trim((string) data_get($order->ship_data, 'express_company', ''));
   $isPending = $order->ship_status === \App\Models\Order::SHIP_STATUS_PENDING;
   $carriers = site_express_carrier_options();
-  $defaultCarrier = $carriers[0] ?? 'EMS自缴税';
+  $defaultCarrier = $carriers[0];
   $mode = trim((string) data_get($order->extra, 'fee_details.shipping_mode', data_get($order->extra, 'shipping_mode', '')));
   if ($mode === \App\Services\ShippingModeService::MODE_EMS) {
       foreach ($carriers as $carrier) {

@@ -405,7 +405,15 @@ function apply_list_sort_order($query, $table = null)
 
 function site_express_carrier_options()
 {
-    return config('site.express_carriers_a', ['EMS自缴税', '顺丰']);
+    $options = config('site.express_carriers_a', ['EMS自缴税', '顺丰']);
+
+    if (!is_array($options) || $options === []) {
+        return ['EMS自缴税', '顺丰'];
+    }
+
+    return array_values(array_filter($options, function ($value) {
+        return trim((string) $value) !== '';
+    })) ?: ['EMS自缴税', '顺丰'];
 }
 
 /**

@@ -347,7 +347,7 @@ class OrdersController extends Controller
             if (is_site_mode_a()) {
                 $allowed = site_express_carrier_options();
                 if (!in_array($expressCompany, $allowed, true)) {
-                    $expressCompany = $allowed[0] ?? $expressCompany;
+                    $expressCompany = $allowed[0];
                 }
             }
 
@@ -358,6 +358,8 @@ class OrdersController extends Controller
                 $expressNo,
                 '物流单号已保存，订单已标记为已发货'
             );
+        } catch (ValidationException $e) {
+            return redirect()->back()->withInput()->withErrors($e->errors());
         } catch (InvalidRequestException $e) {
             return redirect()->back()->with('error', admin_flash_error($e->getMessage()));
         }
@@ -412,7 +414,7 @@ class OrdersController extends Controller
             }
         }
 
-        return $options[0] ?? 'EMS自缴税';
+        return $options[0];
     }
 
     protected function grid()
