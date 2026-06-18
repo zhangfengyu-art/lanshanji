@@ -74,7 +74,7 @@ class OrderAdminExportService
         return [
             '订单流水号',
             '支付时间',
-            '买家昵称',
+            '买家姓名',
             '商品名称',
             '数量',
             '单价(日元)',
@@ -141,10 +141,12 @@ class OrderAdminExportService
 
     protected static function sharedOrderCells(Order $order)
     {
+        $buyerName = trim((string) data_get($order->address, 'contact_name', ''));
+
         return [
             $order->no,
             optional($order->paid_at)->format('Y-m-d H:i:s'),
-            optional($order->user)->name ?: '—',
+            $buyerName !== '' ? $buyerName : '—',
         ];
     }
 
