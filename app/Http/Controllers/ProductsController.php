@@ -492,15 +492,21 @@ class ProductsController extends Controller
             ->whereNotNull('paid_at')
             ->where('paid_at', '>=', now()->subDays(7))
             ->count();
-        $activeAgents = (int) ProcurementOrder::query()
+        $activeAgents = 0;
+        $activeAgentsQuery = ProcurementOrder::query()
             ->whereIn('proxy_status', [
                 ProcurementOrder::STATUS_ACCEPTED,
                 ProcurementOrder::STATUS_SOURCING,
                 ProcurementOrder::STATUS_SHIPPED,
-            ])
-            ->whereNotNull('accepted_by')
-            ->distinct()
-            ->count('accepted_by');
+            ]);
+        if (Schema::hasColumn('procurement_orders', 'accepted_by')) {
+            $activeAgents = (int) (clone $activeAgentsQuery)
+                ->whereNotNull('accepted_by')
+                ->distinct()
+                ->count('accepted_by');
+        } else {
+            $activeAgents = (int) (clone $activeAgentsQuery)->count();
+        }
 
         $recentDeals = Order::query()
             ->whereNotNull('paid_at')
