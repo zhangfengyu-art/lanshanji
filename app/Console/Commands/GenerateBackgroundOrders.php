@@ -4,42 +4,37 @@ namespace App\Console\Commands;
 
 use App\Models\ProcurementOrder;
 use App\Models\ProcurementReferenceItem;
+use App\Services\ProcurementNarrativeService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
 
 class GenerateBackgroundOrders extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'demo:generate-background-orders {--count=1 : Number of mock orders to generate}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Generate demo mock procurement orders and auto-transition a subset of pending orders';
 
     public function handle()
     {
         if (!$this->isDemoEnabled()) {
             $this->info('Skip: DEMO_MODE is disabled and environment is not local/testing.');
+
             return 0;
         }
 
         if (!Schema::hasTable('procurement_orders') || !Schema::hasTable('procurement_reference_items')) {
             $this->warn('Skip: required tables are missing.');
+
             return 0;
         }
 
         $count = max(1, (int) $this->option('count'));
+        $narratives = app(ProcurementNarrativeService::class);
+        $usedTemplateIndices = $this->recentTemplateIndicesInHall();
 
         $created = 0;
         for ($i = 0; $i < $count; $i++) {
-            if ($this->generateOneMockOrder()) {
+            if ($this->generateOneMockOrder($narratives, $usedTemplateIndices)) {
                 $created++;
             }
         }
@@ -51,45 +46,65 @@ class GenerateBackgroundOrders extends Command
         return 0;
     }
 
-    protected function generateOneMockOrder()
+    protected function generateOneMockOrder(ProcurementNarrativeService $narratives, array &$usedTemplateIndices)
     {
         $ref = ProcurementReferenceItem::query()->inRandomOrder()->first();
         if (!$ref) {
             $this->warn('Skip create: no procurement reference items found.');
+
             return false;
         }
 
-        $base = (float) $ref->reference_price;
-        if ($base <= 0) {
-            $base = (float) random_int(1200, 9800);
-        }
-
-        // Keep a controlled price variance for demo realism.
-        $multiplier = random_int(85, 125) / 100;
-        $budgetAmount = round(max(100, $base * $multiplier), 2);
+        $jitter = random_int(95, 105) / 100;
+        $budgetAmount = round(max(2000, min(50000, (float) $ref->reference_price * $jitter)), 2);
+        $built = $narratives->build((string) $ref->name, $budgetAmount, null, $usedTemplateIndices);
+        $usedTemplateIndices[] = $built['template_index'];
 
         $order = new ProcurementOrder();
         $order->item_name = (string) $ref->name;
-        $order->item_image = (string) $ref->image_url;
+        $order->item_image = '';
         $order->buyer_nickname = $this->randomNickname();
         $order->proxy_status = ProcurementOrder::STATUS_PENDING;
-        $order->order_narrative = $this->buildNarrative((string) $ref->name, $budgetAmount);
+        $order->order_narrative = $built['text'];
         $order->budget_amount = $budgetAmount;
         $order->extra = [
             'source' => 'background_pulse',
             'reference_item_id' => (int) $ref->id,
             'reference_category' => (string) $ref->category,
+            'narrative_template_index' => $built['template_index'],
             'is_demo_data' => true,
             'generated_at' => now()->toDateTimeString(),
         ];
         $order->save();
 
-        // Prefer hard column for indexing/filtering if migration has already added it.
         if (Schema::hasColumn('procurement_orders', 'is_mock')) {
             ProcurementOrder::query()->where('id', $order->id)->update(['is_mock' => true]);
         }
 
         return true;
+    }
+
+    /**
+     * 读取大厅近期订单已用话术模板，避免新生成单与首页重复。
+     *
+     * @return int[]
+     */
+    protected function recentTemplateIndicesInHall()
+    {
+        $orders = ProcurementOrder::query()
+            ->orderBy('created_at', 'desc')
+            ->limit(48)
+            ->get(['extra']);
+
+        $indices = [];
+        foreach ($orders as $order) {
+            $idx = data_get($order->extra, 'narrative_template_index');
+            if ($idx !== null && $idx !== '') {
+                $indices[] = (int) $idx;
+            }
+        }
+
+        return $indices;
     }
 
     protected function autoTransitionMockOrders()
@@ -99,7 +114,6 @@ class GenerateBackgroundOrders extends Command
         if (Schema::hasColumn('procurement_orders', 'is_mock')) {
             $query->where('is_mock', true);
         } else {
-            // Fallback when is_mock column is not available yet.
             $query->whereNull('order_no');
         }
 
@@ -134,38 +148,13 @@ class GenerateBackgroundOrders extends Command
     protected function randomNickname()
     {
         $pool = [
-            '小张在大阪',
-            '抹茶控',
-            '浅草散步者',
-            '东京夜猫子',
-            '神户买手',
-            '北海道小队',
-            '奈良鹿友',
-            '冲绳海风',
-            '秋叶原手办党',
-            '京都慢生活',
-            '代官山通勤人',
-            '名古屋日常',
-            '福冈甜品脑袋',
-            '札幌雪人',
-            '湘南海边',
+            '小张在大阪', '抹茶控', '浅草散步者', '东京夜猫子', '神户买手',
+            '北海道小队', '奈良鹿友', '冲绳海风', '秋叶原手办党', '京都慢生活',
+            '代官山通勤人', '名古屋日常', '福冈甜品脑袋', '札幌雪人', '湘南海边',
+            '大阪吃货', '横滨通勤族', '广岛柠檬', '金泽和果子', '长崎华人',
         ];
 
         return $pool[array_rand($pool)];
-    }
-
-    protected function buildNarrative($itemName, $amount)
-    {
-        $templates = [
-            '演示求购：想收 %s，预算约 JPY %s，优先近期可发货。',
-            '演示场景：求购 %s，预算 JPY %s 左右，可接受轻微盒损。',
-            '压测样本：需要 %s，预算 JPY %s，要求正品可溯源。',
-            'Demo 单：想带一件 %s，预算 JPY %s，支持EMS直邮。',
-        ];
-
-        $template = $templates[array_rand($templates)];
-
-        return sprintf($template, $itemName, number_format((float) $amount, 2, '.', ''));
     }
 
     protected function isDemoEnabled()

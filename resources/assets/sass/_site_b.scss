@@ -436,6 +436,10 @@
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+.proc-card--text {
+  border-top: 3px solid #147a72;
+}
+
 .proc-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 8px 20px rgba(15, 45, 60, 0.1);
@@ -454,7 +458,11 @@
 }
 
 .proc-body {
-  padding: 14px;
+  padding: 16px;
+}
+
+.proc-card--text .proc-body {
+  padding-top: 14px;
 }
 
 .proc-meta {
@@ -497,6 +505,11 @@
 .proc-tag.is-info {
   background: #e8f3fb;
   color: #1f5f8b;
+}
+
+.proc-tag.is-category {
+  background: #edf5f3;
+  color: #0d4f5c;
 }
 
 .proc-title {

@@ -58,34 +58,17 @@
         $status = (int) $order->proxy_status;
         $statusLabel = isset($statusMeta[$status]) ? $statusMeta[$status] : ['text' => '待接单', 'class' => 'is-success'];
         $isDemoData = (bool) data_get($order, 'is_mock', false) || (bool) data_get($order, 'extra.is_demo_data', false);
-        $isReferenceSeed = (bool) data_get($order, 'extra.is_reference_seed', false);
-        $imageRaw = (string) data_get($order, 'item_image', '');
-        if ($imageRaw === '') {
-          $imageSrc = asset('images/default.png');
-        } elseif (\Illuminate\Support\Str::startsWith($imageRaw, ['http://', 'https://', '//'])) {
-          $imageSrc = $imageRaw;
-        } elseif (\Illuminate\Support\Str::startsWith($imageRaw, '/')) {
-          $imageSrc = url($imageRaw);
-        } elseif (\Illuminate\Support\Str::startsWith($imageRaw, 'storage/')) {
-          $imageSrc = asset($imageRaw);
-        } elseif (\Illuminate\Support\Str::startsWith($imageRaw, 'references/')) {
-          $imageSrc = asset('storage/' . $imageRaw);
-        } else {
-          $imageSrc = asset($imageRaw);
-        }
+        $category = trim((string) data_get($order, 'extra.category', data_get($order, 'extra.reference_category', '')));
         $buyUrl = (string) data_get($order, 'buy_url', route('products.index', ['search' => (string) $order->item_name]));
       @endphp
 
-      <article class="proc-card" style="--b-stagger: {{ $index }};">
-        <div class="proc-media">
-          <img src="{{ $imageSrc }}" alt="{{ $order->item_name }}" loading="lazy" decoding="async" referrerpolicy="no-referrer">
-        </div>
+      <article class="proc-card proc-card--text" style="--b-stagger: {{ $index }};">
         <div class="proc-body">
           <div class="proc-meta">
             <span class="proc-nickname">{{ $maskedNickname }}</span>
             <span class="proc-tags">
-              @if($isReferenceSeed)
-                <span class="proc-tag is-ref">参考</span>
+              @if($category !== '')
+                <span class="proc-tag is-category">{{ $category }}</span>
               @endif
               @if($isDemoData)
                 <span class="proc-tag is-demo">演示</span>

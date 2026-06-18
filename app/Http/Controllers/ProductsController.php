@@ -10,7 +10,7 @@ use App\Models\ProductSku;
 use App\Models\OrderItem;
 use App\Models\Category;
 use App\Models\ProcurementOrder;
-use App\Models\ProcurementReferenceItem;
+use App\Services\ProcurementNarrativeService;
 use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
@@ -407,27 +407,7 @@ class ProductsController extends Controller
             ->limit(42)
             ->get();
 
-        $referenceSeeds = ProcurementReferenceItem::query()
-            ->orderBy('id', 'desc')
-            ->limit(6)
-            ->get()
-            ->map(function (ProcurementReferenceItem $item) {
-                return (object) [
-                    'item_name' => (string) $item->name,
-                    'item_image' => (string) $item->image_url,
-                    'buyer_nickname' => '参考用户',
-                    'proxy_status' => ProcurementOrder::STATUS_PENDING,
-                    'order_narrative' => sprintf('参考商品分类：%s，等待真实用户发起求购。', (string) ($item->category ?: '未分类')),
-                    'budget_amount' => (float) $item->reference_price,
-                    'extra' => [
-                        'is_reference_seed' => true,
-                    ],
-                ];
-            });
-
-        if ($referenceSeeds->isNotEmpty()) {
-            $procurementOrders = $procurementOrders->concat($referenceSeeds)->take(48)->values();
-        }
+        $procurementOrders = $this->ensureUniqueHallNarratives($procurementOrders);
 
         $procurementOrders = $procurementOrders->map(function ($order) {
             $itemName = trim((string) data_get($order, 'item_name', ''));
@@ -449,6 +429,52 @@ class ProductsController extends Controller
                 'order' => '',
             ],
         ];
+    }
+
+    /**
+     * 首页展示的话术互不重复（对历史重复数据做展示层修正）。
+     */
+    protected function ensureUniqueHallNarratives($orders)
+    {
+        $narratives = app(ProcurementNarrativeService::class);
+        $seenTexts = [];
+        $usedTemplateIndices = [];
+
+        return $orders->map(function ($order) use ($narratives, &$seenTexts, &$usedTemplateIndices) {
+            $text = trim((string) data_get($order, 'order_narrative', ''));
+            $templateIndex = data_get($order->extra, 'narrative_template_index');
+
+            if ($templateIndex !== null && $templateIndex !== '') {
+                $usedTemplateIndices[] = (int) $templateIndex;
+            }
+
+            if ($text !== '' && !in_array($text, $seenTexts, true)) {
+                $seenTexts[] = $text;
+
+                return $order;
+            }
+
+            $itemName = trim((string) data_get($order, 'item_name', '日本人气商品'));
+            $budget = (float) data_get($order, 'budget_amount', 0);
+            if ($budget <= 0) {
+                $budget = 5000;
+            }
+
+            $built = $narratives->build($itemName, $budget, null, $usedTemplateIndices);
+            $usedTemplateIndices[] = $built['template_index'];
+            $seenTexts[] = $built['text'];
+
+            $order->order_narrative = $built['text'];
+            if (is_array($order->extra)) {
+                $order->extra['narrative_template_index'] = $built['template_index'];
+            } elseif (is_object($order)) {
+                $extra = (array) ($order->extra ?: []);
+                $extra['narrative_template_index'] = $built['template_index'];
+                $order->extra = $extra;
+            }
+
+            return $order;
+        });
     }
 
     protected function buildBSiteMarketingData()
