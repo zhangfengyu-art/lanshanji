@@ -458,8 +458,9 @@ class OrdersController extends Controller
             }
 
             $grid->no('订单流水号');
-            $grid->column('buyer_label', '买家昵称')->display(function () {
-                $label = e($this->buyer_label);
+            $grid->column('buyer_real_name', '买家真实姓名')->display(function () {
+                $name = trim((string) data_get($this->address, 'contact_name', ''));
+                $label = $name !== '' ? e($name) : '—';
                 if (!$this->user_id) {
                     return $label;
                 }
