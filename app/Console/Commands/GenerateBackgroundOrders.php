@@ -55,8 +55,8 @@ class GenerateBackgroundOrders extends Command
             return false;
         }
 
-        $jitter = random_int(95, 105) / 100;
-        $budgetAmount = round(max(2000, min(50000, (float) $ref->reference_price * $jitter)), 2);
+        $jitter = random_int(-150, 150);
+        $budgetAmount = (int) max(2000, min(50000, (int) round((float) $ref->reference_price) + $jitter));
         $built = $narratives->build((string) $ref->name, $budgetAmount, null, $usedTemplateIndices);
         $usedTemplateIndices[] = $built['template_index'];
 

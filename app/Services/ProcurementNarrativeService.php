@@ -37,7 +37,7 @@ class ProcurementNarrativeService
             $templateIndex = (int) $candidates[array_rand($candidates)];
         }
 
-        $formattedAmount = number_format(round($amount, 2), 2);
+        $formattedAmount = $this->formatYenAmount($amount);
         $text = sprintf($templates[$templateIndex], $itemName, $formattedAmount);
 
         return [
@@ -104,5 +104,11 @@ class ProcurementNarrativeService
         }
 
         return array_values(array_unique($pool));
+    }
+
+    /** 话术与展示用整数日元，不带小数。 */
+    public function formatYenAmount(float $amount): string
+    {
+        return (string) (int) round($amount);
     }
 }

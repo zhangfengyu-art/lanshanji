@@ -103,27 +103,55 @@ class BSiteReferenceCatalog
     public static function expandedItems(): array
     {
         $items = [];
-        $index = 0;
-        $categories = self::categoriesWithNames();
-        $total = 0;
-        foreach ($categories as $names) {
-            $total += count($names);
-        }
-        $maxIndex = max(1, $total - 1);
 
-        foreach ($categories as $category => $names) {
+        foreach (self::categoriesWithNames() as $category => $names) {
             foreach ($names as $name) {
-                $price = 2000 + (int) round($index * 48000 / $maxIndex);
-                $price = max(2000, min(50000, $price));
                 $items[] = [
                     'name' => $name,
                     'category' => $category,
-                    'reference_price' => (float) $price,
+                    'reference_price' => (float) self::realisticPriceFor($category, $name),
                 ];
-                $index++;
             }
         }
 
         return $items;
+    }
+
+    /**
+     * 各品类真实日元区间（覆盖 2000–50000 用于 A 站影子单匹配，低价品用于大厅展示）。
+     *
+     * @return array<string, array{0: int, 1: int}>
+     */
+    protected static function categoryPriceRanges(): array
+    {
+        return [
+            '零食菓子' => [580, 4200],
+            '美妆护肤' => [1280, 9800],
+            '动漫周边' => [1980, 38000],
+            '家居百货' => [680, 4500],
+            '服饰配件' => [990, 12800],
+            '数码配件' => [1980, 9800],
+            '文具杂货' => [350, 1200],
+            '药妆保健' => [380, 4800],
+            '厨房用品' => [2280, 22000],
+            '宠物用品' => [450, 3800],
+            '户外运动' => [5800, 48000],
+            '酒饮咖啡' => [650, 12000],
+        ];
+    }
+
+    /**
+     * 按品类区间 + 商品名哈希生成稳定、贴近现实的参考价（整数日元）。
+     */
+    public static function realisticPriceFor(string $category, string $name): int
+    {
+        $ranges = self::categoryPriceRanges();
+        $range = $ranges[$category] ?? [2000, 8000];
+        $min = (int) $range[0];
+        $max = (int) $range[1];
+        $span = max(1, $max - $min);
+        $hash = hexdec(substr(md5($category.'|'.$name), 0, 6));
+
+        return $min + ($hash % $span);
     }
 }
