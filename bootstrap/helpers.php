@@ -416,6 +416,13 @@ function site_express_carrier_options()
     })) ?: ['EMS自缴税', '顺丰'];
 }
 
+function site_express_default_carrier()
+{
+    $options = site_express_carrier_options();
+
+    return $options[0] ?? 'EMS自缴税';
+}
+
 /**
  * 日元金额展示：420.00日元
  */

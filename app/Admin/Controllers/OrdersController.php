@@ -330,7 +330,7 @@ class OrdersController extends Controller
                 throw new InvalidRequestException('该订单已退款，无法发货');
             }
 
-            $data = $this->validate($request, [
+            $this->validate($request, [
                 'express_no' => ['required', 'string', 'max:255'],
                 'express_company' => ['nullable', 'string', 'max:255'],
             ], [], [
@@ -338,8 +338,12 @@ class OrdersController extends Controller
                 'express_company' => is_site_mode_b() ? '代购人' : '物流公司',
             ]);
 
-            $expressNo = trim($data['express_no']);
-            $expressCompany = trim((string) data_get($data, 'express_company', ''));
+            $expressNo = trim((string) $request->input('express_no', ''));
+            if ($expressNo === '') {
+                throw new InvalidRequestException(is_site_mode_b() ? '请填写转寄单号' : '请填写物流单号');
+            }
+
+            $expressCompany = trim((string) $request->input('express_company', ''));
             if ($expressCompany === '') {
                 $expressCompany = $this->defaultExpressCarrierForOrder($order);
             }
@@ -347,7 +351,7 @@ class OrdersController extends Controller
             if (is_site_mode_a()) {
                 $allowed = site_express_carrier_options();
                 if (!in_array($expressCompany, $allowed, true)) {
-                    $expressCompany = $allowed[0];
+                    $expressCompany = site_express_default_carrier();
                 }
             }
 
@@ -361,7 +365,17 @@ class OrdersController extends Controller
         } catch (ValidationException $e) {
             return redirect()->back()->withInput()->withErrors($e->errors());
         } catch (InvalidRequestException $e) {
-            return redirect()->back()->with('error', admin_flash_error($e->getMessage()));
+            return redirect()->back()->withInput()->with('error', admin_flash_error($e->getMessage()));
+        } catch (\Throwable $e) {
+            \Log::error('快捷发货失败', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return redirect()->back()->withInput()->with('error', admin_flash_error('发货失败：'.$e->getMessage()));
         }
     }
 
@@ -393,7 +407,15 @@ class OrdersController extends Controller
             && $wasPending
             && $order->user
             && is_site_mode_a()) {
-            $order->user->notify(new \App\Notifications\OrderShippedNotification($order));
+            try {
+                $order->user->notify(new \App\Notifications\OrderShippedNotification($order));
+            } catch (\Throwable $e) {
+                \Log::warning('发货通知邮件发送失败', [
+                    'order_id' => $order->id,
+                    'user_id' => $order->user_id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
 
         return redirect()
@@ -414,7 +436,7 @@ class OrdersController extends Controller
             }
         }
 
-        return $options[0];
+        return site_express_default_carrier();
     }
 
     protected function grid()
