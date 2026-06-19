@@ -20,6 +20,7 @@ class AdminOrderTableHtmlBuilder
         $qtyColumns = (array) ($options['qty_columns'] ?? []);
         $badgeColumns = (array) ($options['badge_columns'] ?? [2]);
         $wrapColumns = (array) ($options['wrap_columns'] ?? []);
+        $largeTextColumns = (array) ($options['large_text_columns'] ?? []);
         $columnWidths = (array) ($options['column_widths'] ?? []);
         $columnWidthsMm = (array) ($options['column_widths_mm'] ?? []);
         $footerNote = (string) ($options['footer_note'] ?? '');
@@ -51,7 +52,7 @@ class AdminOrderTableHtmlBuilder
         }
 
         $html = '<html><head><meta charset="UTF-8">';
-        $html .= static::buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight, $columnWidthsMm, $wrapColumns);
+        $html .= static::buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight, $columnWidthsMm, $wrapColumns, $largeTextColumns);
         $html .= '</head><body class="'.($isPdfStyle ? 'export-pdf' : 'export-default').'">';
 
         if ($titleNote !== '') {
@@ -92,6 +93,7 @@ class AdminOrderTableHtmlBuilder
             $qtyColumns,
             $badgeColumns,
             $wrapColumns,
+            $largeTextColumns,
             $columnWidthsMm,
             $imageDir,
             $imageMaxSize,
@@ -133,6 +135,9 @@ class AdminOrderTableHtmlBuilder
                 }
                 if (in_array($index, $wrapColumns, true)) {
                     $classes[] = 'cell-wrap';
+                }
+                if (in_array($index, $largeTextColumns, true)) {
+                    $classes[] = 'cell-title-text';
                 }
 
                 $classAttr = $classes !== [] ? ' class="'.implode(' ', $classes).'"' : '';
@@ -267,8 +272,9 @@ class AdminOrderTableHtmlBuilder
         return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
 
-    protected static function buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight, array $columnWidthsMm = [], array $wrapColumns = [])
+    protected static function buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight, array $columnWidthsMm = [], array $wrapColumns = [], array $largeTextColumns = [])
     {
+        $titleFontSize = $tableFontSize + 4;
         $css = '<style>';
         if ($isPdfStyle) {
             $css .= 'body.export-pdf{margin:0;padding:0;font-family:"sans-serif";color:#1a1a1a;font-size:'.$tableFontSize.'px;}'
@@ -279,6 +285,7 @@ class AdminOrderTableHtmlBuilder
                 .'table.export-table th{background:#2f5597;color:#fff;padding:8px 6px;font-weight:bold;text-align:center;border:1px solid #244a82;font-size:'.($tableFontSize - 1).'px;line-height:1.3;}'
                 .'table.export-table td{border:1px solid #c5ced8;padding:8px 6px;vertical-align:middle;line-height:1.4;word-wrap:break-word;font-size:'.$tableFontSize.'px;}'
                 .'td.cell-wrap{word-break:break-all;overflow-wrap:anywhere;white-space:normal;padding:6px 4px;}'
+                .'td.cell-title-text{font-size:'.$titleFontSize.'px;font-weight:600;line-height:1.35;}'
                 .'tr.row-even td{background:#ffffff;}'
                 .'tr.row-alt td{background:#f7f9fc;}'
                 .'tr.row-total td{background:#e8eef7;font-weight:bold;border-top:2px solid #2f5597;font-size:'.($tableFontSize + 1).'px;}'

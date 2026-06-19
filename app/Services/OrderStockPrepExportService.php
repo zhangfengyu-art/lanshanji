@@ -80,6 +80,7 @@ class OrderStockPrepExportService
             'numeric_columns' => [2, 3, 4],
             'center_columns' => [1, 2, 3, 4, 6],
             'badge_columns' => [1],
+            'large_text_columns' => [0],
             'column_widths_mm' => ['72mm', '22mm', '18mm', '22mm', '26mm', '44mm', '14mm'],
             'title_note' => '烟草备货表 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
             'pdf_title' => '烟草备货表',
@@ -112,6 +113,7 @@ class OrderStockPrepExportService
             'checkbox_cell_size' => 48,
             'column_widths' => ['28%', '10%', '9%', '11%', '12%', '25%', '5%'],
             'qty_columns' => [2],
+            'large_text_columns' => [0],
             'enable_print_css' => true,
             'footer_note' => '请解压本 ZIP 后，用 Excel 或 WPS 打开「备货表.html」，打印前可在浏览器中预览。'
                 .'本表汇总香烟、加热烟、手卷烟丝按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。'

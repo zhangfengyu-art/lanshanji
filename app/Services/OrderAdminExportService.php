@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class OrderAdminExportService
 {
     /** @var int[] */
-    const TEXT_COLUMN_INDEXES = [0, 16];
+    const TEXT_COLUMN_INDEXES = [0, 15];
 
     /** @var int[] */
     const IMAGE_COLUMN_INDEXES = [6];
@@ -98,7 +98,6 @@ class OrderAdminExportService
             '香烟件数',
             '香烟均价(日元)',
             '烟丝件数',
-            '烟丝均价(日元)',
             '订单备注',
             '退款状态',
             '订单金额(日元)',
@@ -139,7 +138,7 @@ class OrderAdminExportService
                 (int) $item->amount,
                 $item->price,
                 $imageUrl,
-            ], self::tailOrderCells($order, $fee, $mode, $pasteLine, $tobaccoStats, $item));
+            ], self::tailOrderCells($order, $fee, $mode, $pasteLine, $tobaccoStats));
         }
 
         return $rows;
@@ -156,7 +155,7 @@ class OrderAdminExportService
         ];
     }
 
-    protected static function tailOrderCells(Order $order, $fee, $mode, $pasteLine, array $tobaccoStats = null, $item = null)
+    protected static function tailOrderCells(Order $order, $fee, $mode, $pasteLine, array $tobaccoStats = null)
     {
         if ($tobaccoStats === null) {
             $tobaccoStats = self::tobaccoPurchaseStats($order);
@@ -168,35 +167,11 @@ class OrderAdminExportService
             self::formatTobaccoStatQty($tobaccoStats['cigarette_qty']),
             self::formatTobaccoStatAvg($tobaccoStats['cigarette_fee'], $tobaccoStats['cigarette_qty']),
             self::formatTobaccoStatQty($tobaccoStats['rolling_qty']),
-            self::formatRollingTobaccoRowAvg($item),
             $order->remark ?: '—',
             Order::$refundStatusMap[$order->refund_status] ?? $order->refund_status,
             $order->total_amount,
             $pasteLine,
         ];
-    }
-
-    /**
-     * 烟丝均价：仅对当前行手卷烟丝，按本行商品费 ÷ 本行件数计算。
-     */
-    protected static function formatRollingTobaccoRowAvg($item)
-    {
-        if (!$item || !$item->product) {
-            return '—';
-        }
-
-        if ((string) $item->product->tobacco_type !== OrderTobaccoLimitService::TYPE_ROLLING_TOBACCO) {
-            return '—';
-        }
-
-        $qty = (int) $item->amount;
-        if ($qty <= 0) {
-            return '—';
-        }
-
-        $lineFee = round((float) $item->price * $qty, 2);
-
-        return self::formatTobaccoStatAvg($lineFee, $qty);
     }
 
     /**
@@ -804,13 +779,13 @@ class OrderAdminExportService
         return [
             'text_columns' => self::TEXT_COLUMN_INDEXES,
             'image_columns' => self::IMAGE_COLUMN_INDEXES,
-            'numeric_columns' => [4, 5, 8, 9, 10, 11, 12, 15],
-            'center_columns' => [4, 7, 8, 9, 10, 11, 12, 14],
-            'wrap_columns' => [0, 2, 3, 16],
+            'numeric_columns' => [4, 5, 8, 9, 10, 11, 14],
+            'center_columns' => [4, 7, 8, 9, 10, 11, 13],
+            'wrap_columns' => [0, 2, 3, 15],
             'column_widths_mm' => [
                 '10mm', '15mm', '8mm', '22mm', '9mm', '10mm', '22mm',
                 '11mm', '11mm',
-                '8mm', '10mm', '8mm', '10mm',
+                '8mm', '10mm', '8mm',
                 '14mm', '10mm', '12mm', '16mm',
             ],
             'title_note' => '订单导出 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
