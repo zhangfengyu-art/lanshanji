@@ -11,13 +11,13 @@ use Carbon\Carbon;
 class OrderStockPrepExportService
 {
     /** @var int[] */
-    const TEXT_COLUMN_INDEXES = [1];
+    const TEXT_COLUMN_INDEXES = [0];
 
     /** @var int[] */
-    const IMAGE_COLUMN_INDEXES = [4];
+    const IMAGE_COLUMN_INDEXES = [5];
 
     /** @var int[] */
-    const CHECKBOX_COLUMN_INDEXES = [5];
+    const CHECKBOX_COLUMN_INDEXES = [6];
 
     public static function scopeOptions()
     {
@@ -44,10 +44,11 @@ class OrderStockPrepExportService
     public static function headers()
     {
         return [
-            '序号',
             '商品名称',
             '类型',
             '采购(包)',
+            '单价(日元)',
+            '合计(日元)',
             '商品图',
             '确认',
         ];
@@ -75,10 +76,11 @@ class OrderStockPrepExportService
             'text_columns' => self::TEXT_COLUMN_INDEXES,
             'image_columns' => self::IMAGE_COLUMN_INDEXES,
             'checkbox_columns' => self::CHECKBOX_COLUMN_INDEXES,
-            'qty_columns' => [3],
-            'numeric_columns' => [0, 3],
-            'center_columns' => [0, 2, 3, 5],
-            'column_widths_mm' => ['10mm', '108mm', '24mm', '22mm', '48mm', '14mm'],
+            'qty_columns' => [2],
+            'numeric_columns' => [2, 3, 4],
+            'center_columns' => [1, 2, 3, 4, 6],
+            'badge_columns' => [1],
+            'column_widths_mm' => ['72mm', '22mm', '18mm', '22mm', '26mm', '44mm', '14mm'],
             'title_note' => '烟草备货表 · '.$scopeLabel.' · '.date('Y-m-d H:i'),
             'pdf_title' => '烟草备货表',
             'style_mode' => 'pdf',
@@ -108,8 +110,8 @@ class OrderStockPrepExportService
             'image_jpeg_quality' => 92,
             'table_font_size' => 16,
             'checkbox_cell_size' => 48,
-            'column_widths' => ['5%', '42%', '10%', '10%', '28%', '5%'],
-            'qty_columns' => [3],
+            'column_widths' => ['28%', '10%', '9%', '11%', '12%', '25%', '5%'],
+            'qty_columns' => [2],
             'enable_print_css' => true,
             'footer_note' => '请解压本 ZIP 后，用 Excel 或 WPS 打开「备货表.html」，打印前可在浏览器中预览。'
                 .'本表汇总香烟、加热烟、手卷烟丝按包采购数量，不含用户地址与身份信息；已退款成功、已发货（S4）订单不计入。'
@@ -192,6 +194,7 @@ class OrderStockPrepExportService
                             'product' => $product,
                             'title' => (string) $product->title,
                             'tobacco_type_label' => (string) $product->tobacco_type_label,
+                            'unit_price' => round((float) $product->price, 2),
                             'qty' => 0,
                         ];
                     }
@@ -216,24 +219,29 @@ class OrderStockPrepExportService
 
         $index = 0;
         $totalPacks = 0;
+        $totalAmount = 0.0;
 
         foreach ($aggregates as $row) {
             $index++;
             $packs = (int) $row['qty'];
+            $unitPrice = round((float) $row['unit_price'], 2);
+            $lineTotal = round($unitPrice * $packs, 2);
             $totalPacks += $packs;
+            $totalAmount += $lineTotal;
 
             $emitRow([
-                $index,
                 $row['title'],
                 $row['tobacco_type_label'],
                 $packs,
+                self::formatJpyAmount($unitPrice),
+                self::formatJpyAmount($lineTotal),
                 OrderAdminExportService::imageLocalPathForProduct($row['product']),
                 '',
             ]);
         }
 
         if ($index === 0) {
-            $emitRow(['—', '（当前范围无香烟/加热烟/烟丝采购项）', '—', 0, '', '']);
+            $emitRow(['（当前范围无香烟/加热烟/烟丝采购项）', '—', 0, '—', '—', '', '']);
 
             return;
         }
@@ -241,11 +249,17 @@ class OrderStockPrepExportService
         $emitRow([
             '合计',
             $index.' 种商品',
-            '—',
             $totalPacks,
+            '—',
+            self::formatJpyAmount($totalAmount),
             '',
             '',
         ]);
+    }
+
+    protected static function formatJpyAmount($amount)
+    {
+        return number_format((float) $amount, 2, '.', '');
     }
 
     protected static function productIncludedInStockPrep($product)

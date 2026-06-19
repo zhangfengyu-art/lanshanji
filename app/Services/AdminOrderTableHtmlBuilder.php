@@ -18,6 +18,7 @@ class AdminOrderTableHtmlBuilder
         $numericColumns = (array) ($options['numeric_columns'] ?? []);
         $centerColumns = (array) ($options['center_columns'] ?? []);
         $qtyColumns = (array) ($options['qty_columns'] ?? []);
+        $badgeColumns = (array) ($options['badge_columns'] ?? [2]);
         $columnWidths = (array) ($options['column_widths'] ?? []);
         $columnWidthsMm = (array) ($options['column_widths_mm'] ?? []);
         $footerNote = (string) ($options['footer_note'] ?? '');
@@ -88,6 +89,7 @@ class AdminOrderTableHtmlBuilder
             $numericColumns,
             $centerColumns,
             $qtyColumns,
+            $badgeColumns,
             $columnWidthsMm,
             $imageDir,
             $imageMaxSize,
@@ -176,7 +178,7 @@ class AdminOrderTableHtmlBuilder
                 }
 
                 $text = (string) $cell;
-                if ($isPdfStyle && $index === 2 && !$isTotalRow) {
+                if ($isPdfStyle && in_array($index, $badgeColumns, true) && !$isTotalRow) {
                     $text = static::formatTypeBadge($text);
                     $rowHtml .= '<td'.$classAttr.' style="'.$style.'">'.$text.'</td>';
                 } else {
