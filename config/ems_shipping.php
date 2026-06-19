@@ -7,8 +7,8 @@
 return [
     'zone_label' => '第一区域（中国·中国台湾·韩国）',
     'max_billable_grams' => 16000,
-    // 结算计费时每件商品额外计入的包装重量（箱子、泡沫等），单位：克
-    'settlement_packaging_grams_per_unit' => 100,
+    // 结算计费时整单额外计入的包装重量（箱子、泡沫等），单位：克
+    'settlement_packaging_grams_per_order' => 100,
     'tiers' => [
         ['max_grams' => 500, 'fee' => 1450],
         ['max_grams' => 600, 'fee' => 1600],
