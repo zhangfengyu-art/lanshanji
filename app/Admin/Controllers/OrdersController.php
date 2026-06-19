@@ -138,6 +138,14 @@ class OrdersController extends Controller
     public function exportStockPrep(Request $request)
     {
         $scope = (string) $request->query('scope', 'pending');
+        $legacyScopes = [
+            'pending_fulfillment' => 'history_total',
+            's1' => 'pending',
+            's2' => 'pending',
+            's3' => 'pending',
+            's1_s2' => 'pending',
+        ];
+        $scope = $legacyScopes[$scope] ?? $scope;
         $scopeOptions = OrderStockPrepExportService::scopeOptions();
         if (!array_key_exists($scope, $scopeOptions)) {
             $scope = 'pending';
@@ -454,7 +462,11 @@ class OrdersController extends Controller
 
             $orderNo = trim((string) request()->query('order_no', ''));
             if ($orderNo !== '') {
-                $grid->model()->where('no', 'like', '%'.$orderNo.'%');
+                $like = '%'.$orderNo.'%';
+                $grid->model()->where(function ($query) use ($like) {
+                    $query->where('no', 'like', $like)
+                        ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(address, '$.contact_name')) LIKE ?", [$like]);
+                });
             }
 
             $fulfillmentStage = strtoupper(trim((string) request()->query('fulfillment_stage', '')));
@@ -605,7 +617,7 @@ class OrdersController extends Controller
         return '<form method="GET" action="" class="form-inline" style="display:inline-block;margin-right:10px;">'
             .$stageSelect
             .'<div class="input-group input-group-sm" style="width:280px;margin-left:6px;">'
-            .'<input type="text" class="form-control" name="order_no" value="'.e($orderNo).'" placeholder="搜索订单流水号">'
+            .'<input type="text" class="form-control" name="order_no" value="'.e($orderNo).'" placeholder="搜索订单流水号或买家姓名">'
             .'<span class="input-group-btn">'
             .'<button type="submit" class="btn btn-primary">筛选</button>'
             .'</span>'
