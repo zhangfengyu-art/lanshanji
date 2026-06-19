@@ -21,6 +21,7 @@ class AdminOrderTableHtmlBuilder
         $badgeColumns = (array) ($options['badge_columns'] ?? [2]);
         $wrapColumns = (array) ($options['wrap_columns'] ?? []);
         $largeTextColumns = (array) ($options['large_text_columns'] ?? []);
+        $largeTextFontScale = max(1.0, (float) ($options['large_text_font_scale'] ?? 1.0));
         $columnWidths = (array) ($options['column_widths'] ?? []);
         $columnWidthsMm = (array) ($options['column_widths_mm'] ?? []);
         $footerNote = (string) ($options['footer_note'] ?? '');
@@ -52,7 +53,7 @@ class AdminOrderTableHtmlBuilder
         }
 
         $html = '<html><head><meta charset="UTF-8">';
-        $html .= static::buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight, $columnWidthsMm, $wrapColumns, $largeTextColumns);
+        $html .= static::buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight, $columnWidthsMm, $wrapColumns, $largeTextFontScale);
         $html .= '</head><body class="'.($isPdfStyle ? 'export-pdf' : 'export-default').'">';
 
         if ($titleNote !== '') {
@@ -272,9 +273,9 @@ class AdminOrderTableHtmlBuilder
         return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
 
-    protected static function buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight, array $columnWidthsMm = [], array $wrapColumns = [], array $largeTextColumns = [])
+    protected static function buildHeadStyles($isPdfStyle, $enablePrintCss, $tableFontSize, $imageDisplayWidth, $imageDisplayHeight, array $columnWidthsMm = [], array $wrapColumns = [], $largeTextFontScale = 1.0)
     {
-        $titleFontSize = $tableFontSize + 4;
+        $titleFontSize = (int) round(($tableFontSize + 4) * max(1.0, (float) $largeTextFontScale));
         $css = '<style>';
         if ($isPdfStyle) {
             $css .= 'body.export-pdf{margin:0;padding:0;font-family:"sans-serif";color:#1a1a1a;font-size:'.$tableFontSize.'px;}'
