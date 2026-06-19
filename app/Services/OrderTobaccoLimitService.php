@@ -43,6 +43,11 @@ class OrderTobaccoLimitService
         return (int) config('ems_shipping.tobacco_limits.max_rolling_tobacco_grams', 5000);
     }
 
+    public function settlementPackagingGramsPerUnit()
+    {
+        return max(0, (int) config('ems_shipping.settlement_packaging_grams_per_unit', 100));
+    }
+
     /**
      * @param array $items [['sku_id' => int, 'amount' => int], ...]
      */
@@ -53,6 +58,7 @@ class OrderTobaccoLimitService
         $totalCigaretteSticks = 0;
         $totalCigaretteBoxes = 0;
         $totalRollingTobaccoGrams = 0;
+        $packagingPerUnit = $this->settlementPackagingGramsPerUnit();
 
         foreach ($items as $row) {
             $skuId = (int) data_get($row, 'sku_id', 0);
@@ -69,7 +75,9 @@ class OrderTobaccoLimitService
             $product = $sku->product;
             $this->assertProductLogisticsConfigured($product);
 
-            $lineWeight = $amount * (int) $product->unit_weight_grams;
+            $unitWeight = (int) $product->unit_weight_grams;
+            $lineWeight = $amount * $unitWeight;
+            $lineBillableWeight = $lineWeight + ($amount * $packagingPerUnit);
             $lineSticks = 0;
             if (self::countsTowardStickLimit($product->tobacco_type)) {
                 $sticksPerUnit = (int) $product->unit_sticks;
@@ -85,7 +93,7 @@ class OrderTobaccoLimitService
                 $totalRollingTobaccoGrams += $lineWeight;
             }
 
-            $totalWeightGrams += $lineWeight;
+            $totalWeightGrams += $lineBillableWeight;
 
             $lines[] = [
                 'sku_id' => $skuId,
@@ -93,9 +101,11 @@ class OrderTobaccoLimitService
                 'product_title' => $product->title,
                 'tobacco_type' => $product->tobacco_type,
                 'amount' => $amount,
-                'unit_weight_grams' => (int) $product->unit_weight_grams,
+                'unit_weight_grams' => $unitWeight,
+                'settlement_packaging_grams_per_unit' => $packagingPerUnit,
                 'unit_sticks' => (int) $product->unit_sticks,
                 'line_weight_grams' => $lineWeight,
+                'line_billable_weight_grams' => $lineBillableWeight,
                 'line_sticks' => $lineSticks,
             ];
         }
@@ -106,6 +116,7 @@ class OrderTobaccoLimitService
 
         return [
             'lines' => $lines,
+            'settlement_packaging_grams_per_unit' => $packagingPerUnit,
             'total_weight_grams' => $totalWeightGrams,
             'total_cigarette_sticks' => $totalCigaretteSticks,
             'total_cigarette_boxes' => $totalCigaretteBoxes,
@@ -211,13 +222,14 @@ class OrderTobaccoLimitService
             return null;
         }
 
+        $billableUnitWeight = $weight + $this->settlementPackagingGramsPerUnit();
         $shippingMode = app(ShippingModeService::class)->resolveForProduct($product);
         if (app(ShippingModeService::class)->isTaxIncluded($shippingMode)) {
             return null;
         }
 
         $maxGrams = app(EmsShippingFeeService::class)->maxBillableGrams();
-        $byWeight = (int) floor($maxGrams / $weight);
+        $byWeight = (int) floor($maxGrams / $billableUnitWeight);
 
         $limits = [];
         if ($product->tobacco_type === self::TYPE_CIGARETTE) {
