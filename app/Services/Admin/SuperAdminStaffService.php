@@ -6,6 +6,7 @@ use App\Exceptions\InvalidRequestException;
 use App\Models\Admin\Administrator;
 use Encore\Admin\Auth\Database\Role;
 use App\Rules\StrongAdminPassword;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class SuperAdminStaffService
