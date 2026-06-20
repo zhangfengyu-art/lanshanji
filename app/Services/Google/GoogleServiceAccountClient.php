@@ -6,10 +6,11 @@ class GoogleServiceAccountClient
 {
     protected $credentials;
     protected $scope;
+    protected $impersonateEmail;
     protected $accessToken;
     protected $expiresAt = 0;
 
-    public function __construct($jsonPath, $scope = 'https://www.googleapis.com/auth/drive.file')
+    public function __construct($jsonPath, $scope = 'https://www.googleapis.com/auth/drive.file', $impersonateEmail = '')
     {
         $jsonPath = (string) $jsonPath;
         if ($jsonPath === '' || !is_file($jsonPath)) {
@@ -30,6 +31,7 @@ class GoogleServiceAccountClient
 
         $this->credentials = $data;
         $this->scope = (string) $scope;
+        $this->impersonateEmail = trim((string) $impersonateEmail);
     }
 
     public function accessToken()
@@ -65,13 +67,17 @@ class GoogleServiceAccountClient
             'alg' => 'RS256',
             'typ' => 'JWT',
         ]));
-        $payload = $this->base64UrlEncode(json_encode([
+        $claims = [
             'iss' => $this->credentials['client_email'],
             'scope' => $this->scope,
             'aud' => $this->credentials['token_uri'],
             'iat' => $now,
             'exp' => $now + 3600,
-        ]));
+        ];
+        if ($this->impersonateEmail !== '') {
+            $claims['sub'] = $this->impersonateEmail;
+        }
+        $payload = $this->base64UrlEncode(json_encode($claims));
 
         $input = $header.'.'.$payload;
         $signature = '';
