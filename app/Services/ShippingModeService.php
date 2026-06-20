@@ -13,7 +13,7 @@ class ShippingModeService
     public static function options()
     {
         return [
-            self::MODE_EMS => 'EMS 自缴税',
+            self::MODE_EMS => 'EMS',
             self::MODE_TAX_INCLUDED => '含税包邮',
         ];
     }
@@ -63,7 +63,7 @@ class ShippingModeService
 
         if (count($modes) > 1) {
             throw new InvalidRequestException(
-                '不能在同一笔订单中混合「EMS 自缴税」与「含税包邮」商品，请分开下单。'
+                '不能在同一笔订单中混合「EMS」与「含税包邮」商品，请分开下单。'
             );
         }
     }

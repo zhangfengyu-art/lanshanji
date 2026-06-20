@@ -475,7 +475,7 @@ class OrdersController extends Controller
             }
 
             $grid->no('订单流水号');
-            $grid->column('buyer_real_name', '买家真实姓名')->display(function () {
+            $grid->column('buyer_real_name', '买家姓名')->display(function () {
                 $name = trim((string) data_get($this->address, 'contact_name', ''));
                 $label = $name !== '' ? e($name) : '—';
                 if (!$this->user_id) {
@@ -486,7 +486,7 @@ class OrdersController extends Controller
 
                 return '<a href="'.e($url).'">'.$label.'</a>';
             });
-            $grid->total_amount('订单实付金额')->sortable();
+            $grid->total_amount('订单实付')->sortable();
             $grid->column('ems_summary', 'EMS/烟草')->display(function () {
                 $fee = (array) data_get($this->extra, 'fee_details', []);
                 $tobacco = (array) data_get($this->extra, 'tobacco_summary', []);

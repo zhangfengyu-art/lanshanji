@@ -122,7 +122,7 @@ class ProductsController extends Controller
             $grid->column('shipping_mode', '寄送模式')->display(function ($value) {
                 $resolved = $value ?: optional($this->category)->default_shipping_mode;
 
-                return Product::shippingModeOptions()[$resolved] ?? 'EMS 自缴税';
+                return Product::shippingModeOptions()[$resolved] ?? 'EMS';
             });
             $grid->column('tobacco_type', '烟草分类')->display(function ($value) {
                 return Product::tobaccoTypeOptions()[$value] ?? '—';

@@ -97,23 +97,23 @@ class OrderFulfillmentService
         $stage = $this->resolveStage($order);
 
         if ($stage === self::STAGE_S0) {
-            return ['label' => 'S0 已退款', 'color' => '#dc2626'];
+            return ['label' => '已退款', 'color' => '#dc2626'];
         }
 
         if ($stage === self::STAGE_S1) {
             if ($this->processingStartedAt($order)) {
-                return ['label' => 'S1 已处理', 'color' => '#ca8a04'];
+                return ['label' => '已处理', 'color' => '#ca8a04'];
             }
 
-            return ['label' => 'S1 待处理', 'color' => '#6b7280'];
+            return ['label' => '待处理', 'color' => '#6b7280'];
         }
 
         if ($stage === self::STAGE_S3) {
-            return ['label' => 'S3 已打包', 'color' => '#2563eb'];
+            return ['label' => '已打包', 'color' => '#2563eb'];
         }
 
         if ($stage === self::STAGE_S4) {
-            return ['label' => 'S4 已发货', 'color' => '#16a34a'];
+            return ['label' => '已发货', 'color' => '#16a34a'];
         }
 
         return ['label' => '—', 'color' => '#6b7280'];

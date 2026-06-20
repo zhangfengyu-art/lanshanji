@@ -19,7 +19,7 @@
   @if(!$canShip)
     <span class="text-muted">—</span>
   @elseif(!$isPending && $shipNo !== '')
-    <div style="font-size:11px;color:#64748b;">{{ e($shipCompany) }}</div>
+    <div style="font-size:11px;color:#64748b;">{{ e(site_express_normalize_carrier($shipCompany)) }}</div>
     <div style="font-size:12px;font-weight:600;word-break:break-all;">{{ e($shipNo) }}</div>
     <a href="{{ route('admin.orders.show', $order) }}" class="btn btn-xs btn-default" style="margin-top:4px;">修改</a>
   @elseif(!$isPending)

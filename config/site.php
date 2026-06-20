@@ -18,5 +18,5 @@ return [
     'icp_link' => env('SITE_ICP_LINK', 'https://beian.miit.gov.cn/'),
 
     // A 站后台发货：物流公司仅允许以下选项
-    'express_carriers_a' => ['EMS自缴税', '顺丰'],
+    'express_carriers_a' => ['EMS', '顺丰'],
 ];
