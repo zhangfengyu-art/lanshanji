@@ -87,6 +87,38 @@ class OrderFulfillmentService
         return data_get(self::stageLabels(), $this->resolveStage($order), '—');
     }
 
+    /**
+     * 后台订单调度列表：履约阶段展示文案与颜色。
+     *
+     * @return array{label:string,color:string}
+     */
+    public function adminGridStagePresentation(Order $order)
+    {
+        $stage = $this->resolveStage($order);
+
+        if ($stage === self::STAGE_S0) {
+            return ['label' => 'S0 已退款', 'color' => '#dc2626'];
+        }
+
+        if ($stage === self::STAGE_S1) {
+            if ($this->processingStartedAt($order)) {
+                return ['label' => 'S1 已处理', 'color' => '#ca8a04'];
+            }
+
+            return ['label' => 'S1 待处理', 'color' => '#6b7280'];
+        }
+
+        if ($stage === self::STAGE_S3) {
+            return ['label' => 'S3 已打包', 'color' => '#2563eb'];
+        }
+
+        if ($stage === self::STAGE_S4) {
+            return ['label' => 'S4 已发货', 'color' => '#16a34a'];
+        }
+
+        return ['label' => '—', 'color' => '#6b7280'];
+    }
+
     public function adminActionAvailability(Order $order)
     {
         $stage = $this->resolveStage($order);
@@ -352,7 +384,7 @@ class OrderFulfillmentService
         return [
             '' => '全部阶段',
             self::STAGE_S1 => '待处理',
-            self::STAGE_S3 => '备货/打包',
+            self::STAGE_S3 => '已打包',
             self::STAGE_S4 => '已发货',
         ];
     }

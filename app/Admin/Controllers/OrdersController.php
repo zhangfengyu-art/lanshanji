@@ -507,30 +507,19 @@ class OrdersController extends Controller
 
                 return $parts ? implode(' / ', $parts) : '—';
             });
-            $grid->paid_at('支付时间')->sortable();
             if (is_site_mode_a()) {
-                $grid->column('fulfillment_stage', '履约阶段')->display(function () {
-                    $fulfillment = app(OrderFulfillmentService::class);
-                    $stage = $fulfillment->resolveStage($this);
-                    $label = $fulfillment->stageLabel($this);
-                    $colors = [
-                        OrderFulfillmentService::STAGE_S0 => 'default',
-                        OrderFulfillmentService::STAGE_S1 => 'default',
-                        OrderFulfillmentService::STAGE_S3 => 'info',
-                        OrderFulfillmentService::STAGE_S4 => 'success',
-                    ];
-                    $color = $colors[$stage] ?? 'default';
-
-                    return '<span class="label label-'.$color.'" style="font-size:12px;min-width:34px;display:inline-block;">'
-                        .e($stage)
-                        .'</span> <span style="font-size:12px;color:#475569;">'
-                        .e($label)
-                        .'</span>';
-                });
                 $grid->column('fulfillment_photo_cell', '实拍图')->display(function () {
                     return view('admin.orders._fulfillment_photo_cell', ['order' => $this])->render();
                 });
+                $grid->column('fulfillment_stage', '履约阶段')->display(function () {
+                    $presentation = app(OrderFulfillmentService::class)->adminGridStagePresentation($this);
+
+                    return '<strong style="color:'.e($presentation['color']).';font-weight:700;">'
+                        .e($presentation['label'])
+                        .'</strong>';
+                });
             }
+            $grid->paid_at('支付时间')->sortable();
             $grid->payment_method('支付方式')->display(function ($value) {
                 if ($value === 'wechat') {
                     return '微信支付';
