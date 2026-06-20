@@ -176,7 +176,7 @@
               @if(is_site_mode_a())
               <select id="express_company" name="express_company" class="form-control" required style="min-width: 180px;">
                 @foreach($expressCarrierOptions as $carrier)
-                  <option value="{{ $carrier }}" {{ $shipCompany === $carrier ? 'selected' : '' }}>{{ $carrier }}</option>
+                  <option value="{{ $carrier }}" {{ $shipCompany === $carrier ? 'selected' : '' }}>{{ admin_express_carrier_label($carrier) }}</option>
                 @endforeach
               </select>
               @else
@@ -205,7 +205,7 @@
       @elseif($order->ship_data)
       <tr>
         <td>{{ is_site_mode_b() ? '代购人：' : '物流公司：' }}</td>
-        <td>{{ data_get($order->ship_data, 'express_company', '-') }}</td>
+        <td>{{ admin_express_carrier_label(data_get($order->ship_data, 'express_company', '-')) }}</td>
         <td>{{ is_site_mode_b() ? '转寄单号：' : '物流单号：' }}</td>
         <td>{{ data_get($order->ship_data, 'express_no', '-') }}</td>
       </tr>

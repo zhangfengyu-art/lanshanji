@@ -19,7 +19,7 @@
   @if(!$canShip)
     <span class="text-muted">—</span>
   @elseif(!$isPending && $shipNo !== '')
-    <div style="font-size:11px;color:#64748b;">{{ e(site_express_normalize_carrier($shipCompany)) }}</div>
+    <div style="font-size:11px;color:#64748b;">{{ e(admin_express_carrier_label($shipCompany)) }}</div>
     <div style="font-size:12px;font-weight:600;word-break:break-all;">{{ e($shipNo) }}</div>
     <a href="{{ route('admin.orders.show', $order) }}" class="btn btn-xs btn-default" style="margin-top:4px;">修改</a>
   @elseif(!$isPending)
@@ -31,7 +31,7 @@
       @if(is_site_mode_a())
         <select name="express_company" class="form-control input-sm" style="width:100%;margin-bottom:4px;font-size:11px;padding:2px 6px;height:26px;">
           @foreach($carriers as $carrier)
-            <option value="{{ $carrier }}" {{ $carrier === $defaultCarrier ? 'selected' : '' }}>{{ $carrier }}</option>
+            <option value="{{ $carrier }}" {{ $carrier === $defaultCarrier ? 'selected' : '' }}>{{ admin_express_carrier_label($carrier) }}</option>
           @endforeach
         </select>
       @else

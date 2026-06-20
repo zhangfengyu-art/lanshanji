@@ -493,7 +493,11 @@ class OrdersController extends Controller
                 $mode = data_get($fee, 'shipping_mode', data_get($this->extra, 'shipping_mode', ''));
                 $parts = [];
                 if ($mode) {
-                    $parts[] = \App\Services\ShippingModeService::options()[$mode] ?? $mode;
+                    $modeLabel = \App\Services\ShippingModeService::options()[$mode] ?? $mode;
+                    if ($modeLabel === 'EMS 自缴税') {
+                        $modeLabel = 'EMS';
+                    }
+                    $parts[] = $modeLabel;
                 }
                 if ($w = data_get($fee, 'ems_weight_grams')) {
                     $parts[] = $w.'g';
