@@ -54,12 +54,6 @@
       $afterSaleGroupNotice = after_sale_group_notice();
   }
 
-  $refundPolicyHint = '';
-  if ($isPaid && is_site_mode_a() && $useRefundFeedback) {
-    $policyPreview = app(\App\Services\OrderRefundPolicyService::class)->previewAdminRefund($order);
-    $refundPolicyHint = $policyPreview['policy_hint'] ?: $policyPreview['message'];
-  }
-
   if (!$isPaid && !$isClosed) {
     $expiresInSeconds = $order->getAllocationExpiresIn();
   }
@@ -270,9 +264,6 @@
               @if($canInstantRefund && $remainingInstantRefunds > 0)
                 <div class="kv"><span class="k">自助秒退：</span><span class="v">最近 {{ (int) config('order_refund.instant.window_hours', 24) }} 小时内还可 {{ $remainingInstantRefunds }} 次</span></div>
               @endif
-              @if($useRefundFeedback && $refundPolicyHint)
-                <div class="warn-box" style="margin-top:8px;">取消/退款规则：{{ $refundPolicyHint }}。本阶段请通过「客户反馈」提交取消申请，由客服审核后处理。</div>
-              @endif
             @endif
 
             @if($order->paid_at && $order->refund_status !== \App\Models\Order::REFUND_STATUS_PENDING)
@@ -295,14 +286,11 @@
               @if($canChangeAddress)
                 <a class="btn btn-default" href="{{ route('orders.change_address', $order) }}">变更信息</a>
               @endif
-              @if($order->ship_status === \App\Models\Order::SHIP_STATUS_DELIVERED)
-                <button type="button" class="btn btn-success js-action-receive" data-busy-text="提交中...">{{ is_site_mode_b() ? '确认签收' : '确认收货' }}</button>
-              @endif
 
               @if($canInstantRefund)
                 <button type="button" class="btn btn-danger js-action-instant-refund" data-busy-text="退款中...">取消订单（全额秒退）</button>
               @elseif($useRefundFeedback && $refundFeedbackUrl)
-                <a class="btn btn-danger" href="{{ $refundFeedbackUrl }}">申请取消/退款（客户反馈）</a>
+                <a class="btn btn-default" href="{{ $refundFeedbackUrl }}">联系客服</a>
               @elseif($showLegacyRefundApply)
                 <button type="button" class="btn btn-danger js-action-refund" data-busy-text="提交中...">申请退款</button>
               @endif
@@ -314,7 +302,7 @@
   </div>
 </div>
 
-@if((!$isPaid && !$isClosed) || $canChangeAddress || $order->ship_status === \App\Models\Order::SHIP_STATUS_DELIVERED || $canInstantRefund || ($useRefundFeedback && $refundFeedbackUrl) || $showLegacyRefundApply)
+@if((!$isPaid && !$isClosed) || $canChangeAddress || $canInstantRefund || ($useRefundFeedback && $refundFeedbackUrl) || $showLegacyRefundApply)
   <div class="mobile-sticky-actions" aria-label="移动端快捷操作">
     @if(!$isPaid && !$isClosed)
       <p class="mobile-sticky-wechat-hint">{{ trans('frontend.order.payment_wechat_scan_notice_short') }}</p>
@@ -327,14 +315,11 @@
     @if($canChangeAddress)
       <a class="sticky-btn" href="{{ route('orders.change_address', $order) }}">变更信息</a>
     @endif
-    @if($order->ship_status === \App\Models\Order::SHIP_STATUS_DELIVERED)
-      <button type="button" class="sticky-btn success js-action-receive" data-busy-text="提交中...">{{ is_site_mode_b() ? '确认签收' : '确认收货' }}</button>
-    @endif
 
     @if($canInstantRefund)
       <button type="button" class="sticky-btn danger js-action-instant-refund" data-busy-text="退款中...">全额秒退</button>
     @elseif($useRefundFeedback && $refundFeedbackUrl)
-      <a class="sticky-btn danger" href="{{ $refundFeedbackUrl }}">退款反馈</a>
+      <a class="sticky-btn" href="{{ $refundFeedbackUrl }}">联系客服</a>
     @elseif($showLegacyRefundApply)
       <button type="button" class="sticky-btn danger js-action-refund" data-busy-text="提交中...">申请退款</button>
     @endif
@@ -413,33 +398,6 @@
 
       updateTimer();
     }
-
-    $('.js-action-receive').click(function() {
-      const $receiveButtons = $('.js-action-receive');
-      if ($(this).prop('disabled')) {
-        return;
-      }
-
-      swal({
-        title: orderI18n.confirm_received_prompt || '{{ is_site_mode_b() ? '确认已经签收转寄物品？' : '确认已经收到商品？' }}',
-        icon: 'warning',
-        buttons: ['{{ trans('frontend.common.cancel') }}', orderI18n.confirm_received || '{{ is_site_mode_b() ? '确认签收' : '确认收到' }}'],
-        dangerMode: true,
-      }).then(function(ret) {
-        if (!ret) {
-          return;
-        }
-        setButtonsBusy($receiveButtons, true, '提交中...');
-        axios.post('{{ route('orders.received', [$order->id]) }}')
-          .then(function () {
-            location.reload();
-          })
-          .catch(function () {
-            setButtonsBusy($receiveButtons, false);
-            swal('{{ trans('frontend.js.operation_failed_retry') }}', '', 'error');
-          });
-      });
-    });
 
     function postRefund($buttons, payload, successText) {
       setButtonsBusy($buttons, true, '提交中...');

@@ -199,7 +199,7 @@ class OrdersController extends Controller
         }
 
         if ($this->refunds->shouldUseRefundFeedback($order)) {
-            throw new InvalidRequestException('订单已开始处理，不可自助退款，请通过客户反馈联系本站。');
+            throw new InvalidRequestException('订单已开始处理，不可自助退款，请通过「联系客服」提交反馈。');
         }
 
         if ($this->refunds->canSelfInstantRefund($order)) {

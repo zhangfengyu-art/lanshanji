@@ -30,6 +30,16 @@ class OrderRefundService
         $this->crossSitePayment = $crossSitePayment;
     }
 
+    public function hasProcessingStarted(Order $order)
+    {
+        if (trim((string) data_get($order->extra, 'processing_started_at', '')) !== '') {
+            return true;
+        }
+
+        // 已上传实拍图视为开始处理（兼容历史订单）
+        return trim((string) data_get($order->extra, 'fulfillment_photo', '')) !== '';
+    }
+
     public function canSelfInstantRefund(Order $order)
     {
         if (!is_site_mode_a()) {
@@ -44,10 +54,16 @@ class OrderRefundService
             return false;
         }
 
-        return $this->fulfillment->resolveStage($order) === OrderFulfillmentService::STAGE_S1
-            && trim((string) data_get($order->extra, 'processing_started_at', '')) === '';
+        if ($this->hasProcessingStarted($order)) {
+            return false;
+        }
+
+        return $this->fulfillment->resolveStage($order) === OrderFulfillmentService::STAGE_S1;
     }
 
+    /**
+     * 后台标记「开始处理」后：隐藏自助退款，仅展示客户反馈入口。
+     */
     public function shouldUseRefundFeedback(Order $order)
     {
         if (!is_site_mode_a()) {
@@ -62,17 +78,21 @@ class OrderRefundService
             return false;
         }
 
-        return !$this->canSelfInstantRefund($order);
+        return $this->hasProcessingStarted($order);
     }
 
     public function refundFeedbackUrl(Order $order)
+    {
+        return $this->customerFeedbackUrl($order);
+    }
+
+    public function customerFeedbackUrl(Order $order)
     {
         $stageLabel = $order->fulfillment_stage_label;
 
         return route('support.feedbacks.create', [
             'order_no' => $order->no,
-            'question_type' => 'refund',
-            'message' => "订单号：{$order->no}\n当前履约阶段：{$stageLabel}\n\n请协助处理取消/退款事宜：\n",
+            'message' => "订单号：{$order->no}\n当前履约阶段：{$stageLabel}\n\n请描述您的问题：\n",
         ]);
     }
 

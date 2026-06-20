@@ -250,6 +250,28 @@ class OrderFulfillmentService
     }
 
     /**
+     * 上传实拍图时视为「开始处理」：写入 processing_started_at，并切换用户端按钮。
+     */
+    public function ensureProcessingStartedFromPhoto(Order $order)
+    {
+        $this->assertPaidAndNotShipped($order);
+
+        if ($this->processingStartedAt($order)) {
+            return $order->fresh();
+        }
+
+        $stage = $this->resolveStage($order);
+        if ($stage === self::STAGE_S1) {
+            return $this->startProcessing($order);
+        }
+
+        $extra = $this->normalizeExtraArray($order);
+        $extra['processing_started_at'] = now()->toDateTimeString();
+
+        return $this->setStage($order, $stage, 'fulfillment_photo_upload', true, $extra);
+    }
+
+    /**
      * 标记订单已开始处理：仍停留在待处理阶段，但用户不可再自助改址。
      */
     public function startProcessing(Order $order)

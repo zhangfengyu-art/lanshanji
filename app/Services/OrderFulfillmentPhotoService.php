@@ -36,6 +36,9 @@ class OrderFulfillmentPhotoService
         $order->refresh();
 
         $fulfillment = app(OrderFulfillmentService::class);
+        $fulfillment->ensureProcessingStartedFromPhoto($order);
+        $order->refresh();
+
         $stage = $fulfillment->resolveStage($order);
         if ($stage === OrderFulfillmentService::STAGE_S1) {
             $fulfillment->enterStockPrep($order);
