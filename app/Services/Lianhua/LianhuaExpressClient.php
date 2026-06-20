@@ -107,17 +107,15 @@ class LianhuaExpressClient
         );
     }
 
-    public function discoverListEndpoint($html = null, $quick = false)
+    public function discoverListEndpoint($html = null)
     {
         if (!$this->loggedIn) {
             $this->login();
         }
 
         $html = $html ?: $this->fetchStoragePreSearchPage();
-        $maxCandidates = $quick ? 6 : (int) config('lianhua_express.probe_max_candidates', 10);
-        $maxAttempts = $quick ? 24 : (int) config('lianhua_express.probe_max_attempts', 80);
-        $candidates = array_slice($this->buildCandidateListUrls($html), 0, max(1, $maxCandidates));
-        $filterSets = $this->buildShippedFilterSets($html, $quick);
+        $candidates = $this->buildCandidateListUrls($html);
+        $filterSets = $this->buildShippedFilterSets($html);
 
         $best = [
             'url' => '',
@@ -128,16 +126,9 @@ class LianhuaExpressClient
             'sample' => [],
         ];
 
-        $attempts = 0;
-
         foreach ($candidates as $url) {
             foreach ($filterSets as $filters) {
-                if ($attempts >= $maxAttempts) {
-                    break 2;
-                }
-
-                $attempts++;
-                $result = $this->scoreEndpointResponse($url, $filters, true);
+                $result = $this->scoreEndpointResponse($url, $filters);
                 if ($result['score'] <= $best['score']) {
                     continue;
                 }
@@ -150,17 +141,6 @@ class LianhuaExpressClient
                     'tracking_count' => $result['tracking_count'],
                     'sample' => $result['sample'],
                 ];
-
-                if ($result['tracking_count'] > 0 && $result['score'] >= 25) {
-                    break 2;
-                }
-            }
-        }
-
-        if (!$quick && ($best['tracking_count'] === 0 || $best['score'] < 25)) {
-            $extended = $this->discoverListEndpointExtended($html, $best, $attempts, $maxAttempts);
-            if ((int) data_get($extended, 'score', 0) > (int) $best['score']) {
-                $best = $extended;
             }
         }
 
@@ -168,43 +148,6 @@ class LianhuaExpressClient
             $this->detectedListUrl = $best['url'];
             $this->detectedFilters = $best['filters'];
             $this->saveDiscoveryCache($best['url'], $best['filters']);
-        }
-
-        $best['attempts'] = $attempts;
-
-        return $best;
-    }
-
-    protected function discoverListEndpointExtended($html, array $best, &$attempts, $maxAttempts)
-    {
-        $candidates = array_slice($this->buildCandidateListUrls($html), 0, 15);
-        $filterSets = $this->buildShippedFilterSets($html, false, true);
-
-        foreach ($candidates as $url) {
-            foreach ($filterSets as $filters) {
-                if ($attempts >= $maxAttempts) {
-                    return $best;
-                }
-
-                $attempts++;
-                $result = $this->scoreEndpointResponse($url, $filters, true);
-                if ($result['score'] <= $best['score']) {
-                    continue;
-                }
-
-                $best = [
-                    'url' => $url,
-                    'filters' => $filters,
-                    'score' => $result['score'],
-                    'row_count' => $result['row_count'],
-                    'tracking_count' => $result['tracking_count'],
-                    'sample' => $result['sample'],
-                ];
-
-                if ($result['tracking_count'] > 0 && $result['score'] >= 25) {
-                    return $best;
-                }
-            }
         }
 
         return $best;
@@ -264,14 +207,14 @@ class LianhuaExpressClient
         return $html;
     }
 
-    public function saveProbeArtifacts($html = null, $quick = false)
+    public function saveProbeArtifacts($html = null)
     {
         $html = $html ?: $this->fetchStoragePreSearchPage();
         $path = config('lianhua_express.probe_html_path');
 
         file_put_contents($path, $html);
 
-        $discovery = $this->discoverListEndpoint($html, $quick);
+        $discovery = $this->discoverListEndpoint($html);
 
         return [
             'html_path' => $path,
@@ -279,24 +222,6 @@ class LianhuaExpressClient
             'detected_filters' => !empty($discovery['filters']) ? $discovery['filters'] : $this->detectShippedFilters($html),
             'html_table_rows' => count($this->parseHtmlTable($html)),
             'discovery' => $discovery,
-            'html_url_hints' => array_slice($this->buildCandidateListUrls($html), 0, 10),
-        ];
-    }
-
-    public function analyzeSavedProbeHtml()
-    {
-        $path = config('lianhua_express.probe_html_path');
-        if (!is_file($path)) {
-            throw new RuntimeException('找不到已保存的 HTML：' . $path . '，请先运行 php artisan lianhua:probe');
-        }
-
-        $html = (string) file_get_contents($path);
-
-        return [
-            'html_path' => $path,
-            'url_hints' => $this->buildCandidateListUrls($html),
-            'filters' => $this->detectShippedFilters($html),
-            'table_rows' => count($this->parseHtmlTable($html)),
         ];
     }
 
@@ -744,7 +669,7 @@ class LianhuaExpressClient
         return $score;
     }
 
-    protected function buildShippedFilterSets($html, $quick = false, $extended = false)
+    protected function buildShippedFilterSets($html)
     {
         $sets = [];
         $detected = $this->detectShippedFilters($html);
@@ -757,19 +682,14 @@ class LianhuaExpressClient
             $sets[] = $configured;
         }
 
-        $sets[] = [];
-        $sets[] = ['PreState' => 4];
-        $sets[] = ['PreState' => 3];
-        $sets[] = ['PreStatus' => 4];
-        $sets[] = ['Status' => '已发货'];
-
-        if (!$quick && $extended) {
-            foreach ([2, 3, 4, 5] as $state) {
-                foreach (['PreState', 'PreStatus', 'SearchState', 'State', 'SendState', 'TabStatus'] as $key) {
-                    $sets[] = [$key => $state];
-                }
+        foreach ([2, 3, 4, 5] as $state) {
+            foreach (['PreState', 'PreStatus', 'SearchState', 'State', 'SendState', 'TabStatus', 'StatusCode'] as $key) {
+                $sets[] = [$key => $state];
             }
         }
+
+        $sets[] = ['Status' => '已发货'];
+        $sets[] = [];
 
         $unique = [];
         foreach ($sets as $set) {
@@ -781,7 +701,7 @@ class LianhuaExpressClient
         return array_values($unique);
     }
 
-    protected function scoreEndpointResponse($url, array $filters, $probe = false)
+    protected function scoreEndpointResponse($url, array $filters)
     {
         $pageSize = 10;
         $params = array_merge(
@@ -795,20 +715,13 @@ class LianhuaExpressClient
             ]
         );
 
-        $options = [
+        $response = $this->client->post(ltrim($url, '/'), [
             'form_params' => $params,
             'headers' => [
                 'X-Requested-With' => 'XMLHttpRequest',
                 'Referer' => $this->absoluteUrl('/Member/StoragePreSearch'),
             ],
-        ];
-
-        if ($probe) {
-            $options['timeout'] = 8;
-            $options['connect_timeout'] = 5;
-        }
-
-        $response = $this->client->post(ltrim($url, '/'), $options);
+        ]);
 
         $body = (string) $response->getBody();
         if ($body === '' || stripos($body, '<!DOCTYPE') !== false || stripos($body, '<html') !== false) {
