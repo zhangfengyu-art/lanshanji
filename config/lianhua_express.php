@@ -9,16 +9,26 @@ return [
 
     'password' => env('LIANHUA_PASSWORD', ''),
 
-    'list_url' => env('LIANHUA_LIST_URL', ''),
+    'list_url' => env('LIANHUA_LIST_URL', '/Member/StoragePreList'),
+
+    'list_method' => env('LIANHUA_LIST_METHOD', 'get'),
 
     'list_params' => [
-        'pageNumber' => 1,
+        'pageIndex' => 1,
         'pageSize' => (int) env('LIANHUA_LIST_PAGE_SIZE', 200),
+        'sDate' => '',
+        'sTransport' => '',
+        'startDate' => '',
+        'endState' => '',
+        'sEmsNumber' => '',
+        'sPhone' => '',
+        'sRemark' => '',
     ],
 
     'shipped_filter' => array_filter([
+        'sState' => env('LIANHUA_SHIPPED_S_STATE', '已发货'),
         'PreState' => env('LIANHUA_SHIPPED_PRE_STATE'),
-        'Status' => env('LIANHUA_SHIPPED_STATUS', '已发货'),
+        'Status' => env('LIANHUA_SHIPPED_STATUS'),
         'SendStatus' => env('LIANHUA_SHIPPED_SEND_STATUS'),
         'TabStatus' => env('LIANHUA_SHIPPED_TAB_STATUS'),
     ], function ($value) {
@@ -26,11 +36,11 @@ return [
     }),
 
     'field_map' => [
-        'recipient' => env('LIANHUA_FIELD_RECIPIENT', 'ReceiverName'),
-        'phone' => env('LIANHUA_FIELD_PHONE', 'ReceiverPhone'),
-        'tracking' => env('LIANHUA_FIELD_TRACKING', 'SendNo'),
-        'shipping_method' => env('LIANHUA_FIELD_SHIPPING_METHOD', 'SendType'),
-        'status' => env('LIANHUA_FIELD_STATUS', 'Status'),
+        'recipient' => env('LIANHUA_FIELD_RECIPIENT', 'sName'),
+        'phone' => env('LIANHUA_FIELD_PHONE', 'sPhone'),
+        'tracking' => env('LIANHUA_FIELD_TRACKING', 'sEmsNumber'),
+        'shipping_method' => env('LIANHUA_FIELD_SHIPPING_METHOD', 'sTransport'),
+        'status' => env('LIANHUA_FIELD_STATUS', 'sState'),
     ],
 
     'express_company' => env('LIANHUA_EXPRESS_COMPANY', ''),

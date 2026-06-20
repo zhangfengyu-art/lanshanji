@@ -107,13 +107,17 @@ class LianhuaExpressClient
         );
     }
 
-    public function discoverListEndpoint($html = null)
+    public function discoverListEndpoint($html = null, $quick = false)
     {
         if (!$this->loggedIn) {
             $this->login();
         }
 
         $html = $html ?: $this->fetchStoragePreSearchPage();
+        $maxCandidates = $quick ? 6 : (int) config('lianhua_express.probe_max_candidates', 10);
+        $maxAttempts = $quick ? 24 : (int) config('lianhua_express.probe_max_attempts', 80);
+        $candidates = array_slice($this->buildCandidateListUrls($html), 0, max(1, $maxCandidates));
+        $filterSets = $this->buildShippedFilterSets($html, $quick);
 
         $best = [
             'url' => '',
@@ -124,28 +128,39 @@ class LianhuaExpressClient
             'sample' => [],
         ];
 
-        $tableConfig = $this->extractBootstrapTableListConfig($html);
-        if ($tableConfig) {
-            $best = $this->probeUrlFilterSets(
-                $tableConfig['url'],
-                $this->buildShippedFilterSets($html, (array) data_get($tableConfig, 'params', [])),
-                $best,
-                (string) data_get($tableConfig, 'method', 'post')
-            );
+        $attempts = 0;
+
+        foreach ($candidates as $url) {
+            foreach ($filterSets as $filters) {
+                if ($attempts >= $maxAttempts) {
+                    break 2;
+                }
+
+                $attempts++;
+                $result = $this->scoreEndpointResponse($url, $filters, true);
+                if ($result['score'] <= $best['score']) {
+                    continue;
+                }
+
+                $best = [
+                    'url' => $url,
+                    'filters' => $filters,
+                    'score' => $result['score'],
+                    'row_count' => $result['row_count'],
+                    'tracking_count' => $result['tracking_count'],
+                    'sample' => $result['sample'],
+                ];
+
+                if ($result['tracking_count'] > 0 && $result['score'] >= 25) {
+                    break 2;
+                }
+            }
         }
 
-        if ((int) $best['tracking_count'] === 0) {
-            foreach (array_slice($this->buildCandidateListUrls($html), 0, 12) as $url) {
-                $best = $this->probeUrlFilterSets(
-                    $url,
-                    $this->buildShippedFilterSets($html),
-                    $best,
-                    'post'
-                );
-
-                if ((int) $best['tracking_count'] > 0) {
-                    break;
-                }
+        if (!$quick && ($best['tracking_count'] === 0 || $best['score'] < 25)) {
+            $extended = $this->discoverListEndpointExtended($html, $best, $attempts, $maxAttempts);
+            if ((int) data_get($extended, 'score', 0) > (int) $best['score']) {
+                $best = $extended;
             }
         }
 
@@ -155,28 +170,40 @@ class LianhuaExpressClient
             $this->saveDiscoveryCache($best['url'], $best['filters']);
         }
 
+        $best['attempts'] = $attempts;
+
         return $best;
     }
 
-    protected function probeUrlFilterSets($url, array $filterSets, array $best, $method = 'post')
+    protected function discoverListEndpointExtended($html, array $best, &$attempts, $maxAttempts)
     {
-        foreach ($filterSets as $filters) {
-            $result = $this->scoreEndpointResponse($url, $filters, $method);
-            if ($result['score'] <= $best['score']) {
-                continue;
-            }
+        $candidates = array_slice($this->buildCandidateListUrls($html), 0, 15);
+        $filterSets = $this->buildShippedFilterSets($html, false, true);
 
-            $best = [
-                'url' => $url,
-                'filters' => $filters,
-                'score' => $result['score'],
-                'row_count' => $result['row_count'],
-                'tracking_count' => $result['tracking_count'],
-                'sample' => $result['sample'],
-            ];
+        foreach ($candidates as $url) {
+            foreach ($filterSets as $filters) {
+                if ($attempts >= $maxAttempts) {
+                    return $best;
+                }
 
-            if ((int) $result['tracking_count'] > 0) {
-                break;
+                $attempts++;
+                $result = $this->scoreEndpointResponse($url, $filters, true);
+                if ($result['score'] <= $best['score']) {
+                    continue;
+                }
+
+                $best = [
+                    'url' => $url,
+                    'filters' => $filters,
+                    'score' => $result['score'],
+                    'row_count' => $result['row_count'],
+                    'tracking_count' => $result['tracking_count'],
+                    'sample' => $result['sample'],
+                ];
+
+                if ($result['tracking_count'] > 0 && $result['score'] >= 25) {
+                    return $best;
+                }
             }
         }
 
@@ -237,14 +264,14 @@ class LianhuaExpressClient
         return $html;
     }
 
-    public function saveProbeArtifacts($html = null)
+    public function saveProbeArtifacts($html = null, $quick = false)
     {
         $html = $html ?: $this->fetchStoragePreSearchPage();
         $path = config('lianhua_express.probe_html_path');
 
         file_put_contents($path, $html);
 
-        $discovery = $this->discoverListEndpoint($html);
+        $discovery = $this->discoverListEndpoint($html, $quick);
 
         return [
             'html_path' => $path,
@@ -252,6 +279,24 @@ class LianhuaExpressClient
             'detected_filters' => !empty($discovery['filters']) ? $discovery['filters'] : $this->detectShippedFilters($html),
             'html_table_rows' => count($this->parseHtmlTable($html)),
             'discovery' => $discovery,
+            'html_url_hints' => array_slice($this->buildCandidateListUrls($html), 0, 10),
+        ];
+    }
+
+    public function analyzeSavedProbeHtml()
+    {
+        $path = config('lianhua_express.probe_html_path');
+        if (!is_file($path)) {
+            throw new RuntimeException('找不到已保存的 HTML：' . $path . '，请先运行 php artisan lianhua:probe');
+        }
+
+        $html = (string) file_get_contents($path);
+
+        return [
+            'html_path' => $path,
+            'url_hints' => $this->buildCandidateListUrls($html),
+            'filters' => $this->detectShippedFilters($html),
+            'table_rows' => count($this->parseHtmlTable($html)),
         ];
     }
 
@@ -465,7 +510,7 @@ class LianhuaExpressClient
     {
         $pattern = (string) config('lianhua_express.tracking_pattern', '/^EN\d{9}JP$/i');
         $allowedMethods = (array) config('lianhua_express.only_shipping_methods', ['EMS']);
-        $statusNeedle = trim((string) data_get(config('lianhua_express.shipped_filter'), 'Status', '已发货'));
+        $statusNeedle = trim((string) data_get(config('lianhua_express.shipped_filter'), 'sState', data_get(config('lianhua_express.shipped_filter'), 'Status', '已发货')));
 
         $filtered = [];
 
@@ -729,16 +774,12 @@ class LianhuaExpressClient
         return $score;
     }
 
-    protected function buildShippedFilterSets($html, array $baseParams = [])
+    protected function buildShippedFilterSets($html, $quick = false, $extended = false)
     {
         $sets = [];
         $detected = $this->detectShippedFilters($html);
         if (!empty($detected)) {
             $sets[] = $detected;
-        }
-
-        foreach ($this->extractShippedTabFilters($html) as $tabFilter) {
-            $sets[] = $tabFilter;
         }
 
         $configured = (array) config('lianhua_express.shipped_filter');
@@ -747,52 +788,30 @@ class LianhuaExpressClient
         }
 
         $sets[] = [];
-        foreach ([2, 3, 4, 5] as $state) {
-            $sets[] = ['PreState' => $state];
-            $sets[] = ['SearchState' => $state];
-            $sets[] = ['State' => $state];
-            $sets[] = ['TabStatus' => $state];
-        }
-
+        $sets[] = ['PreState' => 4];
+        $sets[] = ['PreState' => 3];
+        $sets[] = ['PreStatus' => 4];
         $sets[] = ['Status' => '已发货'];
-        $sets[] = ['SendStatus' => 1];
-        $sets[] = ['IsSend' => 1];
 
-        foreach ([2, 3, 4, 5] as $state) {
-            foreach (['PreStatus', 'SendState', 'StatusCode', 'listType', 'SearchType'] as $key) {
-                $sets[] = [$key => $state];
+        if (!$quick && $extended) {
+            foreach ([2, 3, 4, 5] as $state) {
+                foreach (['PreState', 'PreStatus', 'SearchState', 'State', 'SendState', 'TabStatus'] as $key) {
+                    $sets[] = [$key => $state];
+                }
             }
         }
 
         $unique = [];
         foreach ($sets as $set) {
-            $merged = array_merge($baseParams, $set);
-            ksort($merged);
-            $hash = json_encode($merged, JSON_UNESCAPED_UNICODE);
-            $unique[$hash] = $merged;
+            ksort($set);
+            $hash = json_encode($set, JSON_UNESCAPED_UNICODE);
+            $unique[$hash] = $set;
         }
 
         return array_values($unique);
     }
 
-    protected function extractShippedTabFilters($html)
-    {
-        $filters = [];
-
-        if (preg_match('/已发货[\s\S]{0,200}?onclick\s*=\s*[\'"][^\'"]*?(\d+)/u', $html, $match)) {
-            foreach (['PreState', 'SearchState', 'State', 'TabStatus'] as $key) {
-                $filters[] = [$key => $match[1]];
-            }
-        }
-
-        if (preg_match('/(PreState|SearchState|State|TabStatus)\s*=\s*(\d+)[^;\n]{0,120}已发货/u', $html, $match)) {
-            $filters[] = [$match[1] => $match[2]];
-        }
-
-        return $filters;
-    }
-
-    protected function scoreEndpointResponse($url, array $filters, $method = 'post')
+    protected function scoreEndpointResponse($url, array $filters, $probe = false)
     {
         $pageSize = 10;
         $params = array_merge(
@@ -806,14 +825,22 @@ class LianhuaExpressClient
             ]
         );
 
-        $body = '';
-        foreach (array_unique([strtolower((string) $method), 'post', 'get']) as $tryMethod) {
-            $response = $this->requestListEndpoint($url, $params, $tryMethod);
-            $body = (string) $response->getBody();
-            if ($this->extractRowsFromResponseBody($body) !== []) {
-                break;
-            }
+        $options = [
+            'form_params' => $params,
+            'headers' => [
+                'X-Requested-With' => 'XMLHttpRequest',
+                'Referer' => $this->absoluteUrl('/Member/StoragePreSearch'),
+            ],
+        ];
+
+        if ($probe) {
+            $options['timeout'] = 8;
+            $options['connect_timeout'] = 5;
         }
+
+        $response = $this->client->post(ltrim($url, '/'), $options);
+
+        $body = (string) $response->getBody();
         if ($body === '' || stripos($body, '<!DOCTYPE') !== false || stripos($body, '<html') !== false) {
             return [
                 'score' => 0,
@@ -927,123 +954,6 @@ class LianhuaExpressClient
         }
 
         return $filters;
-    }
-
-
-    protected function requestListEndpoint($url, array $params, $method = 'post')
-    {
-        $options = [
-            'headers' => [
-                'X-Requested-With' => 'XMLHttpRequest',
-                'Referer' => $this->absoluteUrl('/Member/StoragePreSearch'),
-            ],
-        ];
-
-        $method = strtolower((string) $method);
-        if ($method === 'get') {
-            $options['query'] = $params;
-        } else {
-            $options['form_params'] = $params;
-        }
-
-        return $this->client->request($method, ltrim($url, '/'), $options);
-    }
-
-    protected function extractBootstrapTableListConfig($html)
-    {
-        if (!preg_match_all('/bootstrapTable\s*\(\s*\{([\s\S]*?)\}\s*\)/', $html, $blocks, PREG_SET_ORDER)) {
-            return null;
-        }
-
-        $configs = [];
-        foreach ($blocks as $block) {
-            $body = $block[1];
-            if (!preg_match('/url\s*:\s*[\'"]([^\'"]+)[\'"]/', $body, $urlMatch)) {
-                continue;
-            }
-
-            $url = $urlMatch[1];
-            if ($this->scoreUrlCandidate($url) < 0) {
-                continue;
-            }
-
-            $method = 'post';
-            if (preg_match('/method\s*:\s*[\'"](get|post)[\'"]/i', $body, $methodMatch)) {
-                $method = strtolower($methodMatch[1]);
-            }
-
-            $params = [];
-            if (preg_match('/queryParams\s*:\s*function[^{]*\{([\s\S]*?)\}/', $body, $queryBlock)) {
-                if (preg_match_all('/([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([\w\-.]+)/', $queryBlock[1], $pairs, PREG_SET_ORDER)) {
-                    foreach ($pairs as $pair) {
-                        if (!in_array(strtolower($pair[1]), ['limit', 'offset', 'sort', 'order', 'search', 'pagesize', 'pagenumber'], true)) {
-                            $params[$pair[1]] = $pair[2];
-                        }
-                    }
-                }
-            }
-
-            foreach (['PreState', 'PreStatus', 'SearchState', 'State', 'SendState', 'TabStatus'] as $key) {
-                if (preg_match('/\b' . $key . '\s*:\s*(\d+)/', $body, $match)) {
-                    $params[$key] = $match[1];
-                }
-            }
-
-            $configs[] = [
-                'url' => $url,
-                'method' => $method,
-                'params' => $params,
-                'score' => $this->scoreUrlCandidate($url),
-            ];
-        }
-
-        if ($configs === []) {
-            return null;
-        }
-
-        usort($configs, function ($a, $b) {
-            return $b['score'] <=> $a['score'];
-        });
-
-        return $configs[0];
-    }
-
-    protected function inferTrackingFromRow(array $row)
-    {
-        $pattern = (string) config('lianhua_express.tracking_pattern', '/^EN\d{9}JP$/i');
-
-        foreach ($row as $value) {
-            if (!is_scalar($value)) {
-                continue;
-            }
-
-            $value = strtoupper(trim((string) $value));
-            if ($value === '') {
-                continue;
-            }
-
-            if (($pattern !== '' && preg_match($pattern, $value)) || preg_match('/^EN\d{9}JP$/i', $value)) {
-                return $value;
-            }
-        }
-
-        return '';
-    }
-
-    protected function inferRecipientFromRow(array $row)
-    {
-        foreach ($row as $key => $value) {
-            if (!is_scalar($value)) {
-                continue;
-            }
-
-            $key = (string) $key;
-            if (preg_match('/name|recipient|consignee|receiver|收件/i', $key) && trim((string) $value) !== '') {
-                return trim((string) $value);
-            }
-        }
-
-        return '';
     }
 
     protected function looksLikeLoginPage($html)
