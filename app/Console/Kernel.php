@@ -48,6 +48,20 @@ class Kernel extends ConsoleKernel
                 return (bool) config('daily_export.enabled') && is_site_mode_a();
             })
             ->withoutOverlapping();
+
+        $between = array_values(array_filter((array) config('lianhua_express.schedule_between', [])));
+        $lianhuaSync = $schedule->command('lianhua:sync-shipments')
+            ->timezone((string) config('lianhua_express.timezone', 'Asia/Tokyo'))
+            ->when(function () {
+                return (bool) config('lianhua_express.enabled') && is_site_mode_a();
+            })
+            ->withoutOverlapping();
+
+        if (count($between) === 2) {
+            $lianhuaSync->hourly()->between($between[0], $between[1]);
+        } else {
+            $lianhuaSync->hourly();
+        }
     }
 
     protected function isDemoModeEnabled()
