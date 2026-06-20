@@ -35,6 +35,13 @@ class SyncLianhuaExpressShipments extends Command
         $this->line('成功匹配：' . $report['matched']);
         $this->line(($dryRun ? '预计写入' : '已写入') . '：' . $report['applied']);
 
+        if (!empty($report['skipped'])) {
+            $this->warn('已跳过 ' . count($report['skipped']) . ' 条：');
+            foreach ($report['skipped'] as $item) {
+                $this->line('- ' . $item['tracking'] . ' / ' . $item['recipient'] . '：' . $item['reason']);
+            }
+        }
+
         if (!empty($report['ambiguous'])) {
             $this->warn('同名多单未能自动匹配 ' . count($report['ambiguous']) . ' 条：');
             foreach ($report['ambiguous'] as $item) {
@@ -45,7 +52,16 @@ class SyncLianhuaExpressShipments extends Command
         if (!empty($report['unmatched_records'])) {
             $this->warn('联华记录未找到对应订单 ' . count($report['unmatched_records']) . ' 条：');
             foreach ($report['unmatched_records'] as $item) {
-                $this->line('- ' . $item['tracking'] . ' / ' . $item['recipient']);
+                $phone = trim((string) data_get($item, 'phone'));
+                $suffix = $phone !== '' ? ' / ' . $phone : '';
+                $this->line('- ' . $item['tracking'] . ' / ' . $item['recipient'] . $suffix);
+            }
+        }
+
+        if ($dryRun && (int) $report['matched'] === 0 && !empty($report['pending_samples'])) {
+            $this->line('后台待发货样例（前 20 单，用于对照姓名/电话）：');
+            foreach ($report['pending_samples'] as $item) {
+                $this->line('- ' . $item['no'] . ' / ' . ($item['name'] !== '' ? $item['name'] : '（无姓名）') . ' / ' . ($item['phone'] !== '' ? $item['phone'] : '（无电话）'));
             }
         }
 

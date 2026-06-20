@@ -36,6 +36,14 @@ class LianhuaExpressShipmentSyncService
             'ambiguous' => [],
             'unmatched_records' => [],
             'errors' => [],
+            'pending_samples' => $pendingOrders->take(20)->map(function (Order $order) {
+                return [
+                    'no' => $order->no,
+                    'name' => $this->orderContactName($order),
+                    'phone' => $this->normalizePhone(data_get($order->address, 'contact_phone')),
+                    'id_card' => $this->normalizeIdCard(data_get($order->address, 'id_card')),
+                ];
+            })->all(),
         ];
 
         $usedTrackingNumbers = [];
@@ -72,6 +80,7 @@ class LianhuaExpressShipmentSyncService
                     'tracking' => $tracking,
                     'recipient' => data_get($record, 'recipient'),
                     'phone' => data_get($record, 'phone'),
+                    'id_card' => data_get($record, 'raw.IdentityNumber'),
                 ];
                 continue;
             }
@@ -175,13 +184,34 @@ class LianhuaExpressShipmentSyncService
     {
         $recipient = $this->normalizePersonName(data_get($record, 'recipient'));
         $phone = $this->normalizePhone(data_get($record, 'phone'));
+        $idCard = $this->normalizeIdCard(data_get($record, 'raw.IdentityNumber'));
+
+        if ($idCard !== '') {
+            $idMatches = $orders->filter(function (Order $order) use ($idCard) {
+                return $this->normalizeIdCard(data_get($order->address, 'id_card')) === $idCard;
+            });
+
+            if ($idMatches->count() === 1) {
+                return $idMatches->values();
+            }
+        }
+
+        if ($phone !== '') {
+            $phoneMatches = $orders->filter(function (Order $order) use ($phone) {
+                return $this->normalizePhone(data_get($order->address, 'contact_phone')) === $phone;
+            });
+
+            if ($phoneMatches->count() === 1) {
+                return $phoneMatches->values();
+            }
+        }
 
         if ($recipient === '') {
             return collect();
         }
 
         $matches = $orders->filter(function (Order $order) use ($recipient) {
-            $orderName = $this->normalizePersonName(data_get($order->address, 'contact_name'));
+            $orderName = $this->orderContactName($order);
 
             return $orderName !== '' && $orderName === $recipient;
         });
@@ -202,7 +232,31 @@ class LianhuaExpressShipmentSyncService
             }
         }
 
+        if ($idCard !== '') {
+            $idMatches = $matches->filter(function (Order $order) use ($idCard) {
+                return $this->normalizeIdCard(data_get($order->address, 'id_card')) === $idCard;
+            });
+
+            if ($idMatches->count() === 1) {
+                return $idMatches->values();
+            }
+        }
+
         return $matches->values();
+    }
+
+    protected function orderContactName(Order $order)
+    {
+        $addr = (array) ($order->address ?: []);
+
+        foreach (['contact_name', 'receiver_name', 'consignee_name', 'name'] as $key) {
+            $name = $this->normalizePersonName(data_get($addr, $key));
+            if ($name !== '') {
+                return $name;
+            }
+        }
+
+        return '';
     }
 
     protected function trackingAlreadyUsed($tracking)
@@ -228,5 +282,10 @@ class LianhuaExpressShipmentSyncService
     protected function normalizePhone($phone)
     {
         return preg_replace('/\D+/', '', (string) $phone);
+    }
+
+    protected function normalizeIdCard($idCard)
+    {
+        return strtoupper(preg_replace('/\s+/', '', (string) $idCard));
     }
 }
