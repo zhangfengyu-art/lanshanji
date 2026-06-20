@@ -49,4 +49,8 @@ return [
     'probe_html_path' => storage_path('app/lianhua_probe_storage_pre_search.html'),
 
     'discovery_cache_path' => storage_path('app/lianhua_endpoint_cache.json'),
+
+    'probe_max_candidates' => (int) env('LIANHUA_PROBE_MAX_CANDIDATES', 10),
+
+    'probe_max_attempts' => (int) env('LIANHUA_PROBE_MAX_ATTEMPTS', 80),
 ];
