@@ -40,6 +40,48 @@ class OrderRefundService
         return trim((string) data_get($order->extra, 'fulfillment_photo', '')) !== '';
     }
 
+    /**
+     * 按东京时间每日 17:00 规则，计算该订单全额秒退截止时间（含该时刻）。
+     */
+    public function instantRefundLockAt(Order $order)
+    {
+        if (!$order->paid_at) {
+            return null;
+        }
+
+        $timezone = (string) config('order_refund.instant.daily_lock_timezone', 'Asia/Tokyo');
+        $lockTime = trim((string) config('order_refund.instant.daily_lock_at', '17:00'));
+        if (!preg_match('/^\d{2}:\d{2}$/', $lockTime)) {
+            $lockTime = '17:00';
+        }
+
+        $paidAt = Carbon::parse($order->paid_at)->timezone($timezone);
+        $sameDayLock = $paidAt->copy()->startOfDay()->setTimeFromTimeString($lockTime);
+
+        if ($paidAt->lt($sameDayLock)) {
+            return $sameDayLock;
+        }
+
+        return $sameDayLock->copy()->addDay();
+    }
+
+    public function isInstantRefundScheduleLocked(Order $order)
+    {
+        $lockAt = $this->instantRefundLockAt($order);
+        if (!$lockAt) {
+            return false;
+        }
+
+        $timezone = (string) config('order_refund.instant.daily_lock_timezone', 'Asia/Tokyo');
+
+        return Carbon::now($timezone)->gte($lockAt);
+    }
+
+    protected function blocksSelfInstantRefund(Order $order)
+    {
+        return $this->hasProcessingStarted($order) || $this->isInstantRefundScheduleLocked($order);
+    }
+
     public function canSelfInstantRefund(Order $order)
     {
         if (!is_site_mode_a()) {
@@ -54,7 +96,7 @@ class OrderRefundService
             return false;
         }
 
-        if ($this->hasProcessingStarted($order)) {
+        if ($this->blocksSelfInstantRefund($order)) {
             return false;
         }
 
@@ -62,7 +104,7 @@ class OrderRefundService
     }
 
     /**
-     * 后台标记「开始处理」后：隐藏自助退款，仅展示客户反馈入口。
+     * 不可自助秒退时：隐藏秒退按钮，仅展示客户反馈入口。
      */
     public function shouldUseRefundFeedback(Order $order)
     {
@@ -78,7 +120,7 @@ class OrderRefundService
             return false;
         }
 
-        return $this->hasProcessingStarted($order);
+        return $this->blocksSelfInstantRefund($order);
     }
 
     public function refundFeedbackUrl(Order $order)

@@ -8,6 +8,9 @@ return [
         'window_hours' => (int) env('ORDER_INSTANT_REFUND_WINDOW_HOURS', 24),
         'max_per_window' => (int) env('ORDER_INSTANT_REFUND_MAX_PER_WINDOW', 3),
         'min_interval_minutes' => (int) env('ORDER_INSTANT_REFUND_MIN_INTERVAL_MINUTES', 5),
+        // 东京时间每日截止：支付于该时刻前 → 当日该时刻锁定；之后支付 → 次日该时刻锁定
+        'daily_lock_at' => env('ORDER_INSTANT_REFUND_DAILY_LOCK_AT', '17:00'),
+        'daily_lock_timezone' => env('ORDER_INSTANT_REFUND_DAILY_LOCK_TIMEZONE', 'Asia/Tokyo'),
     ],
 
     /*
