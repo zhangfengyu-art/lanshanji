@@ -40,6 +40,14 @@ class Kernel extends ConsoleKernel
                 return random_int(1, 100) <= 70;
             })
             ->withoutOverlapping();
+
+        $schedule->command('exports:daily-to-google')
+            ->dailyAt((string) config('daily_export.run_at', '05:00'))
+            ->timezone((string) config('daily_export.timezone', 'Asia/Tokyo'))
+            ->when(function () {
+                return (bool) config('daily_export.enabled') && is_site_mode_a();
+            })
+            ->withoutOverlapping();
     }
 
     protected function isDemoModeEnabled()
