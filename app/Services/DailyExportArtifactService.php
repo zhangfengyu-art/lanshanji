@@ -36,7 +36,7 @@ class DailyExportArtifactService
             OrderAdminExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
         });
 
-        $basename = $this->exportBasename('订单', $statusCode, $runAt);
+        $basename = $this->exportBasename('订单', $statusCode);
         $pdfFilename = $basename.'.pdf';
         $csvFilename = $basename.'.csv';
         $tempDir = $this->makeTempDir('orders');
@@ -71,7 +71,7 @@ class DailyExportArtifactService
             OrderStockPrepExportService::exportRowsWithProducer($scope, $fulfillment, $emitRow);
         });
 
-        $basename = $this->exportBasename('备货', $statusCode, $runAt);
+        $basename = $this->exportBasename('备货', $statusCode);
         $pdfFilename = $basename.'.pdf';
         $csvFilename = $basename.'.csv';
         $tempDir = $this->makeTempDir('stock_prep');
@@ -102,7 +102,7 @@ class DailyExportArtifactService
         ];
     }
 
-    protected function exportBasename($purpose, $statusCode, Carbon $runAt)
+    protected function exportBasename($purpose, $statusCode)
     {
         $pdfName = AdminExportFilenameBuilder::buildPdfFilename(
             $purpose,
