@@ -47,4 +47,6 @@ return [
     ],
 
     'probe_html_path' => storage_path('app/lianhua_probe_storage_pre_search.html'),
+
+    'discovery_cache_path' => storage_path('app/lianhua_endpoint_cache.json'),
 ];
