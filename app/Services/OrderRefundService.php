@@ -77,6 +77,22 @@ class OrderRefundService
         return Carbon::now($timezone)->gte($lockAt);
     }
 
+    public function instantRefundRemainingSeconds(Order $order)
+    {
+        if (!$this->canSelfInstantRefund($order)) {
+            return 0;
+        }
+
+        $lockAt = $this->instantRefundLockAt($order);
+        if (!$lockAt) {
+            return 0;
+        }
+
+        $timezone = (string) config('order_refund.instant.daily_lock_timezone', 'Asia/Tokyo');
+
+        return max(0, $lockAt->timestamp - Carbon::now($timezone)->timestamp);
+    }
+
     protected function blocksSelfInstantRefund(Order $order)
     {
         return $this->hasProcessingStarted($order) || $this->isInstantRefundScheduleLocked($order);

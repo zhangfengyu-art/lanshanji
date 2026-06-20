@@ -5,7 +5,7 @@ return [
 
     'timezone' => env('DAILY_EXPORT_TIMEZONE', 'Asia/Tokyo'),
 
-    'run_at' => env('DAILY_EXPORT_RUN_AT', '05:00'),
+    'run_at' => env('DAILY_EXPORT_RUN_AT', '17:00'),
 
     'google' => [
         'service_account_json' => env('GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON', storage_path('app/google-service-account.json')),

@@ -43,6 +43,13 @@
   $remainingInstantRefunds = ($canInstantRefund && auth()->check())
     ? app(\App\Services\OrderRefundService::class)->remainingInstantRefundsInWindow(auth()->user())
     : 0;
+  $refundService = app(\App\Services\OrderRefundService::class);
+  $instantRefundLockAt = (is_site_mode_a() && $canInstantRefund)
+    ? $refundService->instantRefundLockAt($order)
+    : null;
+  $instantRefundRemainingSeconds = (is_site_mode_a() && $canInstantRefund)
+    ? $refundService->instantRefundRemainingSeconds($order)
+    : 0;
   $showLegacyRefundApply = $isPaid
     && $order->refund_status === \App\Models\Order::REFUND_STATUS_PENDING
     && !$canInstantRefund
@@ -264,6 +271,15 @@
               @if($canInstantRefund && $remainingInstantRefunds > 0)
                 <div class="kv"><span class="k">自助秒退：</span><span class="v">最近 {{ (int) config('order_refund.instant.window_hours', 24) }} 小时内还可 {{ $remainingInstantRefunds }} 次</span></div>
               @endif
+              @if($canInstantRefund && $instantRefundLockAt && $instantRefundRemainingSeconds > 0)
+                <div class="kv">
+                  <span class="k">秒退剩余：</span>
+                  <span class="v">
+                    <strong id="instant-refund-countdown" data-remaining="{{ $instantRefundRemainingSeconds }}">--</strong>
+                    <span class="text-muted" style="font-size:12px;">（东京时间 {{ $instantRefundLockAt->format('m-d H:i') }} 截止）</span>
+                  </span>
+                </div>
+              @endif
             @endif
 
             @if($order->paid_at && $order->refund_status !== \App\Models\Order::REFUND_STATUS_PENDING)
@@ -397,6 +413,37 @@
       }
 
       updateTimer();
+    }
+
+    const instantRefundTimer = document.getElementById('instant-refund-countdown');
+    if (instantRefundTimer) {
+      let instantRefundRemaining = parseInt(instantRefundTimer.dataset.remaining, 10) || 0;
+
+      function formatInstantRefundRemaining(totalSeconds) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        if (hours > 0) {
+          return hours + '小时' + String(minutes).padStart(2, '0') + '分' + String(seconds).padStart(2, '0') + '秒';
+        }
+
+        return String(minutes).padStart(2, '0') + '分' + String(seconds).padStart(2, '0') + '秒';
+      }
+
+      function updateInstantRefundTimer() {
+        if (instantRefundRemaining <= 0) {
+          instantRefundTimer.textContent = '已截止';
+          instantRefundTimer.classList.add('expired');
+          window.location.reload();
+          return;
+        }
+
+        instantRefundTimer.textContent = formatInstantRefundRemaining(instantRefundRemaining);
+        instantRefundRemaining--;
+        setTimeout(updateInstantRefundTimer, 1000);
+      }
+
+      updateInstantRefundTimer();
     }
 
     function postRefund($buttons, payload, successText) {
