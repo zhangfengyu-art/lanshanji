@@ -453,8 +453,7 @@ class LianhuaExpressClient
         ]);
         $tracking = $this->pickField($row, [
             data_get($map, 'tracking'),
-            'sEmsNumber',
-            'EmsNumber',
+            'SendNumber',
             'SendNo',
             'TrackingNo',
             'ExpressNo',
@@ -466,27 +465,30 @@ class LianhuaExpressClient
             'WaybillNo',
             'ExpressBillNo',
             'LogisticsNo',
-            '发货单号',
+            'sEmsNumber',
+            'EMSNumber',
         ]);
         $shippingMethod = $this->pickField($row, [
             data_get($map, 'shipping_method'),
+            'TransportCompany',
+            'ShipperCode',
             'sTransport',
             'TransportName',
             'SendType',
             'ExpressType',
             'ShippingMethod',
-            '寄送方式',
         ]);
         $status = $this->pickField($row, [
             data_get($map, 'status'),
+            'State',
             'sState',
             'Status',
             'PreStateName',
             'SendStatus',
-            '状态',
         ]);
 
-        if ($tracking === '') {
+        $pattern = (string) config('lianhua_express.tracking_pattern', '/^EN\d{9}JP$/i');
+        if ($tracking === '' || ($pattern !== '' && !preg_match($pattern, strtoupper(trim($tracking))))) {
             $tracking = $this->inferTrackingFromRow($row);
         }
 

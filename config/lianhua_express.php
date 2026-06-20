@@ -36,11 +36,11 @@ return [
     }),
 
     'field_map' => [
-        'recipient' => env('LIANHUA_FIELD_RECIPIENT', 'sName'),
-        'phone' => env('LIANHUA_FIELD_PHONE', 'sPhone'),
-        'tracking' => env('LIANHUA_FIELD_TRACKING', 'sEmsNumber'),
-        'shipping_method' => env('LIANHUA_FIELD_SHIPPING_METHOD', 'sTransport'),
-        'status' => env('LIANHUA_FIELD_STATUS', 'sState'),
+        'recipient' => env('LIANHUA_FIELD_RECIPIENT', 'ReceiverName'),
+        'phone' => env('LIANHUA_FIELD_PHONE', 'ReceiverPhone'),
+        'tracking' => env('LIANHUA_FIELD_TRACKING', 'SendNumber'),
+        'shipping_method' => env('LIANHUA_FIELD_SHIPPING_METHOD', 'TransportCompany'),
+        'status' => env('LIANHUA_FIELD_STATUS', 'State'),
     ],
 
     'express_company' => env('LIANHUA_EXPRESS_COMPANY', ''),
