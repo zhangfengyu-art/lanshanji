@@ -231,7 +231,7 @@
             <input type="hidden" name="_token" value="{{ csrf_token() }}">
             <div class="form-group">
               <label for="fulfillment_photo" class="control-label">上传/更换实拍图</label>
-              <input type="file" id="fulfillment_photo" name="photo" accept="image/jpeg,image/png,image/webp,image/*" capture="environment" class="form-control" data-order-fp-input style="max-width: 100%;">
+              <input type="file" id="fulfillment_photo" name="photo" accept="image/jpeg,image/png,image/webp,image/*" class="form-control" data-order-fp-input style="max-width: 100%;">
             </div>
             <button type="button" class="btn btn-primary" data-order-fp-upload data-target="#fulfillment_photo">
               <i class="fa fa-camera"></i> 上传实拍图

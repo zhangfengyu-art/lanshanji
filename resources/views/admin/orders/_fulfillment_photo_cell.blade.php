@@ -15,7 +15,7 @@
   @endif
   <form id="{{ $formId }}" class="order-fp-upload-form" action="{{ route('admin.orders.fulfillment_photo.upload', $order) }}" method="post" enctype="multipart/form-data" style="margin:0;">
     <input type="hidden" name="_token" value="{{ csrf_token() }}">
-    <input type="file" id="{{ $inputId }}" name="photo" accept="image/jpeg,image/png,image/webp,image/*" capture="environment" style="display:none;" data-order-fp-input>
+    <input type="file" id="{{ $inputId }}" name="photo" accept="image/jpeg,image/png,image/webp,image/*" style="display:none;" data-order-fp-input>
     <button type="button" class="btn btn-xs btn-{{ $hasPhoto ? 'default' : 'success' }}" data-order-fp-upload data-target="#{{ $inputId }}">
       <i class="fa fa-camera"></i> <span data-order-fp-upload-label>{{ $hasPhoto ? '更换' : '上传' }}</span>
     </button>
