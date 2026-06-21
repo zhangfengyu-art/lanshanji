@@ -6,6 +6,11 @@ class ImageJpegConverter
 {
     public function convertFileToJpeg($sourcePath, $targetPath, $quality = 90)
     {
+        return $this->saveResizedJpeg($sourcePath, $targetPath, 0, $quality);
+    }
+
+    public function saveResizedJpeg($sourcePath, $targetPath, $maxLongEdge = 0, $quality = 90)
+    {
         $image = $this->loadImageResource($sourcePath);
         if (!$image) {
             return false;
@@ -17,13 +22,30 @@ class ImageJpegConverter
 
         $width = \imagesx($image);
         $height = \imagesy($image);
-        $canvas = \imagecreatetruecolor($width, $height);
+        $maxLongEdge = (int) $maxLongEdge;
+
+        if ($maxLongEdge > 0) {
+            $longEdge = max($width, $height);
+            if ($longEdge > $maxLongEdge) {
+                $scale = $maxLongEdge / $longEdge;
+                $targetWidth = max(1, (int) round($width * $scale));
+                $targetHeight = max(1, (int) round($height * $scale));
+            } else {
+                $targetWidth = $width;
+                $targetHeight = $height;
+            }
+        } else {
+            $targetWidth = $width;
+            $targetHeight = $height;
+        }
+
+        $canvas = \imagecreatetruecolor($targetWidth, $targetHeight);
         $white = \imagecolorallocate($canvas, 255, 255, 255);
         \imagefill($canvas, 0, 0, $white);
-        \imagecopy($canvas, $image, 0, 0, 0, 0, $width, $height);
+        \imagecopyresampled($canvas, $image, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
         \imagedestroy($image);
 
-        $saved = \imagejpeg($canvas, $targetPath, $quality);
+        $saved = \imagejpeg($canvas, $targetPath, max(1, min(100, (int) $quality)));
         \imagedestroy($canvas);
 
         return $saved;

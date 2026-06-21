@@ -215,24 +215,27 @@
         <td colspan="4">
           <h4 style="margin-top: 8px;">订单实拍图（用户端可见）</h4>
           @if($order->hasFulfillmentPhoto())
-            <div style="margin-bottom: 12px;">
-              <a href="{{ route('admin.orders.fulfillment_photo', $order) }}" target="_blank">
-                <img src="{{ route('admin.orders.fulfillment_photo', $order) }}" alt="实拍预览" style="max-width: 240px; max-height: 180px; border: 1px solid #ddd; border-radius: 4px;">
+            <div style="margin-bottom: 12px;" data-order-fp-cell data-order-id="{{ $order->id }}">
+              <a href="{{ route('admin.orders.fulfillment_photo', $order) }}" target="_blank" data-order-fp-preview-link>
+                <img src="{{ route('admin.orders.fulfillment_photo', ['order' => $order->id, 'max_edge' => 240]) }}" alt="实拍预览" data-order-fp-preview style="max-width: 240px; max-height: 180px; border: 1px solid #ddd; border-radius: 4px;">
               </a>
               <div style="margin-top: 6px;">
                 <a href="{{ route('admin.orders.fulfillment_photo', $order) }}" target="_blank" class="btn btn-xs btn-default">查看原图</a>
               </div>
             </div>
           @else
-            <p class="text-muted">尚未上传实拍图，用户订单页将显示「待上传」。</p>
+            <p class="text-muted" data-order-fp-empty-notice>尚未上传实拍图，用户订单页将显示「待上传」。</p>
+            <div data-order-fp-cell data-order-id="{{ $order->id }}" style="display:none;"></div>
           @endif
-          <form action="{{ route('admin.orders.fulfillment_photo.upload', $order) }}" method="post" enctype="multipart/form-data" class="form-inline" style="margin-bottom: 8px;">
+          <form action="{{ route('admin.orders.fulfillment_photo.upload', $order) }}" method="post" enctype="multipart/form-data" class="form-inline order-fp-upload-form" style="margin-bottom: 8px;">
             <input type="hidden" name="_token" value="{{ csrf_token() }}">
             <div class="form-group">
               <label for="fulfillment_photo" class="control-label">上传/更换实拍图</label>
-              <input type="file" id="fulfillment_photo" name="photo" accept="image/jpeg,image/png,image/webp" class="form-control" required>
+              <input type="file" id="fulfillment_photo" name="photo" accept="image/jpeg,image/png,image/webp,image/*" capture="environment" class="form-control" data-order-fp-input style="max-width: 100%;">
             </div>
-            <button type="submit" class="btn btn-primary">上传实拍图</button>
+            <button type="button" class="btn btn-primary" data-order-fp-upload data-target="#fulfillment_photo">
+              <i class="fa fa-camera"></i> 上传实拍图
+            </button>
           </form>
           @if($order->hasFulfillmentPhoto())
           <form action="{{ route('admin.orders.fulfillment_photo.delete', $order) }}" method="post" style="display:inline;" onsubmit="return confirm('确认删除实拍图？用户端将不再显示。');">

@@ -10,6 +10,7 @@ use App\Services\OrderStockPrepExportService;
 use App\Services\ShippingModeService;
 use App\Services\OrderFulfillmentPhotoService;
 use App\Services\OrderFulfillmentService;
+use App\Services\ImageJpegConverter;
 use Illuminate\Http\Request;
 use App\Exceptions\InvalidRequestException;
 use Illuminate\Validation\ValidationException;
@@ -106,6 +107,10 @@ class OrdersController extends Controller
                 'refundReasons' => $refundReasons,
                 'feeBreakdown' => $feeBreakdown,
             ]));
+
+            if (is_site_mode_a() && $order->paid_at) {
+                Admin::script(view('admin.orders._fulfillment_photo_upload_script')->render());
+            }
         });
     }
 
@@ -164,7 +169,7 @@ class OrdersController extends Controller
         );
     }
 
-    public function showFulfillmentPhoto(Order $order)
+    public function showFulfillmentPhoto(Order $order, Request $request, OrderFulfillmentPhotoService $photos)
     {
         if (!$order->hasFulfillmentPhoto()) {
             abort(404, '实拍照片尚未上传');
@@ -172,6 +177,27 @@ class OrdersController extends Controller
 
         $path = $order->fulfillment_photo;
         $disk = Storage::disk('private');
+        $maxEdge = max(0, (int) $request->query('max_edge', 0));
+
+        if ($maxEdge > 0) {
+            $maxEdge = min(480, $maxEdge);
+            $thumbPath = $photos->thumbCachePath($path, $maxEdge);
+            $sourcePath = $disk->path($path);
+
+            if (!is_file($thumbPath) || filemtime($thumbPath) < filemtime($sourcePath)) {
+                $converter = app(ImageJpegConverter::class);
+                if (!$converter->saveResizedJpeg($sourcePath, $thumbPath, $maxEdge, 80)) {
+                    return $disk->response($path, 'fulfillment-'.$order->no.'.jpg', [
+                        'Content-Type' => $disk->mimeType($path) ?: 'image/jpeg',
+                    ]);
+                }
+            }
+
+            return response()->file($thumbPath, [
+                'Content-Type' => 'image/jpeg',
+                'Cache-Control' => 'private, max-age=86400',
+            ]);
+        }
 
         return $disk->response($path, 'fulfillment-'.$order->no.'.jpg', [
             'Content-Type' => $disk->mimeType($path) ?: 'image/jpeg',
@@ -180,21 +206,61 @@ class OrdersController extends Controller
 
     public function uploadFulfillmentPhoto(Order $order, Request $request, OrderFulfillmentPhotoService $photos)
     {
-        $this->validate($request, [
-            'photo' => ['required', 'image', 'max:10240'],
-        ], [], [
-            'photo' => '实拍照片',
-        ]);
+        $successMessage = '实拍照片已上传；订单已进入备货/打包阶段（S3），用户不可再自助改址。';
 
         try {
+            $this->validate($request, [
+                'photo' => ['required', 'file', 'max:'.OrderFulfillmentPhotoService::MAX_UPLOAD_KB],
+            ], [], [
+                'photo' => '实拍照片',
+            ]);
+
             $photos->store($order, $request->file('photo'));
+        } catch (ValidationException $e) {
+            return $this->respondFulfillmentPhotoUpload($request, false, collect($e->errors())->flatten()->first() ?: '上传校验失败');
         } catch (InvalidRequestException $e) {
-            return redirect()->back()->with('error', admin_flash_error($e->getMessage()));
+            return $this->respondFulfillmentPhotoUpload($request, false, $e->getMessage());
+        } catch (\Throwable $e) {
+            \Log::error('实拍图上传失败', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return $this->respondFulfillmentPhotoUpload($request, false, '上传失败：'.$e->getMessage());
+        }
+
+        return $this->respondFulfillmentPhotoUpload($request, true, $successMessage, $order->fresh());
+    }
+
+    protected function respondFulfillmentPhotoUpload(Request $request, $ok, $message, Order $order = null)
+    {
+        if ($request->ajax() || $request->wantsJson()) {
+            $payload = [
+                'status' => (bool) $ok,
+                'message' => (string) $message,
+            ];
+
+            if ($ok && $order) {
+                $payload['photo_url'] = route('admin.orders.fulfillment_photo', [
+                    'order' => $order->id,
+                    'max_edge' => 96,
+                ]);
+                $payload['photo_full_url'] = route('admin.orders.fulfillment_photo', ['order' => $order->id]);
+                $payload['has_photo'] = $order->hasFulfillmentPhoto();
+            }
+
+            return response()->json($payload, $ok ? 200 : 422);
+        }
+
+        if ($ok) {
+            return redirect()
+                ->back()
+                ->with('success', admin_flash_success($message));
         }
 
         return redirect()
             ->back()
-            ->with('success', admin_flash_success('实拍照片已上传；订单已进入备货/打包阶段（S3），用户不可再自助改址。'));
+            ->with('error', admin_flash_error($message));
     }
 
     public function startProcessing(Order $order, OrderFulfillmentService $fulfillment)
@@ -271,12 +337,12 @@ class OrdersController extends Controller
         }
     }
 
-    public function deleteFulfillmentPhoto(Order $order)
+    public function deleteFulfillmentPhoto(Order $order, OrderFulfillmentPhotoService $photos)
     {
         $extra = $order->extra ?: [];
         $path = trim((string) data_get($extra, 'fulfillment_photo', ''));
-        if ($path !== '' && Storage::disk('private')->exists($path)) {
-            Storage::disk('private')->delete($path);
+        if ($path !== '') {
+            $photos->deleteStoredVariants($path);
         }
         unset($extra['fulfillment_photo'], $extra['fulfillment_photo_uploaded_at']);
         $order->update(['extra' => $extra]);
@@ -583,7 +649,7 @@ class OrdersController extends Controller
             if (is_site_mode_a()) {
                 Admin::script(view('admin.partials._batch_helper_script')->render());
                 Admin::script(view('admin.orders._batch_tools_script')->render());
-                Admin::script(view('admin.orders._fulfillment_photo_list_script')->render());
+                Admin::script(view('admin.orders._fulfillment_photo_upload_script')->render());
                 Admin::script(view('admin.orders._quick_ship_script')->render());
             }
         });
